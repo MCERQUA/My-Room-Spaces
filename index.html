@@ -167,6 +167,29 @@
       font-size: 8px;
     }
 
+    .screen-controls input[type="range"] {
+      appearance: none;
+      background: transparent;
+      cursor: pointer;
+      height: 15px;
+    }
+
+    .screen-controls input[type="range"]::-webkit-slider-track {
+      background: #00ff00;
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    .screen-controls input[type="range"]::-webkit-slider-thumb {
+      appearance: none;
+      background: #00ff00;
+      height: 12px;
+      width: 12px;
+      border-radius: 50%;
+      cursor: pointer;
+      margin-top: -4px;
+    }
+
     .room-controls {
       position: absolute;
       top: 20px;
@@ -308,6 +331,10 @@
     <input type="file" id="video-upload" accept="video/*" />
     <button id="load-video">📁 Load Video File</button>
     <button id="clear-screen">🧹 Clear Screen</button>
+    <div style="margin-top: 5px;">
+      <button id="toggle-audio">🔊 Audio ON</button>
+      <input type="range" id="volume-slider" min="0" max="100" value="100" style="width: 60px; margin-left: 5px;">
+    </div>
     <div style="margin-top: 5px; font-size: 8px; color: #00ff88;">
       <p style="margin: 2px 0;">Screen in 3D scene</p>
       <p style="margin: 2px 0;">Click to move/resize</p>
@@ -315,7 +342,7 @@
   </div>
 
   
-  <video id="video-element" autoplay muted></video>
+  <video id="video-element" autoplay controls style="display: none;"></video>
   
   <div class="model-controls" id="model-controls">
     <h3 id="selected-object-name">Object Controls</h3>
@@ -595,7 +622,8 @@
       const videoEl = document.createElement('video');
       videoEl.srcObject = stream;
       videoEl.autoplay = true;
-      videoEl.muted = true;
+      videoEl.controls = true;
+      videoEl.volume = 1.0; // Full volume
       videoEl.style.display = 'none';
       document.body.appendChild(videoEl);
       
@@ -1196,6 +1224,38 @@
     document.getElementById('clear-screen').addEventListener('click', (e) => {
       e.stopPropagation();
       clearScreen();
+    });
+
+    // Audio control event listeners
+    let isAudioMuted = false;
+    document.getElementById('toggle-audio').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const videoEl = document.getElementById('video-element');
+      const button = document.getElementById('toggle-audio');
+      
+      isAudioMuted = !isAudioMuted;
+      videoEl.muted = isAudioMuted;
+      
+      // Also update all peer video elements
+      document.querySelectorAll('video').forEach(video => {
+        video.muted = isAudioMuted;
+      });
+      
+      button.textContent = isAudioMuted ? '🔇 Audio OFF' : '🔊 Audio ON';
+      console.log('Audio ' + (isAudioMuted ? 'muted' : 'unmuted'));
+    });
+    
+    document.getElementById('volume-slider').addEventListener('input', (e) => {
+      const volume = e.target.value / 100;
+      const videoEl = document.getElementById('video-element');
+      videoEl.volume = volume;
+      
+      // Also update all peer video elements
+      document.querySelectorAll('video').forEach(video => {
+        video.volume = volume;
+      });
+      
+      console.log('Volume set to:', Math.round(volume * 100) + '%');
     });
 
 

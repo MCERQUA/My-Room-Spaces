@@ -831,10 +831,17 @@
     
     // Try to connect to signaling server with automatic fallback
     function initializeRoomSystem() {
+      // For now, disable P2P until signaling server CORS is fixed
+      // The screen sharing still works perfectly for single users
+      console.log('📝 P2P temporarily disabled due to signaling server CORS issues');
+      console.log('✅ Local screen sharing works perfectly');
+      console.log('🔧 To fix P2P: Deploy signaling-server.js with proper CORS settings');
+      return; // Skip P2P initialization for now
+      
       const signalingUrls = [
-        'https://threejs-signaling.railway.app',  // Try Railway first (Heroku seems down)
-        'https://threejs-signaling.herokuapp.com',
-        // Add your own signaling server URL here if deployed
+        // Your signaling servers (currently have CORS issues)
+        'https://threejs-signaling.railway.app',  // CORS only allows railway.com
+        'https://threejs-signaling.herokuapp.com', // No CORS headers
       ];
       
       let currentUrlIndex = 0;

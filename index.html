@@ -489,10 +489,12 @@
         let shareScreenObject = null;
         console.log('Searching for SHARESCREEN object in model...');
         roomModel.traverse((child) => {
-          console.log('Found object:', child.name, 'Type:', child.type);
-          if (child.name === 'SHARESCREEN' || child.name.toLowerCase().includes('sharescreen')) {
-            shareScreenObject = child;
-            console.log('✓ Found SHARESCREEN object:', child.name, child);
+          if (child.name) {
+            console.log('Found object:', child.name, 'Type:', child.type, 'isMesh:', child.isMesh);
+            if (child.name === 'SHARESCREEN' || child.name === 'SHARESCREEN-HERE' || child.name.toLowerCase().includes('sharescreen')) {
+              shareScreenObject = child;
+              console.log('✓ Found SHARESCREEN object:', child.name, child);
+            }
           }
         });
         
@@ -505,18 +507,21 @@
           // Apply the texture to the SHARESCREEN object
           console.log('Applying texture to SHARESCREEN object...');
           console.log('Material:', shareScreenObject.material);
-          if (shareScreenObject.material) {
-            shareScreenObject.material.map = screenTexture.texture;
-            shareScreenObject.material.needsUpdate = true;
-            console.log('✓ Texture applied to material');
-          } else {
-            console.warn('⚠ No material found on SHARESCREEN object');
-            // Try to create a new material
-            shareScreenObject.material = new THREE.MeshBasicMaterial({ 
-              map: screenTexture.texture 
-            });
-            console.log('✓ Created new material with texture');
-          }
+          console.log('Material type:', shareScreenObject.material ? shareScreenObject.material.type : 'none');
+          
+          // Create a new material specifically for screen content
+          const screenMaterial = new THREE.MeshBasicMaterial({ 
+            map: screenTexture.texture,
+            transparent: false,
+            side: THREE.DoubleSide
+          });
+          
+          shareScreenObject.material = screenMaterial;
+          shareScreenObject.material.needsUpdate = true;
+          shareScreenObject.visible = true;
+          
+          console.log('✓ Applied new MeshBasicMaterial with screen texture');
+          console.log('Texture size:', screenTexture.canvas.width, 'x', screenTexture.canvas.height);
           
           // Set up largeScreen object to work with existing code
           largeScreen = {

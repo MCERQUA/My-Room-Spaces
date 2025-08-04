@@ -1934,27 +1934,13 @@
       console.log('🛑 Stopped live broadcast');
     }
     
-    // Get current screen frame for new visitors
-    async function loadCurrentWorkerFrame() {
-      try {
-        const response = await fetch(`${WORKER_URL}/current`);
-        const data = await response.json();
-        
-        if (data.active && data.frame && !isSharer) {
-          displayWorkerFrame({ data: data.frame });
-          console.log('📺 Loaded current screen share from Worker');
-        }
-      } catch (error) {
-        console.error('Error loading current frame:', error);
-      }
-    }
+    // Note: loadCurrentWorkerFrame removed - using P2P WebRTC instead of worker frame streaming
 
     // Initialize both room system and Worker connection
     initializeRoomSystem();
     initializeWorkerConnection();
     
-    // Load current frame on page load
-    setTimeout(loadCurrentWorkerFrame, 2000);
+    // Note: Auto-loading current frame removed - using P2P WebRTC instead
 
     // Start the animation loop
     // Final mobile compatibility check before starting animation

@@ -532,7 +532,8 @@
     console.log('Canvas size:', renderer.domElement.width, 'x', renderer.domElement.height);
     console.log('Canvas style size:', renderer.domElement.style.width, 'x', renderer.domElement.style.height);
     console.log('Pixel ratio:', renderer.getPixelRatio());
-    console.log('Clear color:', renderer.getClearColor(), 'alpha:', renderer.getClearAlpha());
+    // Skip getClearColor() as it's causing errors
+    console.log('Clear color: (skipped due to error)');
     console.log('=== SCENE INFO ===');
     console.log('Scene background:', scene.background);
 
@@ -610,6 +611,18 @@
     floor.position.y = -3;
     if (!isMobile) floor.receiveShadow = true;
     scene.add(floor);
+    
+    // ALWAYS add a test cube - no conditions, always visible
+    console.log('=== ADDING ALWAYS-VISIBLE TEST CUBE ===');
+    const alwaysTestGeometry = new THREE.BoxGeometry(3, 3, 3);
+    const alwaysTestMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0xff00ff, // Bright magenta - impossible to miss
+      wireframe: false
+    });
+    const alwaysTestCube = new THREE.Mesh(alwaysTestGeometry, alwaysTestMaterial);
+    alwaysTestCube.position.set(0, 2, -7); // Right in camera view
+    scene.add(alwaysTestCube);
+    console.log('Added BRIGHT MAGENTA test cube at (0,2,-7) - should ALWAYS be visible');
     
     // Research-backed minimal test scene for mobile debugging
     if (isMobile) {

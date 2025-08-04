@@ -844,59 +844,104 @@
       const SIGNALING_SERVER = SIGNALING_SERVERS[0];
       
       try {
-        socket = io(SIGNALING_SERVER, {
-          timeout: 5000,
-          transports: ['polling', 'websocket']
-        });
+        // Use native WebSocket instead of Socket.IO
+        socket = new WebSocket(SIGNALING_SERVER.replace('https://', 'wss://'));
         
-        socket.on('connect', () => {
+        socket.onopen = () => {
           console.log('✅ Connected to signaling server!');
           console.log('🎉 Real P2P screen sharing is now enabled!');
           
           // Auto-join the main room
-          socket.emit('join-room', MAIN_ROOM);
-        });
-        
-        socket.on('disconnect', () => {
-          console.log('❌ Disconnected from signaling server');
-        });
-        
-        // Handle room events
-        socket.on('room-joined', (data) => {
-          roomUsers = data.users || [];
+          sendMessage({ type: 'join-room', room: MAIN_ROOM });
           inRoom = true;
-          console.log(`🏠 Joined room! ${roomUsers.length} users online`);
-          
-          // Connect to existing users
-          roomUsers.forEach(userId => {
-            if (userId !== socket.id) {
-              connectToPeer(userId, true); // We initiate
-            }
-          });
-        });
+        };
         
-        socket.on('user-joined', (data) => {
-          console.log(`👋 New user joined: ${data.userId}`);
-          connectToPeer(data.userId, false); // They initiate
-        });
+        socket.onclose = () => {
+          console.log('❌ Disconnected from signaling server');
+          inRoom = false;
+        };
         
-        socket.on('user-left', (data) => {
-          console.log(`👋 User left: ${data.userId}`);
-          if (peers[data.userId]) {
-            peers[data.userId].destroy();
-            delete peers[data.userId];
+        socket.onerror = (error) => {
+          console.error('❌ WebSocket error:', error);
+        };
+        
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleSignalingMessage(data);
+          } catch (error) {
+            console.error('Failed to parse message:', error);
           }
-        });
-        
-        socket.on('signal', (data) => {
-          if (peers[data.from]) {
-            peers[data.from].signal(data.signal);
-          }
-        });
+        };
         
       } catch (error) {
         console.error('❌ Failed to initialize P2P:', error);
         console.log('💡 Screen sharing will work locally only');
+      }
+    }
+    
+    function sendMessage(message) {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(message));
+      }
+    }
+    
+    function handleSignalingMessage(data) {
+      console.log('📨 Received:', data.type);
+      
+      switch (data.type) {
+        case 'connected':
+          console.log(`🆔 Connected with ID: ${data.id}`);
+          break;
+          
+        case 'room-joined':
+          console.log(`👥 Joined room: ${data.room} (${data.memberCount} members)`);
+          roomUsers = data.members || [];
+          // Connect to existing users
+          roomUsers.forEach(userId => {
+            connectToPeer(userId, true); // We initiate
+          });
+          break;
+          
+        case 'user-joined':
+          console.log(`👋 User joined: ${data.userId}`);
+          if (!roomUsers.includes(data.userId)) {
+            roomUsers.push(data.userId);
+          }
+          connectToPeer(data.userId, true); // We initiate
+          break;
+          
+        case 'user-left':
+          console.log(`👋 User left: ${data.userId}`);
+          roomUsers = roomUsers.filter(id => id !== data.userId);
+          if (peers[data.userId]) {
+            peers[data.userId].destroy();
+            delete peers[data.userId];
+          }
+          break;
+          
+        case 'webrtc-offer':
+        case 'webrtc-answer':
+        case 'webrtc-ice':
+          if (peers[data.from]) {
+            peers[data.from].signal(data.data);
+          } else if (data.type === 'webrtc-offer') {
+            // Create peer for incoming offer
+            connectToPeer(data.from, false, data.data);
+          }
+          break;
+          
+        case 'screen-share-started':
+          console.log(`🖥️ User ${data.userId} started screen sharing`);
+          break;
+          
+        case 'screen-share-stopped':
+          console.log(`🛑 User ${data.userId} stopped screen sharing`);
+          break;
+          
+        case 'error':
+          console.error('❌ Server error:', data.message);
+          break;
       }
     }
     
@@ -911,12 +956,11 @@
       peers[userId] = peer;
       
       peer.on('signal', (data) => {
-        if (socket && socket.connected) {
-          socket.emit('signal', {
-            to: userId,
-            signal: data
-          });
-        }
+        sendMessage({
+          type: 'webrtc-offer',
+          to: userId,
+          data: data
+        });
       });
       
       peer.on('stream', (stream) => {
@@ -1066,6 +1110,9 @@
         
         console.log('Screen sharing started');
         
+        // Notify server about screen sharing
+        sendMessage({ type: 'start-screen-share' });
+        
         // Start broadcasting to Cloudflare Worker for all visitors
         startWorkerBroadcast();
         
@@ -1091,6 +1138,9 @@
         document.getElementById('video-element').srcObject = null;
         resetScreenContent();
         console.log('Screen sharing stopped');
+        
+        // Notify server about stopping screen sharing
+        sendMessage({ type: 'stop-screen-share' });
         
         // Stop broadcasting to Cloudflare Worker
         stopWorkerBroadcast();

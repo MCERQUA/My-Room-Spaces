@@ -392,42 +392,104 @@
 
     // Scene setup
     const scene = new THREE.Scene();
-    // Use different background colors for mobile/desktop testing
-    scene.background = new THREE.Color(isMobileEarly ? 0x111111 : 0x000011);
+    // Test if we can see ANY background on mobile - use bright color for debugging
+    if (isMobileEarly) {
+      scene.background = new THREE.Color(0x222222); // Darker gray for mobile visibility test
+    } else {
+      scene.background = new THREE.Color(0x000011); // Original dark blue for desktop
+    }
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Detect mobile first for renderer setup
+    // Enhanced mobile detection with WebGL capability testing
     const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const isIOSNew = /iPhone|iPad/.test(navigator.userAgent) && parseFloat(navigator.userAgent.match(/OS (\d+)/)?.[1] || '0') >= 17;
     
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: !isMobileEarly, // Disable antialiasing on mobile
-      alpha: false,
-      powerPreference: isMobileEarly ? "default" : "high-performance",
-      preserveDrawingBuffer: false,
-      failIfMajorPerformanceCaveat: false
-    });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileEarly ? 1 : 2)); // Lower pixel ratio on mobile
+    // Test WebGL context creation first
+    let webglTestCanvas = document.createElement('canvas');
+    let testGL = null;
+    let webglSupported = false;
+    let highpSupported = false;
     
-    // Simplified renderer settings for mobile compatibility
-    if (isMobileEarly) {
-      // Mobile: Use simplest possible settings
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.NoToneMapping; // Disable tone mapping on mobile
-      renderer.toneMappingExposure = 1.0;
-      console.log('Using simplified mobile renderer settings');
-    } else {
-      // Desktop: Full quality settings
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.0;
-      console.log('Using full quality desktop renderer settings');
+    try {
+      testGL = webglTestCanvas.getContext('webgl') || webglTestCanvas.getContext('experimental-webgl');
+      if (testGL) {
+        webglSupported = true;
+        // Test shader precision support
+        const fragmentShaderPrecision = testGL.getShaderPrecisionFormat(testGL.FRAGMENT_SHADER, testGL.HIGH_FLOAT);
+        highpSupported = fragmentShaderPrecision && fragmentShaderPrecision.precision > 0;
+        console.log('WebGL supported:', webglSupported, 'Highp supported:', highpSupported);
+      }
+    } catch (e) {
+      console.error('WebGL context creation failed:', e);
+    } finally {
+      if (testGL) {
+        // Clean up test context to avoid context limit issues
+        const loseContextExt = testGL.getExtension('WEBGL_lose_context');
+        if (loseContextExt) loseContextExt.loseContext();
+      }
+      webglTestCanvas = null;
+      testGL = null;
     }
+    
+    if (!webglSupported) {
+      document.body.innerHTML = '<div style="color: white; text-align: center; margin-top: 50px;">WebGL not supported on this device</div>';
+      throw new Error('WebGL not supported');
+    }
+    
+    // Create renderer with mobile-optimized settings
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: false, // Disable on all devices to avoid mobile issues
+      alpha: true, // Enable alpha for mobile compatibility
+      powerPreference: "default", // Use default for broader compatibility
+      preserveDrawingBuffer: true, // Required for some mobile browsers
+      failIfMajorPerformanceCaveat: false,
+      stencil: false, // Disable stencil buffer to save memory
+      depth: true
+    });
+    
+    // Conservative sizing for mobile
+    const maxSize = isMobileEarly ? 1024 : 2048;
+    const actualWidth = Math.min(window.innerWidth, maxSize);
+    const actualHeight = Math.min(window.innerHeight, maxSize);
+    
+    renderer.setSize(actualWidth, actualHeight);
+    renderer.setPixelRatio(1); // Always use 1 to avoid mobile GPU issues
+    
+    // Ultra-conservative renderer settings for mobile
+    renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // Use linear instead of sRGB on mobile
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    renderer.sortObjects = false; // Disable sorting for performance
+    renderer.shadowMap.enabled = false; // Always disable shadows
+    
+    console.log('Mobile-optimized renderer created');
     
     // Shadow map setup will be handled in lighting section based on device type
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    document.getElementById('scene-container').appendChild(renderer.domElement);
+    // Add context loss/restore handling before appending to DOM
+    const canvas = renderer.domElement;
+    canvas.addEventListener('webglcontextlost', function(event) {
+      event.preventDefault();
+      console.warn('WebGL context lost - attempting recovery');
+      // Stop animation loop
+      if (window.animationId) {
+        cancelAnimationFrame(window.animationId);
+      }
+    }, false);
+    
+    canvas.addEventListener('webglcontextrestored', function(event) {
+      console.log('WebGL context restored - reinitializing');
+      // Force page reload on context restore for now (simplest recovery)
+      window.location.reload();
+    }, false);
+    
+    // Set canvas style for mobile compatibility
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.display = 'block';
+    
+    document.getElementById('scene-container').appendChild(canvas);
 
     // Detect mobile devices
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -475,12 +537,13 @@
       console.log('Using direct rendering for mobile compatibility');
     }
 
-    // Lighting - much brighter and simpler for mobile compatibility
-    const ambientLight = new THREE.AmbientLight(0xffffff, isMobile ? 1.5 : 0.3);
+    // Ultra-simple lighting for maximum mobile compatibility
+    const ambientLight = new THREE.AmbientLight(0xffffff, isMobile ? 2.0 : 0.3);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 0.5 : 0.8);
-    directionalLight.position.set(10, 10, 5);
+    // Minimal directional light for mobile
+    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 0.2 : 0.8);
+    directionalLight.position.set(5, 5, 5);
     
     // Disable shadows on mobile for better performance and compatibility
     if (!isMobile) {
@@ -521,14 +584,33 @@
     floor.position.y = -3;
     if (!isMobile) floor.receiveShadow = true;
     scene.add(floor);
+    
+    // Add simple test cube for mobile compatibility testing
+    if (isMobile) {
+      const testGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const testMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x00ff00, // Bright green for visibility
+        wireframe: false
+      });
+      const testCube = new THREE.Mesh(testGeometry, testMaterial);
+      testCube.position.set(2, 0, -5);
+      scene.add(testCube);
+      console.log('Added mobile test cube');
+    }
 
 
 
-    // Create canvas texture for screen content
+    // Create canvas texture for screen content - mobile-optimized sizes
     function createScreenTexture() {
       const canvas = document.createElement('canvas');
-      canvas.width = 1920;
-      canvas.height = 1080;
+      // Use much smaller textures on mobile to avoid GPU memory issues
+      if (isMobile) {
+        canvas.width = 512;  // Much smaller for mobile
+        canvas.height = 288; // Maintain 16:9 ratio
+      } else {
+        canvas.width = 1920;
+        canvas.height = 1080;
+      }
       const ctx = canvas.getContext('2d');
       
       ctx.fillStyle = '#001122';
@@ -1365,9 +1447,9 @@
       }
     });
 
-    // Animation loop
+    // Animation loop with context loss tracking
     function animate() {
-      requestAnimationFrame(animate);
+      window.animationId = requestAnimationFrame(animate);
       
       camera.rotation.order = 'YXZ';
       camera.rotation.y = cameraRotation.y;
@@ -1396,8 +1478,13 @@
       }
       
       
-      // Use composer for desktop, direct renderer for mobile
-      if (composer) {
+      // Mobile-optimized rendering with explicit clearing
+      if (isMobile) {
+        // Explicit clear for mobile compatibility
+        renderer.clear(true, true, true);
+        // Force immediate render without composer
+        renderer.render(scene, camera);
+      } else if (composer) {
         composer.render();
       } else {
         renderer.render(scene, camera);
@@ -1504,7 +1591,28 @@
     initializeRoomSystem();
 
     // Start the animation loop
-    animate();
+    // Final mobile compatibility check before starting animation
+    console.log('=== FINAL RENDER CHECK ===');
+    console.log('Renderer ready:', !!renderer);
+    console.log('Scene objects:', scene.children.length);
+    console.log('Camera position:', camera.position);
+    console.log('WebGL context valid:', !renderer.getContext().isContextLost());
+    
+    // Start animation with error handling
+    try {
+      animate();
+      console.log('Animation loop started successfully');
+    } catch (error) {
+      console.error('Failed to start animation:', error);
+      // Fallback: try to render one frame
+      try {
+        renderer.render(scene, camera);
+        console.log('Single frame render successful');
+      } catch (renderError) {
+        console.error('Render failed completely:', renderError);
+        document.body.innerHTML += '<div style="color: red; position: fixed; top: 10px; left: 10px;">Render Error: ' + renderError.message + '</div>';
+      }
+    }
 
     console.log('3D Interactive Website loaded successfully!');
   </script>

@@ -314,14 +314,6 @@
     </div>
   </div>
 
-  <div class="room-controls" id="room-controls">
-    <h3>👥 Shared Room (up to 4 users)</h3>
-    <button id="join-main-room">🚪 Join Shared Room</button>
-    <button id="leave-room" style="display: none;">🚶 Leave Room</button>
-    <div class="room-status" id="room-status">
-      Click to join the shared room
-    </div>
-  </div>
   
   <video id="video-element" autoplay muted></video>
   
@@ -592,21 +584,18 @@
         });
         
         socket.on('connect', () => {
-          console.log('Connected to signaling server');
-          updateRoomStatus('Connected to server', 'connected');
+          console.log('Connected to signaling server - auto-joining shared space');
         });
         
         socket.on('disconnect', () => {
           console.log('Disconnected from signaling server');
-          updateRoomStatus('Disconnected from server', 'error');
         });
         
         // Handle main room events
         socket.on('room-joined', (data) => {
           roomUsers = data.users;
           inRoom = true;
-          updateRoomStatus(`Connected! ${data.users.length}/4 users in shared room.`, 'connected');
-          toggleRoomButtons(true);
+          console.log(`Connected to shared space! ${data.users.length}/4 users online.`);
           
           // Connect to existing users
           data.users.forEach(userId => {
@@ -618,7 +607,7 @@
         
         socket.on('user-joined', (data) => {
           roomUsers = data.users;
-          updateRoomStatus(`User joined! ${data.users.length}/4 users in shared room.`, 'connected');
+          console.log(`User joined! ${data.users.length}/4 users online.`);
           
           // Connect to new user
           connectToPeer(data.newUserId, true);
@@ -626,7 +615,7 @@
         
         socket.on('user-left', (data) => {
           roomUsers = data.users;
-          updateRoomStatus(`User left. ${data.users.length}/4 users in shared room.`, 'connected');
+          console.log(`User left. ${data.users.length}/4 users online.`);
           
           if (peers[data.userId]) {
             peers[data.userId].destroy();
@@ -644,12 +633,11 @@
         });
         
         socket.on('room-error', (error) => {
-          updateRoomStatus(`Error: ${error}`, 'error');
+          console.log(`Connection error: ${error}`);
         });
         
       } catch (error) {
         console.log('No signaling server available, using local mode');
-        updateRoomStatus('Server unavailable - local mode only', 'error');
       }
     }
     
@@ -715,16 +703,7 @@
       });
     }
     
-    function updateRoomStatus(message, type = '') {
-      const statusEl = document.getElementById('room-status');
-      statusEl.textContent = message;
-      statusEl.className = `room-status ${type}`;
-    }
     
-    function toggleRoomButtons(connected) {
-      document.getElementById('join-main-room').style.display = connected ? 'none' : 'block';
-      document.getElementById('leave-room').style.display = connected ? 'block' : 'none';
-    }
     
     async function startScreenShare() {
       try {
@@ -1312,35 +1291,6 @@
       clearScreen();
     });
 
-    // Room control event listeners  
-    document.getElementById('join-main-room').addEventListener('click', (e) => {
-      e.stopPropagation();
-      
-      if (socket && socket.connected) {
-        socket.emit('join-main-room');
-        updateRoomStatus('Connecting to shared room...', '');
-      } else {
-        updateRoomStatus('Cannot connect - server unavailable', 'error');
-      }
-    });
-    
-    document.getElementById('leave-room').addEventListener('click', (e) => {
-      e.stopPropagation();
-      
-      if (socket && socket.connected && inRoom) {
-        socket.emit('leave-main-room');
-      }
-      
-      // Clean up all peer connections
-      Object.values(peers).forEach(peer => peer.destroy());
-      peers = {};
-      
-      inRoom = false;
-      roomUsers = [];
-      
-      toggleRoomButtons(false);
-      updateRoomStatus('Left shared room', '');
-    });
 
     // Initialize room system
     initializeRoomSystem();

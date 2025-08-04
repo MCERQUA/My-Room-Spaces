@@ -55,28 +55,14 @@ io.on('connection', (socket) => {
   
   users.set(socket.id, {
     id: socket.id,
-    room: null,
+    room: MAIN_ROOM,
     connected: new Date()
   });
 
-  // Join the main shared room
-  socket.on('join-main-room', () => {
-    if (mainRoom.users.length >= 4) {
-      socket.emit('room-error', 'Main room is full (max 4 users)');
-      return;
-    }
-
-    // Check if user is already in room
-    if (mainRoom.users.includes(socket.id)) {
-      socket.emit('room-error', 'Already in main room');
-      return;
-    }
-
+  // Auto-join the main room immediately upon connection
+  if (mainRoom.users.length < 4) {
     mainRoom.users.push(socket.id);
     socket.join(MAIN_ROOM);
-    
-    const user = users.get(socket.id);
-    user.room = MAIN_ROOM;
 
     // Notify user they joined
     socket.emit('room-joined', {
@@ -92,13 +78,12 @@ io.on('connection', (socket) => {
       users: mainRoom.users
     });
 
-    console.log(`User ${socket.id} joined main room. Total users: ${mainRoom.users.length}`);
-  });
+    console.log(`User ${socket.id} auto-joined main room. Total users: ${mainRoom.users.length}`);
+  } else {
+    socket.emit('room-error', 'Main room is full (max 4 users)');
+  }
 
-  // Leave main room
-  socket.on('leave-main-room', () => {
-    leaveMainRoom(socket.id);
-  });
+
 
   // Forward WebRTC signaling data
   socket.on('signal', (data) => {

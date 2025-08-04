@@ -331,6 +331,7 @@
     <p>Click objects to select | Drag GLB files to load</p>
     <p>WASD: move | Mouse: look | ENTER: hide screen</p>
     <p>R: reset | Q: rotate | E/C: scale | DEL: delete</p>
+    <p id="user-count">👥 Users: 1</p>
   </div>
   
   <div class="screen-controls" id="screen-controls">
@@ -821,6 +822,14 @@
     // Screen sharing and video functionality
     let currentStream = null;
     let currentVideo = null;
+    
+    // User count display
+    function updateUserCount(count) {
+      const userCountElement = document.getElementById('user-count');
+      if (userCountElement) {
+        userCountElement.textContent = `👥 Users: ${count}`;
+      }
+    }
 
     // P2P Main Room functionality
     let socket = null;
@@ -828,6 +837,7 @@
     const MAIN_ROOM = 'MAIN_SHARED_ROOM';
     let inRoom = false;
     let roomUsers = [];
+    let myUserId = null;
     
     // Simple P2P using BroadcastChannel for same-origin communication
     let broadcastChannel = null;
@@ -882,7 +892,10 @@
     
     function sendMessage(message) {
       if (socket && socket.readyState === WebSocket.OPEN) {
+        console.log('📤 Sending:', message.type, message);
         socket.send(JSON.stringify(message));
+      } else {
+        console.warn('⚠️ Cannot send message, socket not ready:', message.type);
       }
     }
     
@@ -891,12 +904,14 @@
       
       switch (data.type) {
         case 'connected':
+          myUserId = data.id;
           console.log(`🆔 Connected with ID: ${data.id}`);
           break;
           
         case 'room-joined':
           console.log(`👥 Joined room: ${data.room} (${data.memberCount} members)`);
           roomUsers = data.members || [];
+          updateUserCount(data.memberCount);
           // Connect to existing users
           roomUsers.forEach(userId => {
             connectToPeer(userId, true); // We initiate
@@ -908,12 +923,19 @@
           if (!roomUsers.includes(data.userId)) {
             roomUsers.push(data.userId);
           }
+          updateUserCount(roomUsers.length + 1); // +1 for self
           connectToPeer(data.userId, true); // We initiate
+          
+          // If we're currently screen sharing, the new peer will get the stream automatically
+          if (currentStream) {
+            console.log('🖥️ New user will receive current screen share');
+          }
           break;
           
         case 'user-left':
           console.log(`👋 User left: ${data.userId}`);
           roomUsers = roomUsers.filter(id => id !== data.userId);
+          updateUserCount(roomUsers.length + 1); // +1 for self
           if (peers[data.userId]) {
             peers[data.userId].destroy();
             delete peers[data.userId];
@@ -947,6 +969,8 @@
     
     
     function connectToPeer(userId, initiator, initialSignal = null) {
+      console.log(`🔗 Connecting to peer ${userId}, initiator: ${initiator}, hasStream: ${!!currentStream}`);
+      
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
@@ -956,9 +980,15 @@
       peers[userId] = peer;
       
       peer.on('signal', (data) => {
+        // Determine signal type based on data content
+        let signalType = 'webrtc-offer';
+        if (data.type === 'answer') signalType = 'webrtc-answer';
+        if (data.candidate) signalType = 'webrtc-ice';
+        
         sendMessage({
-          type: 'webrtc-offer',
+          type: signalType,
           to: userId,
+          from: myUserId,
           data: data
         });
       });
@@ -1099,11 +1129,15 @@
         videoEl.addEventListener('loadeddata', () => updateScreenTexture());
         stream.getVideoTracks()[0].addEventListener('ended', () => stopScreenShare());
         
-        // Share stream with all peers in shared room
+        // Share stream with all existing peers in shared room
         if (inRoom && Object.keys(peers).length > 0) {
           Object.values(peers).forEach(peer => {
             if (peer.connected) {
+              console.log('📺 Adding stream to existing connected peer');
               peer.addStream(stream);
+            } else {
+              // Peer will get stream when it connects (already passed in constructor)
+              console.log('📺 Peer will receive stream when connected');
             }
           });
         }

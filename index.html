@@ -402,25 +402,36 @@
 
     document.getElementById('scene-container').appendChild(renderer.domElement);
 
-    // Post-processing setup for subtle bloom effect
-    const composer = new EffectComposer(renderer);
-    
-    // Basic render pass
-    const renderPass = new RenderPass(scene, camera);
-    composer.addPass(renderPass);
-    
-    // Bloom pass - very subtle
-    const bloomPass = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.15,   // strength (very subtle)
-      0.4,    // radius  
-      0.95    // threshold (high = less blooming)
-    );
-    composer.addPass(bloomPass);
-    
-    // Output pass for proper color space
-    const outputPass = new OutputPass();
-    composer.addPass(outputPass);
+    // Detect mobile devices
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('Mobile device detected:', isMobile);
+
+    // Post-processing setup for subtle bloom effect (desktop only)
+    let composer = null;
+    if (!isMobile) {
+      composer = new EffectComposer(renderer);
+      
+      // Basic render pass
+      const renderPass = new RenderPass(scene, camera);
+      composer.addPass(renderPass);
+      
+      // Bloom pass - very subtle
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.15,   // strength (very subtle)
+        0.4,    // radius  
+        0.95    // threshold (high = less blooming)
+      );
+      composer.addPass(bloomPass);
+      
+      // Output pass for proper color space
+      const outputPass = new OutputPass();
+      composer.addPass(outputPass);
+      
+      console.log('Bloom post-processing enabled for desktop');
+    } else {
+      console.log('Using direct rendering for mobile compatibility');
+    }
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
@@ -1259,7 +1270,9 @@
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
-      composer.setSize(window.innerWidth, window.innerHeight);
+      if (composer) {
+        composer.setSize(window.innerWidth, window.innerHeight);
+      }
     });
 
     // Animation loop
@@ -1293,7 +1306,12 @@
       }
       
       
-      composer.render();
+      // Use composer for desktop, direct renderer for mobile
+      if (composer) {
+        composer.render();
+      } else {
+        renderer.render(scene, camera);
+      }
     }
 
     // Add event listeners for control buttons

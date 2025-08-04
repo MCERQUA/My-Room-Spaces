@@ -397,7 +397,7 @@
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
+    // Shadow map setup will be handled in lighting section based on device type
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     document.getElementById('scene-container').appendChild(renderer.domElement);
@@ -433,15 +433,24 @@
       console.log('Using direct rendering for mobile compatibility');
     }
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    // Lighting - brighter for mobile compatibility
+    const ambientLight = new THREE.AmbientLight(0xffffff, isMobile ? 0.8 : 0.3);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 1.2 : 0.8);
     directionalLight.position.set(10, 10, 5);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
+    
+    // Disable shadows on mobile for better performance and compatibility
+    if (!isMobile) {
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 2048;
+      directionalLight.shadow.mapSize.height = 2048;
+      renderer.shadowMap.enabled = true;
+    } else {
+      renderer.shadowMap.enabled = false;
+      console.log('Shadows disabled for mobile compatibility');
+    }
+    
     scene.add(directionalLight);
 
     // Initialize object management variables first
@@ -510,11 +519,18 @@
         roomModel.position.set(0, 0, 0);
         roomModel.scale.set(1, 1, 1);
         
-        // Enable shadows for all meshes
+        // Enable shadows for all meshes (desktop only)
         roomModel.traverse((child) => {
           if (child.isMesh) {
-            child.castShadow = true;
-            child.receiveShadow = true;
+            if (!isMobile) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+            // Ensure materials are compatible with mobile
+            if (child.material && isMobile) {
+              // Force material to update on mobile
+              child.material.needsUpdate = true;
+            }
           }
         });
         

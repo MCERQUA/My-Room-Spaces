@@ -399,6 +399,9 @@
 
     console.log('Starting 3D Interactive Website...');
 
+    // Enhanced mobile detection - define FIRST
+    const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
     // Scene setup
     const scene = new THREE.Scene();
     // Test if we can see ANY background on mobile - use bright color for debugging
@@ -409,8 +412,6 @@
     }
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    // Enhanced mobile detection with WebGL capability testing
-    const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     const isIOSNew = /iPhone|iPad/.test(navigator.userAgent) && parseFloat(navigator.userAgent.match(/OS (\d+)/)?.[1] || '0') >= 17;
     
     // Test WebGL context creation first
@@ -472,8 +473,10 @@
     renderer.sortObjects = false; // Disable sorting for performance
     renderer.shadowMap.enabled = false; // Always disable shadows
     
-    // CRITICAL: Set clear color to prevent white screen (research-backed fix)
-    renderer.setClearColor(0x000000, 1); // Black background, full opacity
+    // CRITICAL: Set clear color only if no scene background (research-backed fix)
+    if (!scene.background) {
+      renderer.setClearColor(0x000000, 1); // Black background, full opacity
+    }
     
     console.log('Mobile-optimized renderer created');
     
@@ -612,14 +615,14 @@
     if (isMobile) {
       console.log('=== MOBILE TEST SCENE ===');
       
-      // Test cube 1: Basic green cube (should always work)
+      // Test cube 1: Basic green cube (should always work) - positioned in camera view
       const testGeometry1 = new THREE.BoxGeometry(1, 1, 1);
       const testMaterial1 = new THREE.MeshBasicMaterial({ 
         color: 0x00ff00, // Bright green
         wireframe: false
       });
       const testCube1 = new THREE.Mesh(testGeometry1, testMaterial1);
-      testCube1.position.set(-2, 0, -5);
+      testCube1.position.set(-2, 2, -7); // Match camera height (y=2) and in view
       scene.add(testCube1);
       
       // Test cube 2: Red wireframe cube
@@ -629,7 +632,7 @@
         wireframe: true
       });
       const testCube2 = new THREE.Mesh(testGeometry2, testMaterial2);
-      testCube2.position.set(2, 0, -5);
+      testCube2.position.set(2, 2, -7); // Match camera height
       scene.add(testCube2);
       
       // Test cube 3: Blue solid cube
@@ -638,11 +641,23 @@
         color: 0x0000ff // Bright blue
       });
       const testCube3 = new THREE.Mesh(testGeometry3, testMaterial3);
-      testCube3.position.set(0, 1, -5);
+      testCube3.position.set(0, 3, -6); // Slightly above and closer
       scene.add(testCube3);
       
-      console.log('Added 3 mobile test cubes: Green(-2,0,-5), Red(2,0,-5), Blue(0,1,-5)');
-      console.log('If you see colored cubes, WebGL is working. If white screen, context issue.');
+      console.log('Added 3 mobile test cubes: Green(-2,2,-7), Red(2,2,-7), Blue(0,3,-6)');
+      console.log('If you see colored cubes, WebGL is working. If black screen, camera/position issue.');
+    } else {
+      // Add test cube for desktop too to debug black screen
+      console.log('=== DESKTOP TEST SCENE ===');
+      const testGeometry = new THREE.BoxGeometry(2, 2, 2);
+      const testMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0xffffff, // White cube for desktop
+        wireframe: false
+      });
+      const testCube = new THREE.Mesh(testGeometry, testMaterial);
+      testCube.position.set(0, 2, -7); // In camera view
+      scene.add(testCube);
+      console.log('Added desktop test cube: White(0,2,-7)');
     }
 
 

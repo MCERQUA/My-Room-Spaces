@@ -612,66 +612,6 @@
     if (!isMobile) floor.receiveShadow = true;
     scene.add(floor);
     
-    // ALWAYS add a test cube - no conditions, always visible
-    console.log('=== ADDING ALWAYS-VISIBLE TEST CUBE ===');
-    const alwaysTestGeometry = new THREE.BoxGeometry(3, 3, 3);
-    const alwaysTestMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0xff00ff, // Bright magenta - impossible to miss
-      wireframe: false
-    });
-    const alwaysTestCube = new THREE.Mesh(alwaysTestGeometry, alwaysTestMaterial);
-    alwaysTestCube.position.set(0, 2, -7); // Right in camera view
-    scene.add(alwaysTestCube);
-    console.log('Added BRIGHT MAGENTA test cube at (0,2,-7) - should ALWAYS be visible');
-    
-    // Research-backed minimal test scene for mobile debugging
-    if (isMobile) {
-      console.log('=== MOBILE TEST SCENE ===');
-      
-      // Test cube 1: Basic green cube (should always work) - positioned in camera view
-      const testGeometry1 = new THREE.BoxGeometry(1, 1, 1);
-      const testMaterial1 = new THREE.MeshBasicMaterial({ 
-        color: 0x00ff00, // Bright green
-        wireframe: false
-      });
-      const testCube1 = new THREE.Mesh(testGeometry1, testMaterial1);
-      testCube1.position.set(-2, 2, -7); // Match camera height (y=2) and in view
-      scene.add(testCube1);
-      
-      // Test cube 2: Red wireframe cube
-      const testGeometry2 = new THREE.BoxGeometry(1, 1, 1);
-      const testMaterial2 = new THREE.MeshBasicMaterial({ 
-        color: 0xff0000, // Bright red
-        wireframe: true
-      });
-      const testCube2 = new THREE.Mesh(testGeometry2, testMaterial2);
-      testCube2.position.set(2, 2, -7); // Match camera height
-      scene.add(testCube2);
-      
-      // Test cube 3: Blue solid cube
-      const testGeometry3 = new THREE.BoxGeometry(1, 1, 1);
-      const testMaterial3 = new THREE.MeshBasicMaterial({ 
-        color: 0x0000ff // Bright blue
-      });
-      const testCube3 = new THREE.Mesh(testGeometry3, testMaterial3);
-      testCube3.position.set(0, 3, -6); // Slightly above and closer
-      scene.add(testCube3);
-      
-      console.log('Added 3 mobile test cubes: Green(-2,2,-7), Red(2,2,-7), Blue(0,3,-6)');
-      console.log('If you see colored cubes, WebGL is working. If black screen, camera/position issue.');
-    } else {
-      // Add test cube for desktop too to debug black screen
-      console.log('=== DESKTOP TEST SCENE ===');
-      const testGeometry = new THREE.BoxGeometry(2, 2, 2);
-      const testMaterial = new THREE.MeshBasicMaterial({ 
-        color: 0xffffff, // White cube for desktop
-        wireframe: false
-      });
-      const testCube = new THREE.Mesh(testGeometry, testMaterial);
-      testCube.position.set(0, 2, -7); // In camera view
-      scene.add(testCube);
-      console.log('Added desktop test cube: White(0,2,-7)');
-    }
 
 
 
@@ -691,13 +631,17 @@
       ctx.fillStyle = '#001122';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#00ff00';
-      ctx.font = 'bold 72px Arial';
+      
+      // Scale font sizes based on canvas size for mobile compatibility
+      const scale = canvas.width / 1920; // Scale relative to desktop size
+      
+      ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText('LARGE DISPLAY SCREEN', canvas.width/2, canvas.height/2 - 80);
-      ctx.font = 'bold 48px Arial';
-      ctx.fillText('Ready for Screen Sharing or Video', canvas.width/2, canvas.height/2 + 10);
-      ctx.font = '32px Arial';
-      ctx.fillText('Use controls to share desktop or load video', canvas.width/2, canvas.height/2 + 80);
+      ctx.fillText('LARGE DISPLAY SCREEN', canvas.width/2, canvas.height/2 - Math.floor(80 * scale));
+      ctx.font = `bold ${Math.floor(48 * scale)}px Arial`;
+      ctx.fillText('Ready for Screen Sharing or Video', canvas.width/2, canvas.height/2 + Math.floor(10 * scale));
+      ctx.font = `${Math.floor(32 * scale)}px Arial`;
+      ctx.fillText('Use controls to share desktop or load video', canvas.width/2, canvas.height/2 + Math.floor(80 * scale));
       
       const texture = new THREE.CanvasTexture(canvas);
       texture.needsUpdate = true;
@@ -734,17 +678,26 @@
             }
             // Ensure materials are compatible with mobile
             if (child.material && isMobile) {
-              // Replace complex materials with basic materials on mobile
-              if (child.material.type !== 'MeshBasicMaterial') {
+              // Fix texture loading on mobile - preserve original textures
+              if (child.material.map) {
+                // Ensure texture uses correct color space
+                child.material.map.colorSpace = THREE.SRGBColorSpace;
+                child.material.map.needsUpdate = true;
+              }
+              
+              // Only replace material if it's causing issues
+              if (child.material.type === 'MeshStandardMaterial' || child.material.type === 'MeshPhysicalMaterial') {
                 const basicMaterial = new THREE.MeshBasicMaterial({
-                  color: child.material.color || 0xffffff,
-                  map: child.material.map || null,
+                  map: child.material.map, // CRITICAL: Preserve the texture map
+                  color: child.material.map ? 0xffffff : (child.material.color || 0xffffff), // White if textured
                   transparent: child.material.transparent || false,
-                  opacity: child.material.opacity || 1.0
+                  opacity: child.material.opacity || 1.0,
+                  side: child.material.side || THREE.FrontSide
                 });
                 child.material = basicMaterial;
-                console.log('Replaced material with MeshBasicMaterial for mobile compatibility');
+                console.log('Replaced material with MeshBasicMaterial, preserved texture:', !!child.material.map);
               }
+              
               child.material.needsUpdate = true;
             }
           }
@@ -1135,13 +1088,17 @@
       ctx.fillStyle = '#001122';
       ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
       ctx.fillStyle = '#00ff00';
-      ctx.font = 'bold 72px Arial';
+      
+      // Scale font sizes based on canvas size for mobile compatibility
+      const scale = largeScreen.canvas.width / 1920; // Scale relative to desktop size
+      
+      ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText('LARGE DISPLAY SCREEN', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 80);
-      ctx.font = 'bold 48px Arial';
-      ctx.fillText('Ready for Screen Sharing or Video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 10);
-      ctx.font = '32px Arial';
-      ctx.fillText('Use controls to share desktop or load video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 80);
+      ctx.fillText('LARGE DISPLAY SCREEN', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - Math.floor(80 * scale));
+      ctx.font = `bold ${Math.floor(48 * scale)}px Arial`;
+      ctx.fillText('Ready for Screen Sharing or Video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + Math.floor(10 * scale));
+      ctx.font = `${Math.floor(32 * scale)}px Arial`;
+      ctx.fillText('Use controls to share desktop or load video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + Math.floor(80 * scale));
       
       largeScreen.texture.needsUpdate = true;
     }

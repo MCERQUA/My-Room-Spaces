@@ -950,11 +950,13 @@
         case 'webrtc-offer':
         case 'webrtc-answer':
         case 'webrtc-ice':
-          if (peers[data.from]) {
-            peers[data.from].signal(data.data);
+          console.log(`📨 WebRTC signal from ${data.fromId}:`, data.type);
+          if (peers[data.fromId]) {
+            peers[data.fromId].signal(data.data);
           } else if (data.type === 'webrtc-offer') {
             // Create peer for incoming offer
-            connectToPeer(data.from, false, data.data);
+            console.log(`🔗 Creating peer for incoming offer from ${data.fromId}`);
+            connectToPeer(data.fromId, false, data.data);
           }
           break;
           
@@ -976,10 +978,16 @@
     function connectToPeer(userId, initiator, initialSignal = null) {
       console.log(`🔗 Connecting to peer ${userId}, initiator: ${initiator}, hasStream: ${!!currentStream}`);
       
+      // Don't create duplicate connections
+      if (peers[userId]) {
+        console.log(`⚠️ Peer ${userId} already exists, skipping`);
+        return;
+      }
+      
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
-        stream: currentStream // Share current stream if available
+        stream: currentStream || undefined // Share current stream if available
       });
       
       peers[userId] = peer;
@@ -999,7 +1007,8 @@
       });
       
       peer.on('stream', (stream) => {
-        console.log('Received stream from peer');
+        console.log(`🎥 Received stream from peer ${userId}:`, stream);
+        console.log(`🎥 Stream has ${stream.getTracks().length} tracks`);
         // Display received stream on the large screen
         displaySharedStream(stream);
       });
@@ -1135,17 +1144,29 @@
         stream.getVideoTracks()[0].addEventListener('ended', () => stopScreenShare());
         
         // Share stream with all existing peers in shared room
-        if (inRoom && Object.keys(peers).length > 0) {
-          Object.values(peers).forEach(peer => {
-            if (peer.connected) {
-              console.log('📺 Adding stream to existing connected peer');
+        console.log(`📺 Sharing stream with ${Object.keys(peers).length} existing peers`);
+        Object.entries(peers).forEach(([peerId, peer]) => {
+          if (peer && peer.connected) {
+            console.log(`📺 Adding stream to connected peer ${peerId}`);
+            try {
+              // Remove old stream first
+              if (peer.streams && peer.streams.length > 0) {
+                peer.streams.forEach(oldStream => {
+                  peer.removeStream(oldStream);
+                });
+              }
+              // Add new stream
               peer.addStream(stream);
-            } else {
-              // Peer will get stream when it connects (already passed in constructor)
-              console.log('📺 Peer will receive stream when connected');
+            } catch (error) {
+              console.log(`❌ Failed to add stream to peer ${peerId}:`, error);
+              // Recreate the peer connection with the new stream
+              delete peers[peerId];
+              connectToPeer(peerId, true);
             }
-          });
-        }
+          } else {
+            console.log(`📺 Peer ${peerId} not connected yet, will receive stream when connected`);
+          }
+        });
         
         console.log('Screen sharing started');
         

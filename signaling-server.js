@@ -18,28 +18,36 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// Store rooms and users
-const rooms = new Map();
+// Store the main shared room and users
+const MAIN_ROOM = 'MAIN_SHARED_ROOM';
+const mainRoom = {
+  id: MAIN_ROOM,
+  users: [],
+  created: new Date()
+};
 const users = new Map();
 
 // Health check endpoint
 app.get('/', (req, res) => {
   res.json({ 
     status: 'WebRTC Signaling Server Online',
-    rooms: rooms.size,
-    users: users.size,
+    mainRoom: {
+      users: mainRoom.users.length,
+      created: mainRoom.created
+    },
+    totalUsers: users.size,
     timestamp: new Date().toISOString()
   });
 });
 
-// Get room info endpoint
-app.get('/rooms', (req, res) => {
-  const roomList = Array.from(rooms.entries()).map(([id, room]) => ({
-    id,
-    users: room.users.length,
-    created: room.created
-  }));
-  res.json(roomList);
+// Get main room info endpoint
+app.get('/room', (req, res) => {
+  res.json({
+    id: MAIN_ROOM,
+    users: mainRoom.users.length,
+    created: mainRoom.created,
+    maxUsers: 4
+  });
 });
 
 io.on('connection', (socket) => {
@@ -51,70 +59,45 @@ io.on('connection', (socket) => {
     connected: new Date()
   });
 
-  // Create a new room
-  socket.on('create-room', (roomId) => {
-    if (rooms.has(roomId)) {
-      socket.emit('room-error', 'Room already exists');
+  // Join the main shared room
+  socket.on('join-main-room', () => {
+    if (mainRoom.users.length >= 4) {
+      socket.emit('room-error', 'Main room is full (max 4 users)');
       return;
     }
 
-    const room = {
-      id: roomId,
-      host: socket.id,
-      users: [socket.id],
-      created: new Date()
-    };
+    // Check if user is already in room
+    if (mainRoom.users.includes(socket.id)) {
+      socket.emit('room-error', 'Already in main room');
+      return;
+    }
 
-    rooms.set(roomId, room);
-    socket.join(roomId);
+    mainRoom.users.push(socket.id);
+    socket.join(MAIN_ROOM);
     
     const user = users.get(socket.id);
-    user.room = roomId;
-    
-    socket.emit('room-created', roomId);
-    console.log(`Room created: ${roomId} by ${socket.id}`);
-  });
-
-  // Join an existing room
-  socket.on('join-room', (roomId) => {
-    const room = rooms.get(roomId);
-    
-    if (!room) {
-      socket.emit('room-error', 'Room not found');
-      return;
-    }
-
-    if (room.users.length >= 4) {
-      socket.emit('room-error', 'Room is full (max 4 users)');
-      return;
-    }
-
-    room.users.push(socket.id);
-    socket.join(roomId);
-    
-    const user = users.get(socket.id);
-    user.room = roomId;
+    user.room = MAIN_ROOM;
 
     // Notify user they joined
     socket.emit('room-joined', {
-      roomId: roomId,
-      users: room.users,
-      host: room.host
+      roomId: MAIN_ROOM,
+      users: mainRoom.users,
+      isMainRoom: true
     });
 
     // Notify others in room
-    socket.to(roomId).emit('user-joined', {
-      roomId: roomId,
+    socket.to(MAIN_ROOM).emit('user-joined', {
+      roomId: MAIN_ROOM,
       newUserId: socket.id,
-      users: room.users
+      users: mainRoom.users
     });
 
-    console.log(`User ${socket.id} joined room ${roomId}. Total users: ${room.users.length}`);
+    console.log(`User ${socket.id} joined main room. Total users: ${mainRoom.users.length}`);
   });
 
-  // Leave room
-  socket.on('leave-room', (roomId) => {
-    leaveRoom(socket.id, roomId);
+  // Leave main room
+  socket.on('leave-main-room', () => {
+    leaveMainRoom(socket.id);
   });
 
   // Forward WebRTC signaling data
@@ -128,55 +111,41 @@ io.on('connection', (socket) => {
   // Handle disconnect
   socket.on('disconnect', () => {
     const user = users.get(socket.id);
-    if (user && user.room) {
-      leaveRoom(socket.id, user.room);
+    if (user && user.room === MAIN_ROOM) {
+      leaveMainRoom(socket.id);
     }
     users.delete(socket.id);
     console.log(`User disconnected: ${socket.id}`);
   });
 
-  function leaveRoom(userId, roomId) {
-    const room = rooms.get(roomId);
-    if (!room) return;
+  function leaveMainRoom(userId) {
+    if (!mainRoom.users.includes(userId)) return;
 
-    room.users = room.users.filter(id => id !== userId);
+    mainRoom.users = mainRoom.users.filter(id => id !== userId);
     
-    // Notify others in room
-    socket.to(roomId).emit('user-left', {
-      roomId: roomId,
+    // Notify others in main room
+    socket.to(MAIN_ROOM).emit('user-left', {
+      roomId: MAIN_ROOM,
       userId: userId,
-      users: room.users
+      users: mainRoom.users
     });
 
-    // If room is empty, delete it
-    if (room.users.length === 0) {
-      rooms.delete(roomId);
-      console.log(`Room ${roomId} deleted (empty)`);
-    } else if (room.host === userId && room.users.length > 0) {
-      // Transfer host to next user
-      room.host = room.users[0];
-      socket.to(roomId).emit('host-changed', {
-        roomId: roomId,
-        newHost: room.host
-      });
-      console.log(`Host transferred in room ${roomId} to ${room.host}`);
-    }
-
-    socket.leave(roomId);
-    console.log(`User ${userId} left room ${roomId}. Remaining: ${room.users.length}`);
+    socket.leave(MAIN_ROOM);
+    console.log(`User ${userId} left main room. Remaining: ${mainRoom.users.length}`);
   }
 });
 
-// Clean up empty rooms every 10 minutes
+// Clean up disconnected users from main room every 5 minutes
 setInterval(() => {
-  const now = new Date();
-  for (const [roomId, room] of rooms.entries()) {
-    if (room.users.length === 0 || (now - room.created) > 24 * 60 * 60 * 1000) {
-      rooms.delete(roomId);
-      console.log(`Cleaned up room: ${roomId}`);
-    }
+  // Remove any users that are no longer connected
+  const connectedUserIds = Array.from(users.keys());
+  const originalCount = mainRoom.users.length;
+  mainRoom.users = mainRoom.users.filter(userId => connectedUserIds.includes(userId));
+  
+  if (mainRoom.users.length !== originalCount) {
+    console.log(`Cleaned up main room: ${originalCount - mainRoom.users.length} disconnected users removed`);
   }
-}, 10 * 60 * 1000);
+}, 5 * 60 * 1000);
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {

@@ -315,13 +315,11 @@
   </div>
 
   <div class="room-controls" id="room-controls">
-    <h3>👥 Room Sharing (2-4 users)</h3>
-    <input type="text" id="room-id" placeholder="Enter room code..." maxlength="8"/>
-    <button id="create-room">🆕 Create Room</button>
-    <button id="join-room">🚪 Join Room</button>
+    <h3>👥 Shared Room (up to 4 users)</h3>
+    <button id="join-main-room">🚪 Join Shared Room</button>
     <button id="leave-room" style="display: none;">🚶 Leave Room</button>
     <div class="room-status" id="room-status">
-      Not connected to any room
+      Click to join the shared room
     </div>
   </div>
   
@@ -570,11 +568,11 @@
     let currentStream = null;
     let currentVideo = null;
 
-    // P2P Room functionality
+    // P2P Main Room functionality
     let socket = null;
     let peers = {};
-    let currentRoom = null;
-    let isHost = false;
+    const MAIN_ROOM = 'MAIN_SHARED_ROOM';
+    let inRoom = false;
     let roomUsers = [];
     
     // Try to connect to signaling server (fallback to local P2P if no server)
@@ -603,35 +601,32 @@
           updateRoomStatus('Disconnected from server', 'error');
         });
         
-        // Handle room events
-        socket.on('room-created', (roomId) => {
-          currentRoom = roomId;
-          isHost = true;
-          updateRoomStatus(`Room ${roomId} created. You are host.`, 'connected');
-          document.getElementById('room-id').value = roomId;
-        });
-        
+        // Handle main room events
         socket.on('room-joined', (data) => {
-          currentRoom = data.roomId;
           roomUsers = data.users;
-          isHost = false;
-          updateRoomStatus(`Joined room ${data.roomId}. ${data.users.length} users.`, 'connected');
+          inRoom = true;
+          updateRoomStatus(`Connected! ${data.users.length}/4 users in shared room.`, 'connected');
           toggleRoomButtons(true);
+          
+          // Connect to existing users
+          data.users.forEach(userId => {
+            if (userId !== socket.id) {
+              connectToPeer(userId, false);
+            }
+          });
         });
         
         socket.on('user-joined', (data) => {
           roomUsers = data.users;
-          updateRoomStatus(`User joined. ${data.users.length} users in room.`, 'connected');
+          updateRoomStatus(`User joined! ${data.users.length}/4 users in shared room.`, 'connected');
           
-          if (isHost && currentStream) {
-            // Host shares current stream with new user
-            connectToPeer(data.newUserId, true);
-          }
+          // Connect to new user
+          connectToPeer(data.newUserId, true);
         });
         
         socket.on('user-left', (data) => {
           roomUsers = data.users;
-          updateRoomStatus(`User left. ${data.users.length} users in room.`, 'connected');
+          updateRoomStatus(`User left. ${data.users.length}/4 users in shared room.`, 'connected');
           
           if (peers[data.userId]) {
             peers[data.userId].destroy();
@@ -726,15 +721,9 @@
       statusEl.className = `room-status ${type}`;
     }
     
-    function toggleRoomButtons(inRoom) {
-      document.getElementById('create-room').style.display = inRoom ? 'none' : 'block';
-      document.getElementById('join-room').style.display = inRoom ? 'none' : 'block';
-      document.getElementById('leave-room').style.display = inRoom ? 'block' : 'none';
-      document.getElementById('room-id').disabled = inRoom;
-    }
-    
-    function generateRoomId() {
-      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    function toggleRoomButtons(connected) {
+      document.getElementById('join-main-room').style.display = connected ? 'none' : 'block';
+      document.getElementById('leave-room').style.display = connected ? 'block' : 'none';
     }
     
     async function startScreenShare() {
@@ -764,8 +753,8 @@
         videoEl.addEventListener('loadeddata', () => updateScreenTexture());
         stream.getVideoTracks()[0].addEventListener('ended', () => stopScreenShare());
         
-        // Share stream with all peers in room
-        if (currentRoom && Object.keys(peers).length > 0) {
+        // Share stream with all peers in shared room
+        if (inRoom && Object.keys(peers).length > 0) {
           Object.values(peers).forEach(peer => {
             if (peer.connected) {
               peer.addStream(stream);
@@ -1323,58 +1312,34 @@
       clearScreen();
     });
 
-    // Room control event listeners
-    document.getElementById('create-room').addEventListener('click', (e) => {
+    // Room control event listeners  
+    document.getElementById('join-main-room').addEventListener('click', (e) => {
       e.stopPropagation();
-      const roomId = generateRoomId();
       
       if (socket && socket.connected) {
-        socket.emit('create-room', roomId);
-        toggleRoomButtons(true);
+        socket.emit('join-main-room');
+        updateRoomStatus('Connecting to shared room...', '');
       } else {
-        // Fallback: create local room
-        currentRoom = roomId;
-        isHost = true;
-        document.getElementById('room-id').value = roomId;
-        updateRoomStatus(`Local room ${roomId} created. Share this code!`, 'connected');
-        toggleRoomButtons(true);
-      }
-    });
-    
-    document.getElementById('join-room').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const roomId = document.getElementById('room-id').value.trim().toUpperCase();
-      
-      if (!roomId) {
-        alert('Please enter a room code');
-        return;
-      }
-      
-      if (socket && socket.connected) {
-        socket.emit('join-room', roomId);
-      } else {
-        updateRoomStatus('Cannot join - no server connection', 'error');
+        updateRoomStatus('Cannot connect - server unavailable', 'error');
       }
     });
     
     document.getElementById('leave-room').addEventListener('click', (e) => {
       e.stopPropagation();
       
-      if (socket && socket.connected && currentRoom) {
-        socket.emit('leave-room', currentRoom);
+      if (socket && socket.connected && inRoom) {
+        socket.emit('leave-main-room');
       }
       
       // Clean up all peer connections
       Object.values(peers).forEach(peer => peer.destroy());
       peers = {};
       
-      currentRoom = null;
-      isHost = false;
+      inRoom = false;
       roomUsers = [];
       
       toggleRoomButtons(false);
-      updateRoomStatus('Left room', '');
-      document.getElementById('room-id').value = '';
+      updateRoomStatus('Left shared room', '');
     });
 
     // Initialize room system

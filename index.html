@@ -479,21 +479,35 @@
         
         // Find the SHARESCREEN object
         let shareScreenObject = null;
+        console.log('Searching for SHARESCREEN object in model...');
         roomModel.traverse((child) => {
+          console.log('Found object:', child.name, 'Type:', child.type);
           if (child.name === 'SHARESCREEN' || child.name.toLowerCase().includes('sharescreen')) {
             shareScreenObject = child;
-            console.log('Found SHARESCREEN object:', child.name);
+            console.log('✓ Found SHARESCREEN object:', child.name, child);
           }
         });
+        
+        console.log('SHARESCREEN search complete. Found:', shareScreenObject ? 'YES' : 'NO');
         
         if (shareScreenObject) {
           // Create screen texture
           const screenTexture = createScreenTexture();
           
           // Apply the texture to the SHARESCREEN object
+          console.log('Applying texture to SHARESCREEN object...');
+          console.log('Material:', shareScreenObject.material);
           if (shareScreenObject.material) {
             shareScreenObject.material.map = screenTexture.texture;
             shareScreenObject.material.needsUpdate = true;
+            console.log('✓ Texture applied to material');
+          } else {
+            console.warn('⚠ No material found on SHARESCREEN object');
+            // Try to create a new material
+            shareScreenObject.material = new THREE.MeshBasicMaterial({ 
+              map: screenTexture.texture 
+            });
+            console.log('✓ Created new material with texture');
           }
           
           // Set up largeScreen object to work with existing code
@@ -565,9 +579,6 @@
       sceneObjects.push(displayScreen);
     }
     
-    // Load the room model on startup
-    loadRoomModel();
-
     // Screen sharing and video functionality
     let currentStream = null;
     let currentVideo = null;
@@ -1153,6 +1164,9 @@
 
     // GLTF Loader
     const loader = new GLTFLoader();
+    
+    // Load the room model after loader is initialized
+    loadRoomModel();
 
     function loadModelFromFile(file) {
       const url = URL.createObjectURL(file);

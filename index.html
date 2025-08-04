@@ -431,11 +431,8 @@
 
 
 
-    // Create large display screen
-    function createLargeScreen() {
-      const screenWidth = 16;
-      const screenHeight = 9;
-      
+    // Create canvas texture for screen content
+    function createScreenTexture() {
       const canvas = document.createElement('canvas');
       canvas.width = 1920;
       canvas.height = 1080;
@@ -455,9 +452,93 @@
       const texture = new THREE.CanvasTexture(canvas);
       texture.needsUpdate = true;
       
+      return { texture: texture, canvas: canvas };
+    }
+
+    // Load the room model and setup SHARESCREEN object
+    let largeScreen = null;
+    
+    function loadRoomModel() {
+      loader.load('./models/BAKE-WEBROOM1.glb', function(gltf) {
+        console.log('Loading room model...');
+        const roomModel = gltf.scene;
+        
+        // Add the entire room to the scene
+        roomModel.position.set(0, 0, 0);
+        roomModel.scale.set(1, 1, 1);
+        
+        // Enable shadows for all meshes
+        roomModel.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        
+        scene.add(roomModel);
+        
+        // Find the SHARESCREEN object
+        let shareScreenObject = null;
+        roomModel.traverse((child) => {
+          if (child.name === 'SHARESCREEN' || child.name.toLowerCase().includes('sharescreen')) {
+            shareScreenObject = child;
+            console.log('Found SHARESCREEN object:', child.name);
+          }
+        });
+        
+        if (shareScreenObject) {
+          // Create screen texture
+          const screenTexture = createScreenTexture();
+          
+          // Apply the texture to the SHARESCREEN object
+          if (shareScreenObject.material) {
+            shareScreenObject.material.map = screenTexture.texture;
+            shareScreenObject.material.needsUpdate = true;
+          }
+          
+          // Set up largeScreen object to work with existing code
+          largeScreen = {
+            screen: shareScreenObject,
+            texture: screenTexture.texture,
+            canvas: screenTexture.canvas
+          };
+          
+          shareScreenObject.userData = {
+            name: 'Large Display Screen',
+            type: 'display',
+            originalPosition: shareScreenObject.position.clone(),
+            originalScale: shareScreenObject.scale.clone(),
+            originalRotation: shareScreenObject.rotation.clone()
+          };
+          
+          sceneObjects.push(shareScreenObject);
+          console.log('SHARESCREEN object configured successfully');
+        } else {
+          console.warn('SHARESCREEN object not found in model, creating fallback screen');
+          createFallbackScreen();
+        }
+        
+        console.log('Room model loaded successfully');
+      }, 
+      function(progress) {
+        console.log('Room loading progress:', (progress.loaded / progress.total * 100) + '%');
+      },
+      function(error) {
+        console.error('Error loading room model:', error);
+        console.log('Creating fallback screen instead');
+        createFallbackScreen();
+      });
+    }
+    
+    // Fallback screen creation if GLB fails to load
+    function createFallbackScreen() {
+      const screenWidth = 16;
+      const screenHeight = 9;
+      const screenTexture = createScreenTexture();
+      
       const screenGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
       const screenMaterial = new THREE.MeshBasicMaterial({ 
-        map: texture,
+        map: screenTexture.texture,
         transparent: false
       });
       
@@ -465,36 +546,27 @@
       displayScreen.position.set(0, 4.5, -10);
       displayScreen.rotation.y = 0;
       
-      const frameGeometry = new THREE.PlaneGeometry(screenWidth + 0.4, screenHeight + 0.4);
-      const frameMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
-      const screenFrame = new THREE.Mesh(frameGeometry, frameMaterial);
-      screenFrame.position.copy(displayScreen.position);
-      screenFrame.position.z -= 0.02;
-      screenFrame.rotation.copy(displayScreen.rotation);
-      
-      const standGeometry = new THREE.BoxGeometry(1, 6, 0.5);
-      const standMaterial = new THREE.MeshPhongMaterial({ color: 0x444444 });
-      const screenStand = new THREE.Mesh(standGeometry, standMaterial);
-      screenStand.position.set(0, 1, -10.5);
-      screenStand.castShadow = true;
-      
-      scene.add(screenFrame);
       scene.add(displayScreen);
-      scene.add(screenStand);
       
-      return { screen: displayScreen, frame: screenFrame, stand: screenStand, texture: texture, canvas: canvas };
+      largeScreen = {
+        screen: displayScreen,
+        texture: screenTexture.texture,
+        canvas: screenTexture.canvas
+      };
+      
+      displayScreen.userData = {
+        name: 'Large Display Screen',
+        type: 'display',
+        originalPosition: displayScreen.position.clone(),
+        originalScale: displayScreen.scale.clone(),
+        originalRotation: displayScreen.rotation.clone()
+      };
+      
+      sceneObjects.push(displayScreen);
     }
-
-    const largeScreen = createLargeScreen();
-    largeScreen.screen.userData = {
-      name: 'Large Display Screen',
-      type: 'display',
-      originalPosition: largeScreen.screen.position.clone(),
-      originalScale: largeScreen.screen.scale.clone(),
-      originalRotation: largeScreen.screen.rotation.clone()
-    };
     
-    sceneObjects.push(largeScreen.screen);
+    // Load the room model on startup
+    loadRoomModel();
 
     // Screen sharing and video functionality
     let currentStream = null;

@@ -452,6 +452,14 @@
       const texture = new THREE.CanvasTexture(canvas);
       texture.needsUpdate = true;
       
+      // Fix upside down texture orientation
+      texture.flipY = false;
+      
+      // Fix mirrored/reversed texture (flip horizontally)
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.repeat.x = -1;
+      texture.offset.x = 1;
+      
       return { texture: texture, canvas: canvas };
     }
 

@@ -342,7 +342,7 @@
   </div>
 
   
-  <video id="video-element" autoplay controls style="display: none;"></video>
+  <video id="video-element" autoplay controls muted="false" volume="1.0" style="display: none;"></video>
   
   <div class="model-controls" id="model-controls">
     <h3 id="selected-object-name">Object Controls</h3>
@@ -776,6 +776,8 @@
         currentStream = stream;
         const videoEl = document.getElementById('video-element');
         videoEl.srcObject = stream;
+        videoEl.muted = false; // Ensure screen sharing audio is not muted
+        videoEl.volume = 1.0; // Set volume to maximum
         videoEl.play();
         
         function updateScreenTexture() {
@@ -827,6 +829,8 @@
       const url = URL.createObjectURL(file);
       videoEl.src = url;
       videoEl.loop = true;
+      videoEl.muted = false; // Ensure audio is not muted
+      videoEl.volume = 1.0; // Set volume to maximum
       videoEl.play();
       
       currentVideo = { file: file, url: url };

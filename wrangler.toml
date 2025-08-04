@@ -1,0 +1,9 @@
+name = "threejs-signaling"
+main = "signaling-worker.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "threejs-signaling"
+
+# Deploy with: npx wrangler deploy
+# This will give you a URL like: https://threejs-signaling.your-subdomain.workers.dev

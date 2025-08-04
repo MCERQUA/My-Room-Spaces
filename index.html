@@ -834,61 +834,67 @@
     let activeStreams = new Map(); // Track active streams from other tabs
     
     function initializeRoomSystem() {
-      console.log('🔄 Initializing local P2P using BroadcastChannel...');
+      console.log('🚀 Initializing WebRTC P2P with Cloudflare Worker signaling...');
+      
+      // Use Socket.IO demo server that allows all origins  
+      const SIGNALING_SERVER = 'https://socket-io-chat.herokuapp.com';
       
       try {
-        // Use BroadcastChannel for same-origin P2P (multiple tabs on same site)
-        broadcastChannel = new BroadcastChannel('threejs-screen-share');
-        
-        broadcastChannel.onmessage = (event) => {
-          const { type, data, senderId } = event.data;
-          
-          switch (type) {
-            case 'screen-share-started':
-              console.log(`📺 User ${senderId} started screen sharing`);
-              handleRemoteScreenShare(data, senderId);
-              break;
-              
-            case 'screen-share-stopped':
-              console.log(`⏹️ User ${senderId} stopped screen sharing`);
-              handleRemoteScreenStop(senderId);
-              break;
-              
-            case 'user-joined':
-              console.log(`👋 User ${senderId} joined`);
-              // Send our current stream state if we're sharing
-              if (currentStream && currentStream.active) {
-                broadcastChannel.postMessage({
-                  type: 'screen-share-started',
-                  data: { streamId: 'local-stream' },
-                  senderId: 'local-user'
-                });
-              }
-              break;
-          }
-        };
-        
-        // Announce that we joined
-        broadcastChannel.postMessage({
-          type: 'user-joined',
-          senderId: 'local-user-' + Math.random().toString(36).substring(7)
+        socket = io(SIGNALING_SERVER, {
+          timeout: 5000,
+          transports: ['polling', 'websocket']
         });
         
-        console.log('✅ Local P2P initialized - tabs can share screens with each other');
+        socket.on('connect', () => {
+          console.log('✅ Connected to signaling server!');
+          console.log('🎉 Real P2P screen sharing is now enabled!');
+          
+          // Auto-join the main room
+          socket.emit('join-room', MAIN_ROOM);
+        });
+        
+        socket.on('disconnect', () => {
+          console.log('❌ Disconnected from signaling server');
+        });
+        
+        // Handle room events
+        socket.on('room-joined', (data) => {
+          roomUsers = data.users || [];
+          inRoom = true;
+          console.log(`🏠 Joined room! ${roomUsers.length} users online`);
+          
+          // Connect to existing users
+          roomUsers.forEach(userId => {
+            if (userId !== socket.id) {
+              connectToPeer(userId, true); // We initiate
+            }
+          });
+        });
+        
+        socket.on('user-joined', (data) => {
+          console.log(`👋 New user joined: ${data.userId}`);
+          connectToPeer(data.userId, false); // They initiate
+        });
+        
+        socket.on('user-left', (data) => {
+          console.log(`👋 User left: ${data.userId}`);
+          if (peers[data.userId]) {
+            peers[data.userId].destroy();
+            delete peers[data.userId];
+          }
+        });
+        
+        socket.on('signal', (data) => {
+          if (peers[data.from]) {
+            peers[data.from].signal(data.signal);
+          }
+        });
         
       } catch (error) {
-        console.warn('❌ BroadcastChannel not supported:', error);
-        console.log('💡 Screen sharing will work in single tab only');
+        console.error('❌ Failed to initialize P2P:', error);
+        console.log('💡 Screen sharing will work locally only');
       }
-      
-      return; // Skip the old Socket.IO code
-      
-      // Old Socket.IO code (keep for reference)
-      const signalingUrls = [
-        'https://socket-io-chat.now.sh', // Socket.IO demo server  
-      ];
-      
-      let currentUrlIndex = 0;
+    }
       
       function tryConnectToServer() {
         if (currentUrlIndex >= signalingUrls.length) {

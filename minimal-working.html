@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Interactive Website - Minimal</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      background: #000;
+      color: #00ff00;
+    }
+
+    #scene-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .screen {
+      position: absolute;
+      width: 320px;
+      height: 240px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid #00ff00;
+      border-radius: 8px;
+      padding: 20px;
+      z-index: 100;
+      backdrop-filter: blur(5px);
+      cursor: pointer;
+    }
+
+    .screen h2 {
+      color: #00ff00;
+      margin-bottom: 15px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .terminal-content {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .terminal-content p {
+      margin-bottom: 8px;
+    }
+
+    .controls-info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #00ff00;
+      font-size: 12px;
+    }
+
+    .controls-info p {
+      margin-bottom: 5px;
+      color: #00ff00;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="scene-container">
+    <div class="screen" id="interactive-screen">
+      <h2>3D Scene Loader</h2>
+      <div class="terminal-content">
+        <p>Click to enter the 3D world!</p>
+        <p>Or press ENTER to continue</p>
+        <p>WASD to move, mouse to look around</p>
+      </div>
+    </div>
+  </div>
+  
+  <div class="controls-info">
+    <p>WASD: move camera</p>
+    <p>Mouse: look around</p>
+    <p>ENTER: hide this screen</p>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.158.0/build/three.module.js"
+      }
+    }
+  </script>
+  
+  <script type="module">
+    import * as THREE from 'three';
+
+    console.log('Starting 3D scene setup...');
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x001122);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    document.getElementById('scene-container').appendChild(renderer.domElement);
+
+    console.log('Renderer added to DOM');
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 10, 5);
+    directionalLight.castShadow = true;
+    scene.add(directionalLight);
+
+    // Add a simple rotating cube
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    const material = new THREE.MeshPhongMaterial({ 
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.8
+    });
+    const cube = new THREE.Mesh(geometry, material);
+    cube.position.set(0, 1, -5);
+    cube.castShadow = true;
+    scene.add(cube);
+
+    console.log('Cube added to scene');
+
+    // Add floor
+    const floorGeometry = new THREE.PlaneGeometry(20, 20);
+    const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -2;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Add some spheres
+    const sphereGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    for (let i = 0; i < 3; i++) {
+      const sphereMaterial = new THREE.MeshPhongMaterial({ color: 0xff0088 });
+      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      sphere.position.set(
+        (Math.random() - 0.5) * 8,
+        Math.random() * 2,
+        (Math.random() - 0.5) * 8 - 5
+      );
+      sphere.castShadow = true;
+      scene.add(sphere);
+    }
+
+    // Position camera
+    camera.position.set(0, 2, 5);
+    camera.lookAt(0, 0, -5);
+
+    console.log('Scene objects created');
+
+    // Variables
+    let isScreenVisible = true;
+    let cameraRotation = { x: 0, y: 0 };
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+
+    // Screen control
+    const screenElement = document.getElementById('interactive-screen');
+
+    function hideScreen() {
+      if (isScreenVisible) {
+        screenElement.style.display = 'none';
+        isScreenVisible = false;
+        console.log('Screen hidden');
+      }
+    }
+
+    screenElement.addEventListener('click', hideScreen);
+
+    // Keyboard controls
+    const keys = {};
+    document.addEventListener('keydown', (event) => {
+      keys[event.code] = true;
+      
+      if (event.code === 'Enter' && isScreenVisible) {
+        hideScreen();
+      }
+    });
+
+    document.addEventListener('keyup', (event) => {
+      keys[event.code] = false;
+    });
+
+    // Mouse controls
+    document.addEventListener('mousedown', (event) => {
+      if (!isScreenVisible) {
+        isDragging = true;
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+      }
+    });
+
+    document.addEventListener('mousemove', (event) => {
+      if (isDragging && !isScreenVisible) {
+        const deltaMove = {
+          x: event.clientX - previousMousePosition.x,
+          y: event.clientY - previousMousePosition.y
+        };
+        
+        cameraRotation.y -= deltaMove.x * 0.005;
+        cameraRotation.x -= deltaMove.y * 0.005;
+        cameraRotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, cameraRotation.x));
+        
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // Update camera rotation
+      if (!isScreenVisible) {
+        camera.rotation.order = 'YXZ';
+        camera.rotation.y = cameraRotation.y;
+        camera.rotation.x = cameraRotation.x;
+        
+        // Handle movement
+        const moveSpeed = 0.1;
+        if (keys['KeyW'] || keys['ArrowUp']) {
+          const direction = new THREE.Vector3(0, 0, -1);
+          direction.applyQuaternion(camera.quaternion);
+          camera.position.add(direction.multiplyScalar(moveSpeed));
+        }
+        if (keys['KeyS'] || keys['ArrowDown']) {
+          const direction = new THREE.Vector3(0, 0, 1);
+          direction.applyQuaternion(camera.quaternion);
+          camera.position.add(direction.multiplyScalar(moveSpeed));
+        }
+        if (keys['KeyA'] || keys['ArrowLeft']) {
+          const direction = new THREE.Vector3(-1, 0, 0);
+          direction.applyQuaternion(camera.quaternion);
+          camera.position.add(direction.multiplyScalar(moveSpeed));
+        }
+        if (keys['KeyD'] || keys['ArrowRight']) {
+          const direction = new THREE.Vector3(1, 0, 0);
+          direction.applyQuaternion(camera.quaternion);
+          camera.position.add(direction.multiplyScalar(moveSpeed));
+        }
+      }
+      
+      // Rotate the cube
+      cube.rotation.x += 0.01;
+      cube.rotation.y += 0.01;
+      
+      // Render the scene
+      renderer.render(scene, camera);
+    }
+
+    // Start the animation
+    animate();
+    
+    console.log('Animation started - 3D scene should be visible!');
+  </script>
+</body>
+</html>

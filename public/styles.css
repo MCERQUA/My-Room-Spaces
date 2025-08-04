@@ -1,0 +1,92 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+  background: #000;
+  color: #00ff00;
+}
+
+#scene-container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+
+.screen {
+  position: absolute;
+  width: 320px;
+  height: 240px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid #00ff00;
+  border-radius: 8px;
+  padding: 20px;
+  z-index: 100;
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+}
+
+.screen:hover {
+  background: rgba(0, 255, 0, 0.1);
+  box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+}
+
+.screen h2 {
+  color: #00ff00;
+  margin-bottom: 15px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.terminal-content {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.terminal-content p {
+  margin-bottom: 8px;
+}
+
+.controls-info {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 15px;
+  border-radius: 5px;
+  border: 1px solid #00ff00;
+  font-size: 12px;
+}
+
+.controls-info p {
+  margin-bottom: 5px;
+  color: #00ff00;
+}
+
+canvas {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .screen {
+    width: 280px;
+    height: 200px;
+    padding: 15px;
+  }
+  
+  .controls-info {
+    bottom: 10px;
+    left: 10px;
+    right: 10px;
+    font-size: 11px;
+  }
+}

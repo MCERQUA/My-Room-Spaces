@@ -1,0 +1,49 @@
+{
+  "name": "threejs-interactive-website",
+  "version": "2.0.0",
+  "description": "Interactive 3D web application with screen sharing, GLB model loading, and real-time object manipulation",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve . -p 8080 -s",
+    "dev": "python3 -m http.server 8080",
+    "build": "echo 'Static site - no build required'",
+    "deploy": "netlify deploy --prod"
+  },
+  "keywords": [
+    "threejs",
+    "webgl",
+    "3d",
+    "interactive",
+    "screen-sharing",
+    "webrtc",
+    "gltf",
+    "glb",
+    "models"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MCERQUA/3D-threejs-site.git"
+  },
+  "homepage": "https://3d-threejs-site.netlify.app",
+  "bugs": {
+    "url": "https://github.com/MCERQUA/3D-threejs-site/issues"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "three": "^0.158.0"
+  },
+  "devDependencies": {
+    "serve": "^14.2.1",
+    "netlify-cli": "^17.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead",
+    "not ie 11"
+  ]
+}

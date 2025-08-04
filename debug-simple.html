@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Debug 3D Scene</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      color: #00ff00;
+      font-family: 'Courier New', monospace;
+    }
+    
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      background: rgba(0,0,0,0.8);
+      padding: 10px;
+      border: 1px solid #00ff00;
+      border-radius: 5px;
+    }
+    
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <p>Debug Info:</p>
+    <p id="status">Loading...</p>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.158.0/build/three.module.js"
+      }
+    }
+  </script>
+  
+  <script type="module">
+    const statusEl = document.getElementById('status');
+    
+    try {
+      statusEl.textContent = "Importing Three.js...";
+      
+      import * as THREE from 'three';
+      
+      statusEl.textContent = "Three.js imported. Creating scene...";
+      
+      // Basic scene setup
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x000033);
+      
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      
+      statusEl.textContent = "Renderer created. Setting size...";
+      
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+      
+      statusEl.textContent = "Canvas added. Creating objects...";
+      
+      // Simple cube
+      const geometry = new THREE.BoxGeometry(2, 2, 2);
+      const material = new THREE.MeshBasicMaterial({ color: 0x00ff00, wireframe: true });
+      const cube = new THREE.Mesh(geometry, material);
+      scene.add(cube);
+      
+      // Position camera
+      camera.position.z = 5;
+      
+      statusEl.textContent = "Scene setup complete. Starting animation...";
+      
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+        
+        cube.rotation.x += 0.01;
+        cube.rotation.y += 0.01;
+        
+        renderer.render(scene, camera);
+      }
+      
+      animate();
+      
+      statusEl.textContent = "✅ SUCCESS: Scene is rendering!";
+      
+      // Hide debug info after 3 seconds
+      setTimeout(() => {
+        document.getElementById('info').style.display = 'none';
+      }, 3000);
+      
+    } catch (error) {
+      statusEl.textContent = "❌ ERROR: " + error.message;
+      console.error('Error:', error);
+    }
+    
+    // Handle resize
+    window.addEventListener('resize', () => {
+      if (typeof camera !== 'undefined' && typeof renderer !== 'undefined') {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+  </script>
+</body>
+</html>

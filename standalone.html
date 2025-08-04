@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Interactive Website</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: 'Courier New', monospace;
+      background: #000;
+      color: #00ff00;
+    }
+
+    #scene-container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+    }
+
+    .screen {
+      position: absolute;
+      width: 320px;
+      height: 240px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      border: 2px solid #00ff00;
+      border-radius: 8px;
+      padding: 20px;
+      z-index: 100;
+      backdrop-filter: blur(5px);
+      transition: all 0.3s ease;
+    }
+
+    .screen:hover {
+      background: rgba(0, 255, 0, 0.1);
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+    }
+
+    .screen h2 {
+      color: #00ff00;
+      margin-bottom: 15px;
+      text-align: center;
+      font-size: 18px;
+    }
+
+    .terminal-content {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .terminal-content p {
+      margin-bottom: 8px;
+    }
+
+    .controls-info {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #00ff00;
+      font-size: 12px;
+    }
+
+    .controls-info p {
+      margin-bottom: 5px;
+      color: #00ff00;
+    }
+
+    .drag-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 255, 0, 0.1);
+      border: 3px dashed #00ff00;
+      z-index: 300;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #00ff00;
+      pointer-events: none;
+    }
+
+    .drag-overlay.active {
+      display: flex;
+    }
+
+    .model-controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px;
+      border-radius: 5px;
+      border: 1px solid #00ff00;
+      font-size: 12px;
+      display: none;
+    }
+
+    .model-controls.visible {
+      display: block;
+    }
+
+    .model-controls button {
+      background: transparent;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 5px 10px;
+      margin: 2px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+    }
+
+    .model-controls button:hover {
+      background: rgba(0, 255, 0, 0.2);
+    }
+
+    .screen-controls {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 8px;
+      border-radius: 3px;
+      border: 1px solid #00ff00;
+      font-size: 10px;
+      width: 180px;
+    }
+
+    .screen-controls h3 {
+      color: #00ff00;
+      margin: 0 0 5px 0;
+      font-size: 11px;
+    }
+
+    .screen-controls button {
+      background: transparent;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 4px 6px;
+      margin: 1px;
+      border-radius: 2px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      width: 100%;
+    }
+
+    .screen-controls button:hover {
+      background: rgba(0, 255, 0, 0.2);
+    }
+
+    .screen-controls input[type="file"] {
+      background: transparent;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 2px;
+      margin: 1px 0;
+      border-radius: 2px;
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
+      width: 100%;
+    }
+
+    .screen-controls input[type="file"]::-webkit-file-upload-button {
+      background: transparent;
+      border: 1px solid #00ff00;
+      color: #00ff00;
+      padding: 2px 4px;
+      border-radius: 2px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 8px;
+    }
+
+    #video-element {
+      display: none;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    @media (max-width: 768px) {
+      .screen {
+        width: 280px;
+        height: 200px;
+        padding: 15px;
+      }
+      
+      .controls-info {
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        font-size: 11px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="scene-container">
+    <div class="screen" id="interactive-screen">
+      <h2>3D Model Loader</h2>
+      <div class="terminal-content">
+        <p>Drag & drop GLB files here!</p>
+        <p>Click to enter scene or press ENTER</p>
+        <p>WASD to move, mouse to look</p>
+      </div>
+    </div>
+    <div class="drag-overlay" id="drag-overlay">
+      <div>Drop GLB file to load 3D model</div>
+    </div>
+  </div>
+  <div class="controls-info">
+    <p>Click objects to select | Drag GLB files to load</p>
+    <p>WASD: move | Mouse: look | ENTER: hide screen</p>
+    <p>R: reset | Q: rotate | E/C: scale | DEL: delete</p>
+  </div>
+  
+  <div class="screen-controls" id="screen-controls">
+    <h3>📺 Large Screen Controls</h3>
+    <button id="share-screen">🖥️ Share Desktop Screen</button>
+    <button id="stop-sharing">⏹️ Stop Sharing</button>
+    <input type="file" id="video-upload" accept="video/*" />
+    <button id="load-video">📁 Load Video File</button>
+    <button id="clear-screen">🧹 Clear Screen</button>
+    <div style="margin-top: 5px; font-size: 8px; color: #00ff88;">
+      <p style="margin: 2px 0;">Screen in 3D scene</p>
+      <p style="margin: 2px 0;">Click to move/resize</p>
+    </div>
+  </div>
+  
+  <video id="video-element" autoplay muted></video>
+  <div class="model-controls" id="model-controls">
+    <h3 id="selected-object-name">Object Controls</h3>
+    <div>
+      <button id="move-up">↑ Up</button>
+      <button id="move-down">↓ Down</button>
+      <button id="move-left">← Left</button>
+      <button id="move-right">→ Right</button>
+    </div>
+    <div>
+      <button id="move-forward">▲ Forward</button>
+      <button id="move-backward">▼ Backward</button>
+      <button id="scale-up">+ Scale</button>
+      <button id="scale-down">- Scale</button>
+    </div>
+    <div>
+      <button id="rotate-y">↻ Rotate</button>
+      <button id="reset-object">⟲ Reset</button>
+      <button id="delete-selected" style="background: rgba(255, 0, 0, 0.2); border-color: #ff0000; color: #ff0000;">🗑 Delete</button>
+    </div>
+    <div>
+      <button id="deselect-object">✖ Deselect</button>
+    </div>
+  </div>
+  
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+      }
+    }
+  </script>
+  
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // Scene setup
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000011);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    document.getElementById('scene-container').appendChild(renderer.domElement);
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(10, 10, 5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.mapSize.width = 2048;
+    directionalLight.shadow.mapSize.height = 2048;
+    scene.add(directionalLight);
+
+    // Initialize object management variables first
+    let sceneObjects = [];
+    let selectedObject = null;
+    let isScreenVisible = true;
+    
+    // Selection system
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let selectedOutline = null;
+
+    // Add a rotating cube as main element
+    const geometry = new THREE.BoxGeometry(2, 2, 2);
+    const material = new THREE.MeshPhongMaterial({ 
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.8
+    });
+    const cube = new THREE.Mesh(geometry, material);
+    cube.position.set(0, 0, -5);
+    cube.castShadow = true;
+    cube.userData = { 
+      name: 'Main Cube', 
+      type: 'cube',
+      originalPosition: cube.position.clone(),
+      originalScale: cube.scale.clone(),
+      originalRotation: cube.rotation.clone(),
+      originalColor: 0x00ff88
+    };
+    scene.add(cube);
+    sceneObjects.push(cube);
+
+    // Add floor
+    const floorGeometry = new THREE.PlaneGeometry(20, 20);
+    const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -3;
+    floor.receiveShadow = true;
+    scene.add(floor);
+
+    // Add some decorative elements
+    const sphereGeometry = new THREE.SphereGeometry(0.5, 16, 16);
+    const sphereMaterial = new THREE.MeshPhongMaterial({ color: 0xff0088 });
+
+    for (let i = 0; i < 5; i++) {
+      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
+      const position = new THREE.Vector3(
+        (Math.random() - 0.5) * 10,
+        Math.random() * 2,
+        (Math.random() - 0.5) * 10 - 5
+      );
+      sphere.position.copy(position);
+      sphere.castShadow = true;
+      sphere.userData = { 
+        name: `Sphere ${i + 1}`, 
+        type: 'sphere',
+        originalPosition: position.clone(),
+        originalScale: sphere.scale.clone(),
+        originalRotation: sphere.rotation.clone(),
+        originalColor: 0xff0088
+      };
+      scene.add(sphere);
+      sceneObjects.push(sphere);
+    }
+
+    // Camera position
+    camera.position.set(0, 2, 5);
+    camera.lookAt(0, 0, -5);
+
+
+    // Mobile controls
+    let isMoving = false;
+    let lastTap = 0;
+    let moveDirection = new THREE.Vector3();
+    let cameraRotation = { x: 0, y: 0 };
+    let isDragging = false;
+    let previousMousePosition = { x: 0, y: 0 };
+
+    // Touch controls for mobile
+    document.addEventListener('touchstart', (event) => {
+      if (event.touches.length === 1) {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+        
+        if (tapLength < 500 && tapLength > 0) {
+          // Double tap - move forward
+          isMoving = true;
+          moveForward();
+        }
+        lastTap = currentTime;
+        
+        // Start drag for looking around
+        isDragging = true;
+        previousMousePosition = {
+          x: event.touches[0].clientX,
+          y: event.touches[0].clientY
+        };
+      }
+      event.preventDefault();
+    });
+
+    document.addEventListener('touchmove', (event) => {
+      if (isDragging && event.touches.length === 1) {
+        const deltaMove = {
+          x: event.touches[0].clientX - previousMousePosition.x,
+          y: event.touches[0].clientY - previousMousePosition.y
+        };
+        
+        cameraRotation.y -= deltaMove.x * 0.005;
+        cameraRotation.x -= deltaMove.y * 0.005;
+        cameraRotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, cameraRotation.x));
+        
+        previousMousePosition = {
+          x: event.touches[0].clientX,
+          y: event.touches[0].clientY
+        };
+      }
+      event.preventDefault();
+    });
+
+    document.addEventListener('touchend', (event) => {
+      isMoving = false;
+      isDragging = false;
+      event.preventDefault();
+    });
+
+    // Mouse controls for desktop
+    document.addEventListener('mousedown', (event) => {
+      // Don't handle mouse events if clicking on UI elements
+      if (event.target.closest('.model-controls') || event.target.closest('.controls-info')) {
+        return;
+      }
+      
+      isDragging = true;
+      previousMousePosition = { x: event.clientX, y: event.clientY };
+      
+      // Check for object selection on mouse down
+      if (!isScreenVisible) {
+        checkObjectSelection(event);
+      }
+    });
+
+    document.addEventListener('mousemove', (event) => {
+      if (isDragging) {
+        const deltaMove = {
+          x: event.clientX - previousMousePosition.x,
+          y: event.clientY - previousMousePosition.y
+        };
+        
+        cameraRotation.y -= deltaMove.x * 0.005;
+        cameraRotation.x -= deltaMove.y * 0.005;
+        cameraRotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, cameraRotation.x));
+        
+        previousMousePosition = { x: event.clientX, y: event.clientY };
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // Keyboard controls
+    const keys = {};
+    document.addEventListener('keydown', (event) => {
+      keys[event.code] = true;
+      
+      // Handle special keys
+      if (event.code === 'Enter' && isScreenVisible) {
+        hideScreen();
+        return;
+      }
+      
+      // Object manipulation shortcuts (when screen is hidden)
+      if (!isScreenVisible && selectedObject) {
+        switch(event.code) {
+          case 'KeyR':
+            resetObject();
+            break;
+          case 'KeyQ':
+            rotateObject('y');
+            break;
+          case 'KeyE':
+            scaleObject('up');
+            break;
+          case 'KeyC':
+            scaleObject('down');
+            break;
+          case 'Delete':
+          case 'Backspace':
+            deleteSelected();
+            break;
+          case 'Escape':
+            deselectObject();
+            break;
+        }
+      }
+    });
+
+    document.addEventListener('keyup', (event) => {
+      keys[event.code] = false;
+    });
+
+    function moveForward() {
+      if (isMoving) {
+        const direction = new THREE.Vector3(0, 0, -1);
+        direction.applyQuaternion(camera.quaternion);
+        camera.position.add(direction.multiplyScalar(0.1));
+        requestAnimationFrame(moveForward);
+      }
+    }
+
+    // Screen dismissal functionality
+    const screenElement = document.getElementById('interactive-screen');
+    const dragOverlay = document.getElementById('drag-overlay');
+    const modelControls = document.getElementById('model-controls');
+
+    function hideScreen() {
+      if (isScreenVisible) {
+        screenElement.style.display = 'none';
+        isScreenVisible = false;
+        cube.material.color.setHex(0xff0088);
+        cube.material.emissive.setHex(0x440044);
+      }
+    }
+
+    screenElement.addEventListener('click', hideScreen);
+
+    // Enter key to hide screen
+    document.addEventListener('keydown', (event) => {
+      if (event.code === 'Enter' && isScreenVisible) {
+        hideScreen();
+      }
+    });
+
+    // Drag and drop functionality
+    let dragCounter = 0;
+
+    document.addEventListener('dragenter', (e) => {
+      e.preventDefault();
+      dragCounter++;
+      if (dragCounter === 1) {
+        dragOverlay.classList.add('active');
+      }
+    });
+
+    document.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dragCounter--;
+      if (dragCounter === 0) {
+        dragOverlay.classList.remove('active');
+      }
+    });
+
+    document.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+
+    document.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dragCounter = 0;
+      dragOverlay.classList.remove('active');
+      
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        const file = files[0];
+        if (file.name.toLowerCase().endsWith('.glb') || file.name.toLowerCase().endsWith('.gltf')) {
+          hideScreen();
+          loadModelFromFile(file);
+        } else {
+          alert('Please drop a GLB or GLTF file');
+        }
+      }
+    });
+
+    // GLTF Loader
+    const loader = new GLTFLoader();
+
+    function loadModelFromFile(file) {
+      const url = URL.createObjectURL(file);
+      
+      loader.load(url, function(gltf) {
+        const model = gltf.scene;
+        
+        // Position the model
+        model.position.set(0, -1, -3);
+        model.scale.set(1, 1, 1);
+        
+        // Enable shadows
+        model.traverse((child) => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+        });
+        
+        // Add user data for selection system
+        model.userData = {
+          name: file.name.replace('.glb', '').replace('.gltf', ''),
+          type: 'model',
+          originalPosition: model.position.clone(),
+          originalScale: model.scale.clone(),
+          originalRotation: model.rotation.clone()
+        };
+        
+        // Add to scene and track
+        scene.add(model);
+        sceneObjects.push(model);
+        
+        // Auto-select the newly loaded model
+        selectObject(model);
+        
+        // Clean up the blob URL
+        URL.revokeObjectURL(url);
+        
+        console.log('Model loaded successfully:', file.name);
+      }, 
+      function(progress) {
+        console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+      },
+      function(error) {
+        console.error('Error loading model:', error);
+        alert('Error loading model: ' + error.message);
+      });
+    }
+
+    // Object selection and manipulation functions
+    function checkObjectSelection(event) {
+      mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+      
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(sceneObjects, true);
+      
+      if (intersects.length > 0) {
+        let targetObject = intersects[0].object;
+        
+        // Find the root object if we hit a child
+        while (targetObject.parent && !sceneObjects.includes(targetObject)) {
+          targetObject = targetObject.parent;
+        }
+        
+        if (sceneObjects.includes(targetObject)) {
+          selectObject(targetObject);
+        }
+      } else {
+        deselectObject();
+      }
+    }
+    
+    function selectObject(object) {
+      console.log('selectObject called with:', object);
+      console.log('Object userData:', object.userData);
+      
+      // Deselect previous object
+      if (selectedObject) {
+        clearSelection();
+      }
+      
+      selectedObject = object;
+      console.log('selectedObject is now:', selectedObject);
+      
+      // Add visual selection indicator
+      addSelectionIndicator(object);
+      
+      // Show controls
+      modelControls.classList.add('visible');
+      document.getElementById('selected-object-name').textContent = object.userData.name || 'Unknown Object';
+      
+      console.log('Object selected successfully, controls should be visible');
+    }
+    
+    function deselectObject() {
+      if (selectedObject) {
+        clearSelection();
+        selectedObject = null;
+        modelControls.classList.remove('visible');
+      }
+    }
+    
+    function clearSelection() {
+      if (selectedOutline) {
+        scene.remove(selectedOutline);
+        selectedOutline = null;
+      }
+    }
+    
+    function addSelectionIndicator(object) {
+      // Create a wireframe outline for the selected object
+      const geometry = object.geometry || new THREE.BoxGeometry(2, 2, 2);
+      const wireframe = new THREE.WireframeGeometry(geometry);
+      const outlineMaterial = new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 3 });
+      selectedOutline = new THREE.LineSegments(wireframe, outlineMaterial);
+      
+      // Copy transform from selected object
+      selectedOutline.position.copy(object.position);
+      selectedOutline.rotation.copy(object.rotation);
+      selectedOutline.scale.copy(object.scale);
+      
+      scene.add(selectedOutline);
+    }
+
+    window.moveObject = function(direction) {
+      console.log('moveObject called with direction:', direction);
+      console.log('selectedObject:', selectedObject);
+      
+      if (!selectedObject) {
+        console.log('No object selected!');
+        return;
+      }
+      
+      const moveAmount = 0.5;
+      
+      switch(direction) {
+        case 'up':
+          selectedObject.position.y += moveAmount;
+          break;
+        case 'down':
+          selectedObject.position.y -= moveAmount;
+          break;
+        case 'left':
+          selectedObject.position.x -= moveAmount;
+          break;
+        case 'right':
+          selectedObject.position.x += moveAmount;
+          break;
+        case 'forward':
+          selectedObject.position.z -= moveAmount; // Negative Z is forward in Three.js
+          break;
+        case 'backward':
+          selectedObject.position.z += moveAmount; // Positive Z is backward in Three.js
+          break;
+      }
+      
+      console.log('New position:', selectedObject.position);
+      
+      // Update selection indicator
+      if (selectedOutline) {
+        selectedOutline.position.copy(selectedObject.position);
+      }
+    };
+
+    window.scaleObject = function(direction) {
+      console.log('scaleObject called with direction:', direction);
+      if (!selectedObject) {
+        console.log('No object selected for scaling!');
+        return;
+      }
+      
+      const scaleAmount = direction === 'up' ? 1.1 : 0.9;
+      selectedObject.scale.multiplyScalar(scaleAmount);
+      console.log('New scale:', selectedObject.scale);
+      
+      // Update selection indicator
+      if (selectedOutline) {
+        selectedOutline.scale.copy(selectedObject.scale);
+      }
+    };
+
+    window.rotateObject = function(axis) {
+      if (!selectedObject) return;
+      
+      if (axis === 'y') {
+        selectedObject.rotation.y += Math.PI / 4;
+      }
+      
+      // Update selection indicator
+      if (selectedOutline) {
+        selectedOutline.rotation.copy(selectedObject.rotation);
+      }
+    };
+
+    window.resetObject = function() {
+      if (!selectedObject || !selectedObject.userData) return;
+      
+      const userData = selectedObject.userData;
+      selectedObject.position.copy(userData.originalPosition);
+      selectedObject.scale.copy(userData.originalScale);
+      selectedObject.rotation.copy(userData.originalRotation);
+      
+      // Reset color if it's a basic object
+      if (userData.originalColor && selectedObject.material) {
+        selectedObject.material.color.setHex(userData.originalColor);
+        selectedObject.material.emissive.setHex(0x000000);
+      }
+      
+      // Update selection indicator
+      if (selectedOutline) {
+        selectedOutline.position.copy(selectedObject.position);
+        selectedOutline.scale.copy(selectedObject.scale);
+        selectedOutline.rotation.copy(selectedObject.rotation);
+      }
+    };
+    
+    window.deleteSelected = function() {
+      if (!selectedObject) return;
+      
+      // Remove from scene
+      scene.remove(selectedObject);
+      
+      // Remove from objects array
+      const index = sceneObjects.indexOf(selectedObject);
+      if (index > -1) {
+        sceneObjects.splice(index, 1);
+      }
+      
+      // Clear selection
+      deselectObject();
+    };
+    
+    window.deselectObject = deselectObject;
+
+    // Add meme/2D plane functionality
+    function createMemePlane() {
+      // Create a canvas for the meme text
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const context = canvas.getContext('2d');
+      
+      // Draw meme background
+      context.fillStyle = '#000000';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw meme text
+      context.fillStyle = '#00ff00';
+      context.font = 'bold 48px Arial';
+      context.textAlign = 'center';
+      context.fillText('SUCH 3D', canvas.width/2, canvas.height/2 - 50);
+      context.fillText('VERY WOW', canvas.width/2, canvas.height/2 + 50);
+      
+      // Create texture from canvas
+      const texture = new THREE.CanvasTexture(canvas);
+      
+      // Create plane geometry
+      const planeGeometry = new THREE.PlaneGeometry(4, 4);
+      const planeMaterial = new THREE.MeshBasicMaterial({ 
+        map: texture,
+        transparent: true,
+        opacity: 0.9
+      });
+      
+      const memePlane = new THREE.Mesh(planeGeometry, planeMaterial);
+      memePlane.position.set(-6, 2, -3);
+      memePlane.rotation.y = Math.PI / 4;
+      
+      return memePlane;
+    }
+
+    // Add the meme plane to the scene
+    const meme = createMemePlane();
+    meme.userData = {
+      name: 'Meme Plane',
+      type: 'meme',
+      originalPosition: meme.position.clone(),
+      originalScale: meme.scale.clone(),
+      originalRotation: meme.rotation.clone()
+    };
+    scene.add(meme);
+    sceneObjects.push(meme);
+
+    // Create large display screen
+    function createLargeScreen() {
+      const screenWidth = 16;  // Much larger - 16 units wide
+      const screenHeight = 9;  // 16:9 aspect ratio - 9 units tall
+      
+      // Create initial canvas texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 1920;
+      canvas.height = 1080;
+      const ctx = canvas.getContext('2d');
+      
+      // Draw initial screen content
+      ctx.fillStyle = '#001122';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#00ff00';
+      ctx.font = 'bold 72px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('LARGE DISPLAY SCREEN', canvas.width/2, canvas.height/2 - 80);
+      ctx.font = 'bold 48px Arial';
+      ctx.fillText('Ready for Screen Sharing or Video', canvas.width/2, canvas.height/2 + 10);
+      ctx.font = '32px Arial';
+      ctx.fillText('Use controls to share desktop or load video', canvas.width/2, canvas.height/2 + 80);
+      
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.needsUpdate = true;
+      
+      // Create screen geometry
+      const screenGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
+      const screenMaterial = new THREE.MeshBasicMaterial({ 
+        map: texture,
+        transparent: false
+      });
+      
+      const displayScreen = new THREE.Mesh(screenGeometry, screenMaterial);
+      // Position it parallel to the back edge of the floor, elevated
+      displayScreen.position.set(0, 4.5, -10); // Centered, elevated, at back edge
+      displayScreen.rotation.y = 0; // Perfectly parallel to floor edge (no angle)
+      
+      // Add screen frame
+      const frameGeometry = new THREE.PlaneGeometry(screenWidth + 0.4, screenHeight + 0.4);
+      const frameMaterial = new THREE.MeshBasicMaterial({ color: 0x333333 });
+      const screenFrame = new THREE.Mesh(frameGeometry, frameMaterial);
+      screenFrame.position.copy(displayScreen.position);
+      screenFrame.position.z -= 0.02; // Slightly behind the screen
+      screenFrame.rotation.copy(displayScreen.rotation);
+      
+      // Add screen stand/support
+      const standGeometry = new THREE.BoxGeometry(1, 6, 0.5);
+      const standMaterial = new THREE.MeshPhongMaterial({ color: 0x444444 });
+      const screenStand = new THREE.Mesh(standGeometry, standMaterial);
+      screenStand.position.set(0, 1, -10.5); // Below the screen
+      screenStand.castShadow = true;
+      
+      scene.add(screenFrame);
+      scene.add(displayScreen);
+      scene.add(screenStand);
+      
+      return { screen: displayScreen, frame: screenFrame, stand: screenStand, texture: texture, canvas: canvas };
+    }
+
+    const largeScreen = createLargeScreen();
+    largeScreen.screen.userData = {
+      name: 'Large Display Screen',
+      type: 'display',
+      originalPosition: largeScreen.screen.position.clone(),
+      originalScale: largeScreen.screen.scale.clone(),
+      originalRotation: largeScreen.screen.rotation.clone()
+    };
+    
+    sceneObjects.push(largeScreen.screen);
+
+    // Screen sharing and video functionality
+    let currentStream = null;
+    let currentVideo = null;
+    
+    // Screen sharing functions
+    async function startScreenShare() {
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: true
+        });
+        
+        currentStream = stream;
+        
+        // Create video element to capture stream
+        const videoEl = document.getElementById('video-element');
+        videoEl.srcObject = stream;
+        videoEl.play();
+        
+        // Update screen texture with video
+        function updateScreenTexture() {
+          if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
+            const ctx = largeScreen.canvas.getContext('2d');
+            ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+            largeScreen.texture.needsUpdate = true;
+          }
+          
+          if (currentStream && currentStream.active) {
+            requestAnimationFrame(updateScreenTexture);
+          }
+        }
+        
+        videoEl.addEventListener('loadeddata', () => {
+          updateScreenTexture();
+        });
+        
+        // Handle stream end
+        stream.getVideoTracks()[0].addEventListener('ended', () => {
+          stopScreenShare();
+        });
+        
+        console.log('Screen sharing started');
+        
+      } catch (error) {
+        console.error('Error starting screen share:', error);
+        alert('Screen sharing failed. Please make sure you allow screen access.');
+      }
+    }
+    
+    function stopScreenShare() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+        currentStream = null;
+        
+        const videoEl = document.getElementById('video-element');
+        videoEl.srcObject = null;
+        
+        // Reset screen to default content
+        resetScreenContent();
+        
+        console.log('Screen sharing stopped');
+      }
+    }
+    
+    function loadVideoFile(file) {
+      if (currentStream) {
+        stopScreenShare();
+      }
+      
+      const videoEl = document.getElementById('video-element');
+      const url = URL.createObjectURL(file);
+      videoEl.src = url;
+      videoEl.loop = true;
+      videoEl.play();
+      
+      currentVideo = { file: file, url: url };
+      
+      // Update screen texture with video
+      function updateVideoTexture() {
+        if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
+          const ctx = largeScreen.canvas.getContext('2d');
+          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          largeScreen.texture.needsUpdate = true;
+        }
+        
+        if (currentVideo && !videoEl.paused) {
+          requestAnimationFrame(updateVideoTexture);
+        }
+      }
+      
+      videoEl.addEventListener('loadeddata', () => {
+        updateVideoTexture();
+      });
+      
+      videoEl.addEventListener('play', () => {
+        updateVideoTexture();
+      });
+      
+      console.log('Video loaded:', file.name);
+    }
+    
+    function clearScreen() {
+      if (currentStream) {
+        stopScreenShare();
+      }
+      
+      if (currentVideo) {
+        const videoEl = document.getElementById('video-element');
+        videoEl.pause();
+        videoEl.src = '';
+        URL.revokeObjectURL(currentVideo.url);
+        currentVideo = null;
+      }
+      
+      resetScreenContent();
+    }
+    
+    function resetScreenContent() {
+      const ctx = largeScreen.canvas.getContext('2d');
+      ctx.fillStyle = '#001122';
+      ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+      ctx.fillStyle = '#00ff00';
+      ctx.font = 'bold 48px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('Large Display Screen', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
+      ctx.font = 'bold 32px Arial';
+      ctx.fillText('Ready for Screen Sharing or Video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 20);
+      ctx.font = '24px Arial';
+      ctx.fillText('Use controls to share desktop or load video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 70);
+      
+      largeScreen.texture.needsUpdate = true;
+    }
+
+    // Handle window resize
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Animation loop
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      // Update camera rotation
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = cameraRotation.y;
+      camera.rotation.x = cameraRotation.x;
+      
+      // Handle keyboard movement
+      const moveSpeed = 0.1;
+      if (keys['KeyW'] || keys['ArrowUp']) {
+        const direction = new THREE.Vector3(0, 0, -1);
+        direction.applyQuaternion(camera.quaternion);
+        camera.position.add(direction.multiplyScalar(moveSpeed));
+      }
+      if (keys['KeyS'] || keys['ArrowDown']) {
+        const direction = new THREE.Vector3(0, 0, 1);
+        direction.applyQuaternion(camera.quaternion);
+        camera.position.add(direction.multiplyScalar(moveSpeed));
+      }
+      if (keys['KeyA'] || keys['ArrowLeft']) {
+        const direction = new THREE.Vector3(-1, 0, 0);
+        direction.applyQuaternion(camera.quaternion);
+        camera.position.add(direction.multiplyScalar(moveSpeed));
+      }
+      if (keys['KeyD'] || keys['ArrowRight']) {
+        const direction = new THREE.Vector3(1, 0, 0);
+        direction.applyQuaternion(camera.quaternion);
+        camera.position.add(direction.multiplyScalar(moveSpeed));
+      }
+      
+      // Rotate the cube
+      cube.rotation.x += 0.01;
+      cube.rotation.y += 0.01;
+      
+      // Animate meme plane
+      meme.rotation.z += 0.005;
+      
+      // Render the scene
+      renderer.render(scene, camera);
+    }
+
+    // Add event listeners for control buttons
+    document.getElementById('move-up').addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveObject('up');
+    });
+    
+    document.getElementById('move-down').addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveObject('down');
+    });
+    
+    document.getElementById('move-left').addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveObject('left');
+    });
+    
+    document.getElementById('move-right').addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveObject('right');
+    });
+    
+    document.getElementById('move-forward').addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveObject('forward');
+    });
+    
+    document.getElementById('move-backward').addEventListener('click', (e) => {
+      e.stopPropagation();
+      moveObject('backward');
+    });
+    
+    document.getElementById('scale-up').addEventListener('click', (e) => {
+      e.stopPropagation();
+      scaleObject('up');
+    });
+    
+    document.getElementById('scale-down').addEventListener('click', (e) => {
+      e.stopPropagation();
+      scaleObject('down');
+    });
+    
+    document.getElementById('rotate-y').addEventListener('click', (e) => {
+      e.stopPropagation();
+      rotateObject('y');
+    });
+    
+    document.getElementById('reset-object').addEventListener('click', (e) => {
+      e.stopPropagation();
+      resetObject();
+    });
+    
+    document.getElementById('delete-selected').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deleteSelected();
+    });
+    
+    document.getElementById('deselect-object').addEventListener('click', (e) => {
+      e.stopPropagation();
+      deselectObject();
+    });
+
+    // Screen control event listeners
+    document.getElementById('share-screen').addEventListener('click', (e) => {
+      e.stopPropagation();
+      startScreenShare();
+    });
+    
+    document.getElementById('stop-sharing').addEventListener('click', (e) => {
+      e.stopPropagation();
+      stopScreenShare();
+    });
+    
+    document.getElementById('video-upload').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        loadVideoFile(file);
+      }
+    });
+    
+    document.getElementById('load-video').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('video-upload').click();
+    });
+    
+    document.getElementById('clear-screen').addEventListener('click', (e) => {
+      e.stopPropagation();
+      clearScreen();
+    });
+
+    // Start the animation loop
+    animate();
+
+    console.log('3D Interactive Website loaded successfully!');
+  </script>
+</body>
+</html>

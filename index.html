@@ -392,11 +392,38 @@
 
     // Scene setup
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000011);
+    // Use different background colors for mobile/desktop testing
+    scene.background = new THREE.Color(isMobileEarly ? 0x111111 : 0x000011);
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    // Detect mobile first for renderer setup
+    const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    const renderer = new THREE.WebGLRenderer({ 
+      antialias: !isMobileEarly, // Disable antialiasing on mobile
+      alpha: false,
+      powerPreference: isMobileEarly ? "default" : "high-performance",
+      preserveDrawingBuffer: false,
+      failIfMajorPerformanceCaveat: false
+    });
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobileEarly ? 1 : 2)); // Lower pixel ratio on mobile
+    
+    // Simplified renderer settings for mobile compatibility
+    if (isMobileEarly) {
+      // Mobile: Use simplest possible settings
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.NoToneMapping; // Disable tone mapping on mobile
+      renderer.toneMappingExposure = 1.0;
+      console.log('Using simplified mobile renderer settings');
+    } else {
+      // Desktop: Full quality settings
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.0;
+      console.log('Using full quality desktop renderer settings');
+    }
+    
     // Shadow map setup will be handled in lighting section based on device type
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -405,6 +432,21 @@
     // Detect mobile devices
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     console.log('Mobile device detected:', isMobile);
+    
+    // Check WebGL capabilities and renderer info
+    const gl = renderer.getContext();
+    console.log('=== DEVICE INFO ===');
+    console.log('User Agent:', navigator.userAgent);
+    console.log('Mobile detected:', isMobile);
+    console.log('Device pixel ratio:', window.devicePixelRatio);
+    console.log('=== WEBGL INFO ===');
+    console.log('WebGL version:', gl.getParameter(gl.VERSION));
+    console.log('WebGL vendor:', gl.getParameter(gl.VENDOR));
+    console.log('WebGL renderer:', gl.getParameter(gl.RENDERER));
+    console.log('Max texture size:', gl.getParameter(gl.MAX_TEXTURE_SIZE));
+    console.log('Renderer info:', renderer.info);
+    console.log('=== SCENE INFO ===');
+    console.log('Scene background:', scene.background);
 
     // Post-processing setup for subtle bloom effect (desktop only)
     let composer = null;
@@ -433,11 +475,11 @@
       console.log('Using direct rendering for mobile compatibility');
     }
 
-    // Lighting - brighter for mobile compatibility
-    const ambientLight = new THREE.AmbientLight(0xffffff, isMobile ? 0.8 : 0.3);
+    // Lighting - much brighter and simpler for mobile compatibility
+    const ambientLight = new THREE.AmbientLight(0xffffff, isMobile ? 1.5 : 0.3);
     scene.add(ambientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 1.2 : 0.8);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, isMobile ? 0.5 : 0.8);
     directionalLight.position.set(10, 10, 5);
     
     // Disable shadows on mobile for better performance and compatibility
@@ -452,6 +494,11 @@
     }
     
     scene.add(directionalLight);
+    
+    console.log('=== LIGHTING INFO ===');
+    console.log('Ambient light intensity:', ambientLight.intensity);
+    console.log('Directional light intensity:', directionalLight.intensity);
+    console.log('Shadows enabled:', renderer.shadowMap.enabled);
 
     // Initialize object management variables first
     let sceneObjects = [];
@@ -464,13 +511,15 @@
     let selectedOutline = null;
 
 
-    // Add floor
+    // Add floor - use basic material on mobile for better compatibility
     const floorGeometry = new THREE.PlaneGeometry(20, 20);
-    const floorMaterial = new THREE.MeshLambertMaterial({ color: 0x333333 });
+    const floorMaterial = isMobile 
+      ? new THREE.MeshBasicMaterial({ color: 0x333333 })
+      : new THREE.MeshLambertMaterial({ color: 0x333333 });
     const floor = new THREE.Mesh(floorGeometry, floorMaterial);
     floor.rotation.x = -Math.PI / 2;
     floor.position.y = -3;
-    floor.receiveShadow = true;
+    if (!isMobile) floor.receiveShadow = true;
     scene.add(floor);
 
 
@@ -528,7 +577,17 @@
             }
             // Ensure materials are compatible with mobile
             if (child.material && isMobile) {
-              // Force material to update on mobile
+              // Replace complex materials with basic materials on mobile
+              if (child.material.type !== 'MeshBasicMaterial') {
+                const basicMaterial = new THREE.MeshBasicMaterial({
+                  color: child.material.color || 0xffffff,
+                  map: child.material.map || null,
+                  transparent: child.material.transparent || false,
+                  opacity: child.material.opacity || 1.0
+                });
+                child.material = basicMaterial;
+                console.log('Replaced material with MeshBasicMaterial for mobile compatibility');
+              }
               child.material.needsUpdate = true;
             }
           }
@@ -560,12 +619,15 @@
           console.log('Material:', shareScreenObject.material);
           console.log('Material type:', shareScreenObject.material ? shareScreenObject.material.type : 'none');
           
-          // Create a new material specifically for screen content
+          // Create a new material specifically for screen content  
           const screenMaterial = new THREE.MeshBasicMaterial({ 
             map: screenTexture.texture,
             transparent: false,
             side: THREE.DoubleSide
           });
+          
+          // Ensure texture color space is correct
+          screenTexture.texture.colorSpace = THREE.SRGBColorSpace;
           
           shareScreenObject.material = screenMaterial;
           shareScreenObject.material.needsUpdate = true;
@@ -619,6 +681,9 @@
         map: screenTexture.texture,
         transparent: false
       });
+      
+      // Ensure texture color space is correct
+      screenTexture.texture.colorSpace = THREE.SRGBColorSpace;
       
       const displayScreen = new THREE.Mesh(screenGeometry, screenMaterial);
       displayScreen.position.set(0, 4.5, -10);

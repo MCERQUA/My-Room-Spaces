@@ -711,7 +711,7 @@
       document.body.appendChild(videoEl);
       
       function updateScreenFromPeer() {
-        if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
+        if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
           ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           largeScreen.texture.needsUpdate = true;
@@ -742,7 +742,7 @@
         videoEl.play();
         
         function updateScreenTexture() {
-          if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
+          if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
             const ctx = largeScreen.canvas.getContext('2d');
             ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
             largeScreen.texture.needsUpdate = true;
@@ -795,7 +795,7 @@
       currentVideo = { file: file, url: url };
       
       function updateVideoTexture() {
-        if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
+        if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
           ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           largeScreen.texture.needsUpdate = true;
@@ -827,6 +827,11 @@
     }
     
     function resetScreenContent() {
+      if (!largeScreen || !largeScreen.canvas) {
+        console.warn('Cannot reset screen content - largeScreen not ready');
+        return;
+      }
+      
       const ctx = largeScreen.canvas.getContext('2d');
       ctx.fillStyle = '#001122';
       ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
@@ -842,9 +847,9 @@
       largeScreen.texture.needsUpdate = true;
     }
 
-    // Camera position
-    camera.position.set(0, 2, 5);
-    camera.lookAt(0, 0, -5);
+    // Camera position - positioned at couch facing the screen
+    camera.position.set(0, 1.5, -2);
+    camera.lookAt(0, 2, -8);
 
     // Mobile controls
     let isMoving = false;

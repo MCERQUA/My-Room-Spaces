@@ -942,6 +942,11 @@
           }
           break;
           
+        case 'member-count-update':
+          console.log(`📊 Member count updated: ${data.count}`);
+          updateUserCount(data.count);
+          break;
+          
         case 'webrtc-offer':
         case 'webrtc-answer':
         case 'webrtc-ice':

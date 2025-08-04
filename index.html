@@ -836,8 +836,12 @@
     function initializeRoomSystem() {
       console.log('🚀 Initializing WebRTC P2P with Cloudflare Worker signaling...');
       
-      // Use Socket.IO demo server that allows all origins  
-      const SIGNALING_SERVER = 'https://socket-io-chat.herokuapp.com';
+      // Use Cloudflare Worker signaling server for live screen sharing
+      const SIGNALING_SERVERS = [
+        'https://screen-share-signaling.metamike.workers.dev',
+        'https://test-worker.metamike.workers.dev'
+      ];
+      const SIGNALING_SERVER = SIGNALING_SERVERS[0];
       
       try {
         socket = io(SIGNALING_SERVER, {
@@ -1150,6 +1154,9 @@
         
         console.log('Screen sharing started');
         
+        // Start broadcasting to Cloudflare Worker for all visitors
+        startWorkerBroadcast();
+        
         // Broadcast to other tabs
         if (broadcastChannel) {
           broadcastChannel.postMessage({
@@ -1172,6 +1179,9 @@
         document.getElementById('video-element').srcObject = null;
         resetScreenContent();
         console.log('Screen sharing stopped');
+        
+        // Stop broadcasting to Cloudflare Worker
+        stopWorkerBroadcast();
         
         // Broadcast to other tabs
         if (broadcastChannel) {
@@ -1779,8 +1789,150 @@
     });
 
 
-    // Initialize room system
+    // Cloudflare Worker broadcast system for live screen sharing
+    const WORKER_URL = 'https://live-screen-broadcast.YOUR-SUBDOMAIN.workers.dev';
+    let workerWebSocket = null;
+    let isSharer = false;
+    let broadcastInterval = null;
+    
+    // Initialize Worker WebSocket connection for receiving broadcasts
+    function initializeWorkerConnection() {
+      try {
+        const wsUrl = WORKER_URL.replace('https://', 'wss://');
+        workerWebSocket = new WebSocket(wsUrl);
+        
+        workerWebSocket.onopen = () => {
+          console.log('✅ Connected to Cloudflare Worker for live screen sharing!');
+        };
+        
+        workerWebSocket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            handleWorkerMessage(data);
+          } catch (error) {
+            console.error('Error parsing Worker message:', error);
+          }
+        };
+        
+        workerWebSocket.onclose = () => {
+          console.log('❌ Disconnected from Worker. Attempting reconnection in 5s...');
+          setTimeout(initializeWorkerConnection, 5000);
+        };
+        
+        workerWebSocket.onerror = (error) => {
+          console.error('Worker WebSocket error:', error);
+        };
+        
+      } catch (error) {
+        console.error('Failed to connect to Worker:', error);
+        console.log('💡 Live screen sharing may not work without Worker connection');
+      }
+    }
+    
+    // Handle messages from Cloudflare Worker
+    function handleWorkerMessage(data) {
+      switch (data.type) {
+        case 'frame':
+          if (!isSharer && largeScreen && largeScreen.canvas) {
+            displayWorkerFrame(data);
+          }
+          break;
+        case 'stop':
+          resetScreenContent();
+          break;
+      }
+    }
+    
+    // Display frame received from Worker
+    function displayWorkerFrame(messageData) {
+      try {
+        const frameData = messageData.frame?.data || messageData.data;
+        if (!frameData) return;
+        
+        const img = new Image();
+        img.onload = () => {
+          if (largeScreen && largeScreen.canvas) {
+            const ctx = largeScreen.canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+            largeScreen.texture.needsUpdate = true;
+          }
+        };
+        img.src = frameData;
+      } catch (error) {
+        console.error('Error displaying Worker frame:', error);
+      }
+    }
+    
+    // Start broadcasting screen frames to Worker
+    function startWorkerBroadcast() {
+      if (broadcastInterval) return;
+      
+      isSharer = true;
+      console.log('🚀 Starting live broadcast to all site visitors...');
+      
+      broadcastInterval = setInterval(() => {
+        if (largeScreen && largeScreen.canvas && currentStream && currentStream.active) {
+          try {
+            const frameData = largeScreen.canvas.toDataURL('image/jpeg', 0.8);
+            
+            fetch(`${WORKER_URL}/broadcast`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                frameData: frameData,
+                width: largeScreen.canvas.width,
+                height: largeScreen.canvas.height
+              })
+            }).catch(error => {
+              console.error('Error sending frame to Worker:', error);
+            });
+          } catch (error) {
+            console.error('Error capturing frame for broadcast:', error);
+          }
+        }
+      }, 100); // Send frame every 100ms (10 FPS)
+    }
+    
+    // Stop broadcasting to Worker
+    function stopWorkerBroadcast() {
+      if (broadcastInterval) {
+        clearInterval(broadcastInterval);
+        broadcastInterval = null;
+      }
+      
+      isSharer = false;
+      
+      // Notify Worker to stop sharing
+      fetch(`${WORKER_URL}/stop`, {
+        method: 'POST'
+      }).catch(error => {
+        console.error('Error stopping Worker broadcast:', error);
+      });
+      
+      console.log('🛑 Stopped live broadcast');
+    }
+    
+    // Get current screen frame for new visitors
+    async function loadCurrentWorkerFrame() {
+      try {
+        const response = await fetch(`${WORKER_URL}/current`);
+        const data = await response.json();
+        
+        if (data.active && data.frame && !isSharer) {
+          displayWorkerFrame({ data: data.frame });
+          console.log('📺 Loaded current screen share from Worker');
+        }
+      } catch (error) {
+        console.error('Error loading current frame:', error);
+      }
+    }
+
+    // Initialize both room system and Worker connection
     initializeRoomSystem();
+    initializeWorkerConnection();
+    
+    // Load current frame on page load
+    setTimeout(loadCurrentWorkerFrame, 2000);
 
     // Start the animation loop
     // Final mobile compatibility check before starting animation

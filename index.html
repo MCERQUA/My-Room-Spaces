@@ -167,6 +167,68 @@
       font-size: 8px;
     }
 
+    .room-controls {
+      position: absolute;
+      top: 20px;
+      left: 220px;
+      z-index: 200;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 8px;
+      border-radius: 3px;
+      border: 1px solid #ffaa00;
+      font-size: 10px;
+      width: 200px;
+    }
+
+    .room-controls h3 {
+      color: #ffaa00;
+      margin: 0 0 5px 0;
+      font-size: 11px;
+    }
+
+    .room-controls button {
+      background: transparent;
+      border: 1px solid #ffaa00;
+      color: #ffaa00;
+      padding: 4px 6px;
+      margin: 1px;
+      border-radius: 2px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      width: 100%;
+    }
+
+    .room-controls button:hover {
+      background: rgba(255, 170, 0, 0.2);
+    }
+
+    .room-controls input[type="text"] {
+      background: transparent;
+      border: 1px solid #ffaa00;
+      color: #ffaa00;
+      padding: 4px;
+      margin: 2px 0;
+      border-radius: 2px;
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      width: 100%;
+    }
+
+    .room-status {
+      margin-top: 5px;
+      font-size: 8px;
+      color: #ffaa88;
+    }
+
+    .room-status.connected {
+      color: #88ffaa;
+    }
+
+    .room-status.error {
+      color: #ff8888;
+    }
+
     #video-element {
       display: none;
     }
@@ -251,6 +313,17 @@
       <p style="margin: 2px 0;">Click to move/resize</p>
     </div>
   </div>
+
+  <div class="room-controls" id="room-controls">
+    <h3>👥 Room Sharing (2-4 users)</h3>
+    <input type="text" id="room-id" placeholder="Enter room code..." maxlength="8"/>
+    <button id="create-room">🆕 Create Room</button>
+    <button id="join-room">🚪 Join Room</button>
+    <button id="leave-room" style="display: none;">🚶 Leave Room</button>
+    <div class="room-status" id="room-status">
+      Not connected to any room
+    </div>
+  </div>
   
   <video id="video-element" autoplay muted></video>
   
@@ -277,6 +350,9 @@
       <button id="deselect-object">✖ Deselect</button>
     </div>
   </div>
+  
+  <script src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.js"></script>
+  <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
   
   <script type="importmap">
     {
@@ -493,6 +569,173 @@
     // Screen sharing and video functionality
     let currentStream = null;
     let currentVideo = null;
+
+    // P2P Room functionality
+    let socket = null;
+    let peers = {};
+    let currentRoom = null;
+    let isHost = false;
+    let roomUsers = [];
+    
+    // Try to connect to signaling server (fallback to local P2P if no server)
+    function initializeRoomSystem() {
+      try {
+        // Try connecting to your deployed signaling server
+        // Replace with your actual signaling server URL
+        const signalingUrls = [
+          'https://threejs-signaling.herokuapp.com',
+          'https://threejs-signaling.railway.app', 
+          'https://your-signaling-server.netlify.app'
+        ];
+        
+        socket = io(signalingUrls[0], {
+          timeout: 5000,
+          forceNew: true
+        });
+        
+        socket.on('connect', () => {
+          console.log('Connected to signaling server');
+          updateRoomStatus('Connected to server', 'connected');
+        });
+        
+        socket.on('disconnect', () => {
+          console.log('Disconnected from signaling server');
+          updateRoomStatus('Disconnected from server', 'error');
+        });
+        
+        // Handle room events
+        socket.on('room-created', (roomId) => {
+          currentRoom = roomId;
+          isHost = true;
+          updateRoomStatus(`Room ${roomId} created. You are host.`, 'connected');
+          document.getElementById('room-id').value = roomId;
+        });
+        
+        socket.on('room-joined', (data) => {
+          currentRoom = data.roomId;
+          roomUsers = data.users;
+          isHost = false;
+          updateRoomStatus(`Joined room ${data.roomId}. ${data.users.length} users.`, 'connected');
+          toggleRoomButtons(true);
+        });
+        
+        socket.on('user-joined', (data) => {
+          roomUsers = data.users;
+          updateRoomStatus(`User joined. ${data.users.length} users in room.`, 'connected');
+          
+          if (isHost && currentStream) {
+            // Host shares current stream with new user
+            connectToPeer(data.newUserId, true);
+          }
+        });
+        
+        socket.on('user-left', (data) => {
+          roomUsers = data.users;
+          updateRoomStatus(`User left. ${data.users.length} users in room.`, 'connected');
+          
+          if (peers[data.userId]) {
+            peers[data.userId].destroy();
+            delete peers[data.userId];
+          }
+        });
+        
+        socket.on('signal', (data) => {
+          if (peers[data.from]) {
+            peers[data.from].signal(data.signal);
+          } else {
+            // Create new peer connection for incoming call
+            connectToPeer(data.from, false, data.signal);
+          }
+        });
+        
+        socket.on('room-error', (error) => {
+          updateRoomStatus(`Error: ${error}`, 'error');
+        });
+        
+      } catch (error) {
+        console.log('No signaling server available, using local mode');
+        updateRoomStatus('Server unavailable - local mode only', 'error');
+      }
+    }
+    
+    function connectToPeer(userId, initiator, initialSignal = null) {
+      const peer = new SimplePeer({
+        initiator: initiator,
+        trickle: false,
+        stream: currentStream // Share current stream if available
+      });
+      
+      peers[userId] = peer;
+      
+      peer.on('signal', (data) => {
+        if (socket && socket.connected) {
+          socket.emit('signal', {
+            to: userId,
+            signal: data
+          });
+        }
+      });
+      
+      peer.on('stream', (stream) => {
+        console.log('Received stream from peer');
+        // Display received stream on the large screen
+        displaySharedStream(stream);
+      });
+      
+      peer.on('error', (err) => {
+        console.error('Peer error:', err);
+      });
+      
+      peer.on('close', () => {
+        delete peers[userId];
+      });
+      
+      if (initialSignal) {
+        peer.signal(initialSignal);
+      }
+    }
+    
+    function displaySharedStream(stream) {
+      const videoEl = document.createElement('video');
+      videoEl.srcObject = stream;
+      videoEl.autoplay = true;
+      videoEl.muted = true;
+      videoEl.style.display = 'none';
+      document.body.appendChild(videoEl);
+      
+      function updateScreenFromPeer() {
+        if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
+          const ctx = largeScreen.canvas.getContext('2d');
+          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          largeScreen.texture.needsUpdate = true;
+        }
+        
+        if (stream.active) {
+          requestAnimationFrame(updateScreenFromPeer);
+        }
+      }
+      
+      videoEl.addEventListener('loadeddata', () => {
+        updateScreenFromPeer();
+      });
+    }
+    
+    function updateRoomStatus(message, type = '') {
+      const statusEl = document.getElementById('room-status');
+      statusEl.textContent = message;
+      statusEl.className = `room-status ${type}`;
+    }
+    
+    function toggleRoomButtons(inRoom) {
+      document.getElementById('create-room').style.display = inRoom ? 'none' : 'block';
+      document.getElementById('join-room').style.display = inRoom ? 'none' : 'block';
+      document.getElementById('leave-room').style.display = inRoom ? 'block' : 'none';
+      document.getElementById('room-id').disabled = inRoom;
+    }
+    
+    function generateRoomId() {
+      return Math.random().toString(36).substring(2, 8).toUpperCase();
+    }
     
     async function startScreenShare() {
       try {
@@ -520,6 +763,15 @@
         
         videoEl.addEventListener('loadeddata', () => updateScreenTexture());
         stream.getVideoTracks()[0].addEventListener('ended', () => stopScreenShare());
+        
+        // Share stream with all peers in room
+        if (currentRoom && Object.keys(peers).length > 0) {
+          Object.values(peers).forEach(peer => {
+            if (peer.connected) {
+              peer.addStream(stream);
+            }
+          });
+        }
         
         console.log('Screen sharing started');
         
@@ -1070,6 +1322,63 @@
       e.stopPropagation();
       clearScreen();
     });
+
+    // Room control event listeners
+    document.getElementById('create-room').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const roomId = generateRoomId();
+      
+      if (socket && socket.connected) {
+        socket.emit('create-room', roomId);
+        toggleRoomButtons(true);
+      } else {
+        // Fallback: create local room
+        currentRoom = roomId;
+        isHost = true;
+        document.getElementById('room-id').value = roomId;
+        updateRoomStatus(`Local room ${roomId} created. Share this code!`, 'connected');
+        toggleRoomButtons(true);
+      }
+    });
+    
+    document.getElementById('join-room').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const roomId = document.getElementById('room-id').value.trim().toUpperCase();
+      
+      if (!roomId) {
+        alert('Please enter a room code');
+        return;
+      }
+      
+      if (socket && socket.connected) {
+        socket.emit('join-room', roomId);
+      } else {
+        updateRoomStatus('Cannot join - no server connection', 'error');
+      }
+    });
+    
+    document.getElementById('leave-room').addEventListener('click', (e) => {
+      e.stopPropagation();
+      
+      if (socket && socket.connected && currentRoom) {
+        socket.emit('leave-room', currentRoom);
+      }
+      
+      // Clean up all peer connections
+      Object.values(peers).forEach(peer => peer.destroy());
+      peers = {};
+      
+      currentRoom = null;
+      isHost = false;
+      roomUsers = [];
+      
+      toggleRoomButtons(false);
+      updateRoomStatus('Left room', '');
+      document.getElementById('room-id').value = '';
+    });
+
+    // Initialize room system
+    initializeRoomSystem();
 
     // Start the animation loop
     animate();

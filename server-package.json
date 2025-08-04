@@ -1,0 +1,30 @@
+{
+  "name": "threejs-webrtc-signaling-server",
+  "version": "1.0.0",
+  "description": "WebRTC signaling server for 3D Interactive Website room sharing",
+  "main": "signaling-server.js",
+  "scripts": {
+    "start": "node signaling-server.js",
+    "dev": "nodemon signaling-server.js"
+  },
+  "keywords": [
+    "webrtc",
+    "signaling",
+    "socket.io",
+    "p2p",
+    "screen-sharing"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}

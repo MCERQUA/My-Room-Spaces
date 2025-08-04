@@ -392,26 +392,6 @@
     const mouse = new THREE.Vector2();
     let selectedOutline = null;
 
-    // Add a rotating cube as main element
-    const geometry = new THREE.BoxGeometry(2, 2, 2);
-    const material = new THREE.MeshPhongMaterial({ 
-      color: 0x00ff88,
-      transparent: true,
-      opacity: 0.8
-    });
-    const cube = new THREE.Mesh(geometry, material);
-    cube.position.set(0, 0, -5);
-    cube.castShadow = true;
-    cube.userData = { 
-      name: 'Main Cube', 
-      type: 'cube',
-      originalPosition: new THREE.Vector3(0, 0, -5),
-      originalScale: new THREE.Vector3(1, 1, 1),
-      originalRotation: new THREE.Euler(0, 0, 0),
-      originalColor: 0x00ff88
-    };
-    scene.add(cube);
-    sceneObjects.push(cube);
 
     // Add floor
     const floorGeometry = new THREE.PlaneGeometry(20, 20);
@@ -422,74 +402,7 @@
     floor.receiveShadow = true;
     scene.add(floor);
 
-    // Add some decorative elements
-    const sphereGeometry = new THREE.SphereGeometry(0.5, 16, 16);
-    const sphereMaterial = new THREE.MeshPhongMaterial({ color: 0xff0088 });
-    const spheres = [];
 
-    for (let i = 0; i < 5; i++) {
-      const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-      const position = new THREE.Vector3(
-        (Math.random() - 0.5) * 10,
-        Math.random() * 2,
-        (Math.random() - 0.5) * 10 - 5
-      );
-      sphere.position.copy(position);
-      sphere.castShadow = true;
-      sphere.userData = { 
-        name: `Sphere ${i + 1}`, 
-        type: 'sphere',
-        originalPosition: position.clone(),
-        originalScale: new THREE.Vector3(1, 1, 1),
-        originalRotation: new THREE.Euler(0, 0, 0),
-        originalColor: 0xff0088
-      };
-      scene.add(sphere);
-      spheres.push(sphere);
-      sceneObjects.push(sphere);
-    }
-
-    // Add meme plane
-    function createMemePlane() {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const context = canvas.getContext('2d');
-      
-      context.fillStyle = '#000000';
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      
-      context.fillStyle = '#00ff00';
-      context.font = 'bold 48px Arial';
-      context.textAlign = 'center';
-      context.fillText('SUCH 3D', canvas.width/2, canvas.height/2 - 50);
-      context.fillText('VERY WOW', canvas.width/2, canvas.height/2 + 50);
-      
-      const texture = new THREE.CanvasTexture(canvas);
-      const planeGeometry = new THREE.PlaneGeometry(4, 4);
-      const planeMaterial = new THREE.MeshBasicMaterial({ 
-        map: texture,
-        transparent: true,
-        opacity: 0.9
-      });
-      
-      const memePlane = new THREE.Mesh(planeGeometry, planeMaterial);
-      memePlane.position.set(-6, 2, -3);
-      memePlane.rotation.y = Math.PI / 4;
-      
-      return memePlane;
-    }
-
-    const meme = createMemePlane();
-    meme.userData = {
-      name: 'Meme Plane',
-      type: 'meme',
-      originalPosition: new THREE.Vector3(-6, 2, -3),
-      originalScale: new THREE.Vector3(1, 1, 1),
-      originalRotation: new THREE.Euler(0, Math.PI / 4, 0)
-    };
-    scene.add(meme);
-    sceneObjects.push(meme);
 
     // Create large display screen
     function createLargeScreen() {
@@ -838,8 +751,6 @@
       if (isScreenVisible) {
         screenElement.style.display = 'none';
         isScreenVisible = false;
-        cube.material.color.setHex(0xff0088);
-        cube.material.emissive.setHex(0x440044);
       }
     }
 
@@ -1220,10 +1131,6 @@
         camera.position.add(direction.multiplyScalar(moveSpeed));
       }
       
-      cube.rotation.x += 0.01;
-      cube.rotation.y += 0.01;
-      
-      meme.rotation.z += 0.005;
       
       renderer.render(scene, camera);
     }

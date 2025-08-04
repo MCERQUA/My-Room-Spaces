@@ -760,6 +760,15 @@
         delete peers[userId];
       });
       
+      peer.on('connect', () => {
+        console.log('Peer connected:', userId);
+        // If we have an active screen share, add it to the new peer
+        if (currentStream && currentStream.active) {
+          console.log('Adding existing screen share to new peer');
+          peer.addStream(currentStream);
+        }
+      });
+      
       if (initialSignal) {
         peer.signal(initialSignal);
       }

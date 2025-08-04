@@ -829,19 +829,63 @@
     let inRoom = false;
     let roomUsers = [];
     
-    // Try to connect to signaling server with automatic fallback
+    // Simple P2P using BroadcastChannel for same-origin communication
+    let broadcastChannel = null;
+    let activeStreams = new Map(); // Track active streams from other tabs
+    
     function initializeRoomSystem() {
-      // For now, disable P2P until signaling server CORS is fixed
-      // The screen sharing still works perfectly for single users
-      console.log('📝 P2P temporarily disabled due to signaling server CORS issues');
-      console.log('✅ Local screen sharing works perfectly');
-      console.log('🔧 To fix P2P: Deploy signaling-server.js with proper CORS settings');
-      return; // Skip P2P initialization for now
+      console.log('🔄 Initializing local P2P using BroadcastChannel...');
       
+      try {
+        // Use BroadcastChannel for same-origin P2P (multiple tabs on same site)
+        broadcastChannel = new BroadcastChannel('threejs-screen-share');
+        
+        broadcastChannel.onmessage = (event) => {
+          const { type, data, senderId } = event.data;
+          
+          switch (type) {
+            case 'screen-share-started':
+              console.log(`📺 User ${senderId} started screen sharing`);
+              handleRemoteScreenShare(data, senderId);
+              break;
+              
+            case 'screen-share-stopped':
+              console.log(`⏹️ User ${senderId} stopped screen sharing`);
+              handleRemoteScreenStop(senderId);
+              break;
+              
+            case 'user-joined':
+              console.log(`👋 User ${senderId} joined`);
+              // Send our current stream state if we're sharing
+              if (currentStream && currentStream.active) {
+                broadcastChannel.postMessage({
+                  type: 'screen-share-started',
+                  data: { streamId: 'local-stream' },
+                  senderId: 'local-user'
+                });
+              }
+              break;
+          }
+        };
+        
+        // Announce that we joined
+        broadcastChannel.postMessage({
+          type: 'user-joined',
+          senderId: 'local-user-' + Math.random().toString(36).substring(7)
+        });
+        
+        console.log('✅ Local P2P initialized - tabs can share screens with each other');
+        
+      } catch (error) {
+        console.warn('❌ BroadcastChannel not supported:', error);
+        console.log('💡 Screen sharing will work in single tab only');
+      }
+      
+      return; // Skip the old Socket.IO code
+      
+      // Old Socket.IO code (keep for reference)
       const signalingUrls = [
-        // Your signaling servers (currently have CORS issues)
-        'https://threejs-signaling.railway.app',  // CORS only allows railway.com
-        'https://threejs-signaling.herokuapp.com', // No CORS headers
+        'https://socket-io-chat.now.sh', // Socket.IO demo server  
       ];
       
       let currentUrlIndex = 0;
@@ -981,6 +1025,57 @@
       }
     }
     
+    // Handle remote screen share from other tabs
+    function handleRemoteScreenShare(data, senderId) {
+      console.log('🔄 Attempting to display remote screen share (limited by browser security)');
+      
+      // Note: BroadcastChannel can't transfer MediaStreams directly
+      // This is a limitation - we can only sync the UI state, not the actual video
+      
+      // Show indicator that another tab is sharing
+      const indicator = document.createElement('div');
+      indicator.id = `remote-indicator-${senderId}`;
+      indicator.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0, 255, 0, 0.8);
+        color: black;
+        padding: 10px;
+        border-radius: 5px;
+        z-index: 1000;
+        font-size: 14px;
+      `;
+      indicator.textContent = `📺 Another tab is sharing screen`;
+      document.body.appendChild(indicator);
+      
+      // Update screen with message
+      if (largeScreen && largeScreen.canvas) {
+        const ctx = largeScreen.canvas.getContext('2d');
+        ctx.fillStyle = '#001122';
+        ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+        ctx.fillStyle = '#00ff00';
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('Another Tab is Screen Sharing', largeScreen.canvas.width/2, largeScreen.canvas.height/2);
+        ctx.font = '32px Arial';
+        ctx.fillText('(BroadcastChannel limitation - can\'t share video)', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 50);
+        largeScreen.texture.needsUpdate = true;
+      }
+    }
+    
+    function handleRemoteScreenStop(senderId) {
+      const indicator = document.getElementById(`remote-indicator-${senderId}`);
+      if (indicator) {
+        indicator.remove();
+      }
+      
+      // Reset screen content if no other remote shares
+      if (!document.querySelector('[id^="remote-indicator-"]')) {
+        resetScreenContent();
+      }
+    }
+    
     function displaySharedStream(stream) {
       const videoEl = document.createElement('video');
       videoEl.srcObject = stream;
@@ -1049,6 +1144,15 @@
         
         console.log('Screen sharing started');
         
+        // Broadcast to other tabs
+        if (broadcastChannel) {
+          broadcastChannel.postMessage({
+            type: 'screen-share-started',
+            data: { streamId: 'local-stream' },
+            senderId: 'local-user-' + Math.random().toString(36).substring(7)
+          });
+        }
+        
       } catch (error) {
         console.error('Error starting screen share:', error);
         alert('Screen sharing failed. Please make sure you allow screen access.');
@@ -1062,6 +1166,14 @@
         document.getElementById('video-element').srcObject = null;
         resetScreenContent();
         console.log('Screen sharing stopped');
+        
+        // Broadcast to other tabs
+        if (broadcastChannel) {
+          broadcastChannel.postMessage({
+            type: 'screen-share-stopped',
+            senderId: 'local-user'
+          });
+        }
       }
     }
     

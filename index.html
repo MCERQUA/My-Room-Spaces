@@ -846,43 +846,74 @@
     function initializeRoomSystem() {
       console.log('🚀 Initializing WebRTC P2P with Cloudflare Worker signaling...');
       
-      // Use Cloudflare Worker signaling server for live screen sharing
+      // Use Railway Socket.IO signaling server for live screen sharing
       const SIGNALING_SERVERS = [
-        'https://screen-share-signaling.metamike.workers.dev',
-        'https://test-worker.metamike.workers.dev'
+        'https://threejs-signaling.up.railway.app',
+        'https://threejs-signaling-backup.up.railway.app'
       ];
       const SIGNALING_SERVER = SIGNALING_SERVERS[0];
       
       try {
-        // Use native WebSocket instead of Socket.IO
-        socket = new WebSocket(SIGNALING_SERVER.replace('https://', 'wss://'));
+        // Use Socket.IO for Railway server
+        socket = io(SIGNALING_SERVER, {
+          transports: ['websocket', 'polling']
+        });
         
-        socket.onopen = () => {
-          console.log('✅ Connected to signaling server!');
+        socket.on('connect', () => {
+          console.log('✅ Connected to Railway signaling server!');
           console.log('🎉 Real P2P screen sharing is now enabled!');
-          
-          // Auto-join the main room
-          sendMessage({ type: 'join-room', room: MAIN_ROOM });
           inRoom = true;
-        };
+          myUserId = socket.id;
+        });
         
-        socket.onclose = () => {
-          console.log('❌ Disconnected from signaling server');
-          inRoom = false;
-        };
+        socket.on('room-joined', (data) => {
+          console.log(`👥 Joined room: ${data.roomId} (${data.users.length} members)`);
+          roomUsers = data.users.filter(id => id !== socket.id);
+          updateUserCount(data.users.length);
+          
+          // Connect to existing users
+          roomUsers.forEach(userId => {
+            connectToPeer(userId, true);
+          });
+        });
         
-        socket.onerror = (error) => {
-          console.error('❌ WebSocket error:', error);
-        };
-        
-        socket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            handleSignalingMessage(data);
-          } catch (error) {
-            console.error('Failed to parse message:', error);
+        socket.on('user-joined', (data) => {
+          console.log(`👋 User joined: ${data.newUserId}`);
+          if (!roomUsers.includes(data.newUserId)) {
+            roomUsers.push(data.newUserId);
           }
-        };
+          updateUserCount(data.users.length);
+          connectToPeer(data.newUserId, true);
+        });
+        
+        socket.on('user-left', (data) => {
+          console.log(`👋 User left: ${data.userId}`);
+          roomUsers = roomUsers.filter(id => id !== data.userId);
+          updateUserCount(data.users.length);
+          if (peers[data.userId]) {
+            peers[data.userId].destroy();
+            delete peers[data.userId];
+          }
+        });
+        
+        socket.on('signal', (data) => {
+          console.log(`📨 WebRTC signal from ${data.from}`);
+          if (peers[data.from]) {
+            peers[data.from].signal(data.signal);
+          } else {
+            // Create peer for incoming signal
+            connectToPeer(data.from, false, data.signal);
+          }
+        });
+        
+        socket.on('disconnect', () => {
+          console.log('🔌 Disconnected from signaling server');
+          inRoom = false;
+        });
+        
+        socket.on('error', (error) => {
+          console.error('❌ Signaling server error:', error);
+        });
         
       } catch (error) {
         console.error('❌ Failed to initialize P2P:', error);
@@ -891,88 +922,15 @@
     }
     
     function sendMessage(message) {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        console.log('📤 Sending:', message.type, message);
-        socket.send(JSON.stringify(message));
+      if (socket && socket.connected) {
+        console.log('📤 Sending:', message);
+        socket.emit(message.type, message);
       } else {
-        console.warn('⚠️ Cannot send message, socket not ready:', message.type);
+        console.warn('⚠️ Cannot send message, socket not connected:', message);
       }
     }
     
-    function handleSignalingMessage(data) {
-      console.log('📨 Received:', data.type);
-      
-      switch (data.type) {
-        case 'connected':
-          myUserId = data.id;
-          console.log(`🆔 Connected with ID: ${data.id}`);
-          break;
-          
-        case 'room-joined':
-          console.log(`👥 Joined room: ${data.room} (${data.memberCount} members)`);
-          roomUsers = data.members || [];
-          updateUserCount(data.memberCount);
-          // Connect to existing users
-          roomUsers.forEach(userId => {
-            connectToPeer(userId, true); // We initiate
-          });
-          break;
-          
-        case 'user-joined':
-          console.log(`👋 User joined: ${data.userId}`);
-          if (!roomUsers.includes(data.userId)) {
-            roomUsers.push(data.userId);
-          }
-          updateUserCount(roomUsers.length + 1); // +1 for self
-          connectToPeer(data.userId, true); // We initiate
-          
-          // If we're currently screen sharing, the new peer will get the stream automatically
-          if (currentStream) {
-            console.log('🖥️ New user will receive current screen share');
-          }
-          break;
-          
-        case 'user-left':
-          console.log(`👋 User left: ${data.userId}`);
-          roomUsers = roomUsers.filter(id => id !== data.userId);
-          updateUserCount(roomUsers.length + 1); // +1 for self
-          if (peers[data.userId]) {
-            peers[data.userId].destroy();
-            delete peers[data.userId];
-          }
-          break;
-          
-        case 'member-count-update':
-          console.log(`📊 Member count updated: ${data.count}`);
-          updateUserCount(data.count);
-          break;
-          
-        case 'webrtc-offer':
-        case 'webrtc-answer':
-        case 'webrtc-ice':
-          console.log(`📨 WebRTC signal from ${data.fromId}:`, data.type);
-          if (peers[data.fromId]) {
-            peers[data.fromId].signal(data.data);
-          } else if (data.type === 'webrtc-offer') {
-            // Create peer for incoming offer
-            console.log(`🔗 Creating peer for incoming offer from ${data.fromId}`);
-            connectToPeer(data.fromId, false, data.data);
-          }
-          break;
-          
-        case 'screen-share-started':
-          console.log(`🖥️ User ${data.userId} started screen sharing`);
-          break;
-          
-        case 'screen-share-stopped':
-          console.log(`🛑 User ${data.userId} stopped screen sharing`);
-          break;
-          
-        case 'error':
-          console.error('❌ Server error:', data.message);
-          break;
-      }
-    }
+    // Note: handleSignalingMessage removed - using Socket.IO event handlers directly
     
     
     function connectToPeer(userId, initiator, initialSignal = null) {
@@ -993,16 +951,10 @@
       peers[userId] = peer;
       
       peer.on('signal', (data) => {
-        // Determine signal type based on data content
-        let signalType = 'webrtc-offer';
-        if (data.type === 'answer') signalType = 'webrtc-answer';
-        if (data.candidate) signalType = 'webrtc-ice';
-        
-        sendMessage({
-          type: signalType,
+        console.log(`📤 Sending WebRTC signal to ${userId}:`, data.type || 'offer');
+        socket.emit('signal', {
           to: userId,
-          from: myUserId,
-          data: data
+          signal: data
         });
       });
       

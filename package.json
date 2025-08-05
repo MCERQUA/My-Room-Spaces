@@ -2,11 +2,11 @@
   "name": "threejs-interactive-website",
   "version": "2.0.0",
   "description": "Interactive 3D web application with screen sharing, GLB model loading, and real-time object manipulation",
-  "main": "index.html",
+  "main": "signaling-server.js",
   "scripts": {
-    "start": "serve . -p 8080 -s",
-    "dev": "python3 -m http.server 8080",
-    "build": "echo 'Static site - no build required'",
+    "start": "node signaling-server.js",
+    "dev": "nodemon signaling-server.js",
+    "build": "echo 'No build required'",
     "deploy": "netlify deploy --prod"
   },
   "keywords": [
@@ -34,11 +34,12 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
-    "three": "^0.158.0"
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2",
+    "cors": "^2.8.5"
   },
   "devDependencies": {
-    "serve": "^14.2.1",
-    "netlify-cli": "^17.0.0"
+    "nodemon": "^3.0.1"
   },
   "browserslist": [
     "> 1%",

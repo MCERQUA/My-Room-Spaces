@@ -1626,6 +1626,50 @@
       }
     }
     
+    // Initialize Cloudflare visitor counter
+    async function initializeCloudflareVisitorCounter() {
+      try {
+        // Define the API URL here since it's called before initializeRoomSystem
+        const CLOUDFLARE_API = 'https://visitor-counter.mikecerqua.workers.dev';
+        
+        // Generate or retrieve a unique visitor ID for this browser
+        let visitorId = localStorage.getItem('visitorId');
+        if (!visitorId) {
+          visitorId = 'visitor_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+          localStorage.setItem('visitorId', visitorId);
+        }
+        
+        // Increment the visitor count
+        const response = await fetch(`${CLOUDFLARE_API}/increment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.count !== undefined) {
+            updateVisitorCount(data.count);
+            console.log(`✅ Cloudflare visitor count: ${data.count}`);
+          }
+        } else {
+          console.error('Failed to increment visitor count:', response.status);
+          // Fallback to getting current count
+          const getResponse = await fetch(`${CLOUDFLARE_API}/count`);
+          if (getResponse.ok) {
+            const data = await getResponse.json();
+            if (data.count !== undefined) {
+              updateVisitorCount(data.count);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error connecting to Cloudflare visitor counter:', error);
+        // Continue with the app even if visitor counter fails
+      }
+    }
+    
     // Space name display
     function updateSpaceName(spaceName) {
       // You can add space name display if needed
@@ -1848,6 +1892,9 @@
         ? 'http://localhost:3001'  // Local development
         : 'https://3d-threejs-site-production.up.railway.app';  // Railway backend
       
+      // Cloudflare Worker API for persistent visitor counter
+      const VISITOR_COUNTER_API = 'https://visitor-counter.mikecerqua.workers.dev';
+      
       try {
         // Use Socket.IO for Railway server
         socket = io(SIGNALING_SERVER, {
@@ -1921,9 +1968,9 @@
           updateUserCount(worldData.users.length);
           updateUserList();
           
-          // Update visitor count if provided
-          if (worldData.visitorCount !== undefined) {
-            updateVisitorCount(worldData.visitorCount);
+          // Skip Railway visitor count - using Cloudflare instead
+          // if (worldData.visitorCount !== undefined) {
+          //   updateVisitorCount(worldData.visitorCount);
           }
           
           // Update space name if provided
@@ -2091,10 +2138,11 @@
           displayChatMessage(message);
         });
         
-        // ===== VISITOR COUNT UPDATE =====
+        // ===== VISITOR COUNT UPDATE (disabled - using Cloudflare) =====
         socket.on('visitor-count-update', (data) => {
-          if (data.visitorCount !== undefined) {
-            updateVisitorCount(data.visitorCount);
+          // Skip Railway visitor count - using Cloudflare instead
+          // if (data.visitorCount !== undefined) {
+          //   updateVisitorCount(data.visitorCount);
           }
         });
         
@@ -3749,6 +3797,9 @@
 
     // Show welcome dialog first, then initialize room system
     showWelcomeDialog();
+    
+    // Initialize Cloudflare visitor counter immediately (separate from Socket.IO)
+    initializeCloudflareVisitorCounter();
     
     // Note: Auto-loading current frame removed - using P2P WebRTC instead
 

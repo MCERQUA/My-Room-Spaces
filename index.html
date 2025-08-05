@@ -425,14 +425,56 @@
       min-width: 150px;
     }
 
+    .user-list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
     .user-list h3 {
-      margin: 0 0 10px 0;
+      margin: 0;
       color: #ffffff;
       font-size: 14px;
       font-weight: 600;
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+    
+    .user-list-close {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+      font-size: 20px;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+      padding: 0;
+      line-height: 1;
+    }
+    
+    .user-list-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    
+    .user-list.collapsed {
+      min-width: auto;
+      padding: 10px 15px;
+    }
+    
+    .user-list.collapsed .user-list-body {
+      display: none;
+    }
+    
+    .user-list.collapsed .user-list-header {
+      margin-bottom: 0;
     }
 
     .user-item {
@@ -854,6 +896,12 @@
       .user-list h3 {
         font-size: 12px;
       }
+      
+      .user-list-close {
+        width: 20px;
+        height: 20px;
+        font-size: 16px;
+      }
 
       .user-item {
         font-size: 11px;
@@ -965,13 +1013,18 @@
 
   <!-- User List in Top Right -->
   <div class="user-list" id="user-list">
-    <h3>👥 Users Online <span class="user-count" id="user-count-badge">(1)</span></h3>
-    <div id="user-list-content">
-      <div class="user-item self" id="current-user">Loading...</div>
+    <div class="user-list-header">
+      <h3>👥 Users Online <span class="user-count" id="user-count-badge">(1)</span></h3>
+      <button class="user-list-close" id="user-list-close">×</button>
     </div>
-    <button class="avatar-upload-button" id="upload-avatar">
-      🎭 Upload Custom Avatar
-    </button>
+    <div class="user-list-body" id="user-list-body">
+      <div id="user-list-content">
+        <div class="user-item self" id="current-user">Loading...</div>
+      </div>
+      <button class="avatar-upload-button" id="upload-avatar">
+        🎭 Upload Custom Avatar
+      </button>
+    </div>
   </div>
 
   <!-- Chat Interface -->
@@ -3476,6 +3529,21 @@
     document.getElementById('chat-toggle').addEventListener('click', (e) => {
       e.stopPropagation();
       toggleChat();
+    });
+
+    // User list toggle functionality
+    document.getElementById('user-list-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const userList = document.getElementById('user-list');
+      userList.classList.toggle('collapsed');
+      
+      // Change button text based on state
+      const closeButton = document.getElementById('user-list-close');
+      if (userList.classList.contains('collapsed')) {
+        closeButton.textContent = '+';
+      } else {
+        closeButton.textContent = '×';
+      }
     });
 
 

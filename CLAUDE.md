@@ -1,35 +1,43 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with the **Self-Hosted Multi-user 3D World Website**.
+
+## Project Overview
+
+This is a **real-time multi-user 3D virtual world** where users can:
+- See each other as 3D avatars with name labels
+- Share screens via WebRTC P2P streaming
+- Chat in real-time with persistent message history
+- Collaboratively manipulate 3D objects
+- Edit their display names by clicking them
 
 ## Development Commands
 
 ### Local Development
 ```bash
-# Start local development server (preferred)
-npm run dev
+# Start backend server (required for multi-user features)
+npm run dev                 # Railway server on localhost:3001
 
-# Alternative local server
-npm start
+# Start frontend (separate terminal)
+npm start                   # Static site on localhost:8080
 
 # Deploy to production
-npm run deploy
+git push origin main        # Auto-deploys to Netlify + Railway
 ```
 
-### Testing the Application
-- Open browser to `http://localhost:8080` after running dev server
-- Test screen sharing requires HTTPS (works on deployed version)
-- Drag GLB/GLTF files onto browser window to test model loading
-- Use WASD keys + mouse to navigate 3D scene
+### Testing Multi-User Features
+- Backend must be running (`npm run dev`) for multi-user functionality
+- Open multiple browser tabs to `http://localhost:8080` to test multi-user
+- Test real-time avatar movement, chat, screen sharing, object synchronization
+- Check browser console for Socket.IO connection messages
 
 ## Architecture Overview
 
-### Single-File Application Structure
-This is a **single-file Three.js application** (`index.html`) containing:
-- Complete HTML structure with embedded CSS styling
-- All JavaScript code in a single `<script type="module">` block
-- Three.js imported via ES6 modules from unpkg CDN
-- No build process required - runs directly in browser
+### Hybrid Multi-User Architecture
+This is a **hybrid client-server application** with:
+- **Frontend**: Single-file Three.js application (`index.html`) hosted on Netlify
+- **Backend**: Node.js Socket.IO server (`signaling-server.js`) hosted on Railway
+- **WebRTC Layer**: Direct P2P connections for screen sharing between users
 
 ### Key Components
 
@@ -64,7 +72,7 @@ This is a **single-file Three.js application** (`index.html`) containing:
 
 ### File Structure
 ```
-index.html              # Main application with social features (2400+ lines)
+index.html              # Main application with multi-user features (2400+ lines)
 ├── 3D Scene Components # Three.js setup, lighting, objects, cameras
 ├── User Avatar System  # Real-time multi-user presence with 3D spheres
 ├── Screen Sharing      # Hybrid server coordination + WebRTC P2P video
@@ -78,9 +86,18 @@ signaling-server.js     # Railway persistent world server (350+ lines)
 ├── Avatar Management   # User spawning, position tracking, cleanup
 └── Chat System         # Message persistence and broadcasting
 
+docs/                   # Comprehensive documentation
+├── SETUP.md           # Complete deployment guide
+├── USER_GUIDE.md      # All features and how to use them
+├── netlify-deployment.md  # Frontend hosting setup
+├── railway-deployment.md  # Backend server setup
+├── TROUBLESHOOTING.md # Common issues and solutions
+└── CONTRIBUTING.md    # Development and contribution guide
+
 models/                 # Optional GLB models directory
 netlify.toml           # Static site deployment configuration
-CLAUDE.md              # Complete v2.0 architecture documentation
+README.md              # Project overview and quick start
+CLAUDE.md              # This documentation file
 ```
 
 ## Important Implementation Details
@@ -262,22 +279,49 @@ function updateUserList() {
    - **Message Persistence**: Refresh page, verify chat history is restored
    - **Real-time Updates**: Join/leave users, verify user list updates immediately
 
+## Documentation Structure
+
+### Comprehensive Documentation Suite
+The project now includes extensive documentation for users and developers:
+
+**Setup and Deployment:**
+- `README.md`: Project overview with one-click deploy buttons
+- `docs/SETUP.md`: Complete setup guide with troubleshooting
+- `docs/netlify-deployment.md`: Detailed Netlify frontend deployment
+- `docs/railway-deployment.md`: Detailed Railway backend deployment
+
+**User Documentation:**
+- `docs/USER_GUIDE.md`: Complete feature reference with screenshots and examples
+- `docs/TROUBLESHOOTING.md`: Common issues, solutions, and debugging techniques
+
+**Developer Documentation:**
+- `docs/CONTRIBUTING.md`: Development setup, coding standards, and contribution process
+- `CLAUDE.md`: This file - technical architecture and development guidance
+
+### Documentation Maintenance
+- **Keep docs updated** when adding new features
+- **Test all examples** in documentation to ensure accuracy
+- **Include screenshots** for visual features when possible
+- **Provide troubleshooting** for common issues with new features
+
 ## Recent Major Changes (v2.0 Architecture Upgrade)
 
 ### Migration from Cloudflare Workers to Railway (August 2025)
 - **Previous**: Pure P2P with Cloudflare Workers signaling
-- **Current**: Hybrid server-authoritative + P2P architecture
-- **Benefits**: Persistent world state, reliable user management, better scalability
+- **Current**: Hybrid server-authoritative + P2P architecture with comprehensive documentation
+- **Benefits**: Persistent world state, reliable user management, better scalability, easy deployment
 
-### Key Files Modified:
-- `signaling-server.js`: Comprehensive persistent world server (300+ lines)
+### Key Files Added/Modified:
+- `signaling-server.js`: Comprehensive persistent world server (350+ lines)
 - `index.html`: Added server-mediated events, avatar system, hybrid screen sharing, social features
-- `CLAUDE.md`: Complete documentation of v2.0 architecture
+- `docs/`: Complete documentation suite for setup, usage, and development
+- `README.md`: Updated for multi-user architecture with deployment guides
 
 ### Recent Feature Additions (August 2025):
 - **Social Features**: User list (top right) and persistent world chat interface
-- **Real-time Communication**: Chat messages with timestamps and server persistence
-- **UI Components**: Toggleable chat interface with mobile responsive design
+- **Real-time Name Editing**: Click to edit usernames with real-time sync
+- **Comprehensive Documentation**: Full setup, user, and developer guides
+- **One-Click Deployment**: Netlify and Railway deploy buttons
 - **WebRTC P2P Video Streaming**: Fixed actual video sharing between users
 
 ### Breaking Changes:

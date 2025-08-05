@@ -608,6 +608,22 @@
     }
 
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    
+    // Create user object/group that the camera is attached to
+    const userObject = new THREE.Group();
+    userObject.add(camera);
+    scene.add(userObject);
+    
+    // Create local user avatar visible to the current user
+    const localAvatarGeometry = new THREE.SphereGeometry(0.15, 8, 6);
+    const localAvatarMaterial = new THREE.MeshBasicMaterial({ 
+      color: 0x00ff00, // Green color for current user
+      transparent: true,
+      opacity: 0.6
+    });
+    const localAvatar = new THREE.Mesh(localAvatarGeometry, localAvatarMaterial);
+    localAvatar.position.set(0, -0.3, -0.8); // Below and in front of camera
+    userObject.add(localAvatar);
     const isIOSNew = /iPhone|iPad/.test(navigator.userAgent) && parseFloat(navigator.userAgent.match(/OS (\d+)/)?.[1] || '0') >= 17;
     
     // Test WebGL context creation first
@@ -1595,9 +1611,11 @@
       largeScreen.texture.needsUpdate = true;
     }
 
-    // Camera position - positioned at couch facing the screen (further back and slightly higher)
-    camera.position.set(0, 2, -4);
-    camera.lookAt(0, 2, -8);
+    // User object position - positioned at couch facing the screen (further back and slightly higher)
+    userObject.position.set(0, 2, -4);
+    // Camera is now at origin relative to user object
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -4); // Look forward relative to user object
 
     // Mobile controls
     let isMoving = false;
@@ -2011,9 +2029,9 @@
       if (timeDelta < 100) return;
       
       const currentPosition = {
-        x: Math.round(camera.position.x * 100) / 100,
-        y: Math.round(camera.position.y * 100) / 100,
-        z: Math.round(camera.position.z * 100) / 100
+        x: Math.round(userObject.position.x * 100) / 100,
+        y: Math.round(userObject.position.y * 100) / 100,
+        z: Math.round(userObject.position.z * 100) / 100
       };
       
       const currentRotation = {
@@ -2155,7 +2173,7 @@
       if (isMoving) {
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyQuaternion(camera.quaternion);
-        camera.position.add(direction.multiplyScalar(0.1));
+        userObject.position.add(direction.multiplyScalar(0.1));
         requestAnimationFrame(moveForward);
       }
     }
@@ -2291,22 +2309,22 @@
       if (keys['KeyW'] || keys['ArrowUp']) {
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyQuaternion(camera.quaternion);
-        camera.position.add(direction.multiplyScalar(moveSpeed));
+        userObject.position.add(direction.multiplyScalar(moveSpeed));
       }
       if (keys['KeyS'] || keys['ArrowDown']) {
         const direction = new THREE.Vector3(0, 0, 1);
         direction.applyQuaternion(camera.quaternion);
-        camera.position.add(direction.multiplyScalar(moveSpeed));
+        userObject.position.add(direction.multiplyScalar(moveSpeed));
       }
       if (keys['KeyA'] || keys['ArrowLeft']) {
         const direction = new THREE.Vector3(-1, 0, 0);
         direction.applyQuaternion(camera.quaternion);
-        camera.position.add(direction.multiplyScalar(moveSpeed));
+        userObject.position.add(direction.multiplyScalar(moveSpeed));
       }
       if (keys['KeyD'] || keys['ArrowRight']) {
         const direction = new THREE.Vector3(1, 0, 0);
         direction.applyQuaternion(camera.quaternion);
-        camera.position.add(direction.multiplyScalar(moveSpeed));
+        userObject.position.add(direction.multiplyScalar(moveSpeed));
       }
       
       

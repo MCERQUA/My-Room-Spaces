@@ -1801,7 +1801,8 @@
             worldData.chatHistory.forEach(msg => displayChatMessage(msg));
           }
           
-          // worldData.users.length already includes all users (including current user)
+          // Update user count from world state
+          console.log('🌍 World state users:', worldData.users.length);
           updateUserCount(worldData.users.length);
           updateUserList();
           
@@ -1821,7 +1822,7 @@
           if (avatar.id !== socket.id) {
             spawnUserAvatar(avatar.id, avatar);
           }
-          updateUserCount(userAvatars.size + 1); // Current avatars + self
+          // User count will be updated by server via 'user-count-update' event
           updateUserList();
           
           // If we're currently screen sharing, establish P2P connection with new user
@@ -1833,7 +1834,7 @@
         
         socket.on('user-left', (data) => {
           removeUserAvatar(data.userId);
-          updateUserCount(userAvatars.size + 1); // Remaining avatars + self
+          // User count will be updated by server via 'user-count-update' event
           updateUserList();
         });
         
@@ -1979,6 +1980,14 @@
         socket.on('visitor-count-update', (data) => {
           if (data.visitorCount !== undefined) {
             updateVisitorCount(data.visitorCount);
+          }
+        });
+        
+        // ===== USER COUNT UPDATE =====
+        socket.on('user-count-update', (data) => {
+          if (data.count !== undefined) {
+            console.log('👥 User count update:', data.count);
+            updateUserCount(data.count);
           }
         });
         

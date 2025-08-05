@@ -250,11 +250,13 @@ io.on('connection', async (socket) => {
     };
 
     worldState.users.set(socket.id, userAvatar);
+    console.log(`🧑 User spawned: ${userAvatar.username} (${socket.id}), Total users: ${worldState.users.size}`);
     
     // Notify all users of new avatar
     io.emit('user-joined', userAvatar);
     
-    // Removed verbose spawning log
+    // Send updated user count to all
+    io.emit('user-count-update', { count: worldState.users.size });
   });
 
   // ===== REAL-TIME POSITION UPDATES =====
@@ -490,12 +492,16 @@ io.on('connection', async (socket) => {
     if (worldState.users.has(socket.id)) {
       const user = worldState.users.get(socket.id);
       worldState.users.delete(socket.id);
+      console.log(`👥 User removed: ${user.username}, Remaining users: ${worldState.users.size}`);
       
       // Notify others that user left
       socket.broadcast.emit('user-left', {
         userId: socket.id,
         username: user.username
       });
+      
+      // Send updated user count to all
+      io.emit('user-count-update', { count: worldState.users.size });
       
       console.log(`🗑️ Removed ${user.username} from world state`);
     }

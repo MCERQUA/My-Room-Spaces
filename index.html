@@ -1152,7 +1152,10 @@
         
         socket.on('user-joined', (avatar) => {
           console.log(`👋 ${avatar.username} joined the world`);
-          spawnUserAvatar(avatar.id, avatar);
+          // Don't spawn avatar for current user (they have their own local avatar)
+          if (avatar.id !== socket.id) {
+            spawnUserAvatar(avatar.id, avatar);
+          }
           updateUserCount(userAvatars.size + 1); // Current avatars + self
           updateUserList();
           

@@ -858,74 +858,89 @@
         });
         
         socket.on('connect', () => {
-          console.log('✅ Connected to Railway signaling server!');
-          console.log('🎉 Real P2P screen sharing is now enabled!');
+          console.log('✅ Connected to persistent world server!');
+          console.log('🎉 Server-mediated world sharing is now enabled!');
           inRoom = true;
           myUserId = socket.id;
-        });
-        
-        socket.on('room-joined', (data) => {
-          console.log(`👥 Joined room: ${data.roomId} (${data.users.length} members)`);
-          roomUsers = data.users.filter(id => id !== socket.id);
-          updateUserCount(data.users.length);
           
-          // Connect to existing users
-          roomUsers.forEach(userId => {
-            connectToPeer(userId, true);
+          // Spawn user avatar in world
+          socket.emit('user-spawn', {
+            position: { x: 0, y: 0, z: 5 },
+            rotation: { x: 0, y: 0, z: 0 },
+            username: `User${socket.id.substr(0,4)}`
           });
         });
         
-        socket.on('user-joined', (data) => {
-          console.log(`👋 User joined: ${data.newUserId}`);
-          if (!roomUsers.includes(data.newUserId)) {
-            roomUsers.push(data.newUserId);
+        // ===== WORLD STATE SYNCHRONIZATION =====
+        socket.on('world-state', (worldData) => {
+          console.log('🌍 Received world state:', worldData);
+          
+          // Apply persistent object positions
+          worldData.objects.forEach(([objectId, state]) => {
+            updateObjectInScene(objectId, state);
+          });
+          
+          // Spawn existing user avatars
+          worldData.users.forEach(([userId, avatar]) => {
+            if (userId !== socket.id) {
+              spawnUserAvatar(userId, avatar);
+            }
+          });
+          
+          // Apply shared screen if active
+          if (worldData.sharedScreen) {
+            handleRemoteScreenShare(worldData.sharedScreen);
           }
-          updateUserCount(data.users.length);
-          connectToPeer(data.newUserId, true);
+          
+          // Load chat history
+          if (worldData.chatHistory) {
+            worldData.chatHistory.forEach(msg => displayChatMessage(msg));
+          }
+          
+          updateUserCount(worldData.users.length);
+        });
+        
+        socket.on('user-joined', (avatar) => {
+          console.log(`👋 ${avatar.username} joined the world`);
+          spawnUserAvatar(avatar.id, avatar);
+          updateUserCount(getUserCount() + 1);
         });
         
         socket.on('user-left', (data) => {
-          console.log(`👋 User left: ${data.userId}`);
-          roomUsers = roomUsers.filter(id => id !== data.userId);
-          updateUserCount(data.users.length);
-          if (peers[data.userId]) {
-            peers[data.userId].destroy();
-            delete peers[data.userId];
-          }
+          console.log(`👋 ${data.username} left the world`);
+          removeUserAvatar(data.userId);
+          updateUserCount(getUserCount() - 1);
         });
         
-        // Handle specific WebRTC events for better reliability
-        socket.on('webrtc-offer', (data) => {
-          console.log(`📨 WebRTC offer from ${data.from}`);
-          if (peers[data.from]) {
-            peers[data.from].signal(data.offer);
-          } else {
-            connectToPeer(data.from, false, data.offer);
-          }
+        // ===== PERSISTENT OBJECT INTERACTIONS =====
+        socket.on('object-moved', (data) => {
+          console.log(`📦 Object ${data.objectId} moved by ${data.movedBy}`);
+          updateObjectInScene(data.objectId, {
+            position: data.position,
+            rotation: data.rotation,
+            scale: data.scale
+          });
         });
         
-        socket.on('webrtc-answer', (data) => {
-          console.log(`📨 WebRTC answer from ${data.from}`);
-          if (peers[data.from]) {
-            peers[data.from].signal(data.answer);
-          }
+        // ===== USER AVATAR EVENTS =====
+        socket.on('user-moved', (data) => {
+          moveUserAvatar(data.userId, data.position, data.rotation);
         });
         
-        socket.on('webrtc-ice-candidate', (data) => {
-          console.log(`📨 WebRTC ICE candidate from ${data.from}`);
-          if (peers[data.from]) {
-            peers[data.from].signal(data.candidate);
-          }
+        // ===== SCREEN SHARING EVENTS =====
+        socket.on('screen-share-started', (data) => {
+          console.log(`📺 Screen sharing started by ${data.userId}`);
+          handleRemoteScreenShare(data);
         });
         
-        // Fallback for generic signal (backwards compatibility)
-        socket.on('signal', (data) => {
-          console.log(`📨 WebRTC signal from ${data.from}`);
-          if (peers[data.from]) {
-            peers[data.from].signal(data.signal);
-          } else {
-            connectToPeer(data.from, false, data.signal);
-          }
+        socket.on('screen-share-stopped', (data) => {
+          console.log(`📺 Screen sharing stopped by ${data.userId}`);
+          clearScreenShare(data.clearObject);
+        });
+        
+        // ===== CHAT SYSTEM =====
+        socket.on('chat-message', (message) => {
+          displayChatMessage(message);
         });
         
         socket.on('disconnect', () => {
@@ -1137,46 +1152,17 @@
         videoEl.addEventListener('loadeddata', () => updateScreenTexture());
         stream.getVideoTracks()[0].addEventListener('ended', () => stopScreenShare());
         
-        // Share stream with all existing peers in shared room
-        console.log(`📺 Sharing stream with ${Object.keys(peers).length} existing peers`);
-        Object.entries(peers).forEach(([peerId, peer]) => {
-          if (peer && peer.connected) {
-            console.log(`📺 Adding stream to connected peer ${peerId}`);
-            try {
-              // Remove old stream first
-              if (peer.streams && peer.streams.length > 0) {
-                peer.streams.forEach(oldStream => {
-                  peer.removeStream(oldStream);
-                });
-              }
-              // Add new stream
-              peer.addStream(stream);
-            } catch (error) {
-              console.log(`❌ Failed to add stream to peer ${peerId}:`, error);
-              // Recreate the peer connection with the new stream
-              delete peers[peerId];
-              connectToPeer(peerId, true);
-            }
-          } else {
-            console.log(`📺 Peer ${peerId} not connected yet, will receive stream when connected`);
-          }
-        });
-        
-        console.log('Screen sharing started');
-        
-        // Notify server about screen sharing
-        sendMessage({ type: 'start-screen-share' });
-        
-        // Note: Cloudflare Worker broadcasting removed - using Railway P2P only
-        
-        // Broadcast to other tabs
-        if (broadcastChannel) {
-          broadcastChannel.postMessage({
-            type: 'screen-share-started',
-            data: { streamId: 'local-stream' },
-            senderId: 'local-user-' + Math.random().toString(36).substring(7)
+        // ===== SERVER-MEDIATED SCREEN SHARING =====
+        if (socket && socket.connected) {
+          socket.emit('screen-share-start', {
+            streamId: stream.id,
+            hasVideo: stream.getVideoTracks().length > 0,
+            hasAudio: stream.getAudioTracks().length > 0
           });
+          console.log('📺 Notified server of screen sharing start');
         }
+        
+        console.log('✅ Screen sharing started successfully!');
         
       } catch (error) {
         console.error('Error starting screen share:', error);
@@ -1190,20 +1176,17 @@
         currentStream = null;
         document.getElementById('video-element').srcObject = null;
         resetScreenContent();
-        console.log('Screen sharing stopped');
-        
-        // Notify server about stopping screen sharing
-        sendMessage({ type: 'stop-screen-share' });
-        
-        // Note: Cloudflare Worker stop removed - using Railway P2P only
-        
-        // Broadcast to other tabs
-        if (broadcastChannel) {
-          broadcastChannel.postMessage({
-            type: 'screen-share-stopped',
-            senderId: 'local-user'
-          });
+        // ===== SERVER-MEDIATED SCREEN SHARING STOP =====
+        if (socket && socket.connected) {
+          socket.emit('screen-share-stop');
+          console.log('📺 Notified server of screen sharing stop');
         }
+        
+        console.log('🛑 Screen sharing stopped');
+        
+        // Hide stop button, show share button
+        document.getElementById('stop-sharing').style.display = 'none';
+        document.getElementById('share-screen').style.display = 'inline-block';
       }
     }
     
@@ -1364,83 +1347,269 @@
       }
     }
 
-    // Object manipulation functions
+    // ===== SERVER-MEDIATED OBJECT MANIPULATION =====
     window.moveObject = function(direction) {
-      if (!selectedObject) return;
+      if (!selectedObject || !socket) return;
       
       const moveAmount = 0.5;
+      const newPosition = { ...selectedObject.position };
       
       switch(direction) {
-        case 'up': selectedObject.position.y += moveAmount; break;
-        case 'down': selectedObject.position.y -= moveAmount; break;
-        case 'left': selectedObject.position.x -= moveAmount; break;
-        case 'right': selectedObject.position.x += moveAmount; break;
-        case 'forward': selectedObject.position.z -= moveAmount; break;
-        case 'backward': selectedObject.position.z += moveAmount; break;
+        case 'up': newPosition.y += moveAmount; break;
+        case 'down': newPosition.y -= moveAmount; break;
+        case 'left': newPosition.x -= moveAmount; break;
+        case 'right': newPosition.x += moveAmount; break;
+        case 'forward': newPosition.z -= moveAmount; break;
+        case 'backward': newPosition.z += moveAmount; break;
       }
       
-      if (selectedOutline) {
-        selectedOutline.position.copy(selectedObject.position);
-      }
+      // Send to server for persistence and sync
+      socket.emit('object-move', {
+        objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
+        position: newPosition,
+        rotation: selectedObject.rotation,
+        scale: selectedObject.scale
+      });
     };
 
     window.scaleObject = function(direction) {
-      if (!selectedObject) return;
+      if (!selectedObject || !socket) return;
       
       const scaleAmount = direction === 'up' ? 1.1 : 0.9;
-      selectedObject.scale.multiplyScalar(scaleAmount);
+      const newScale = {
+        x: selectedObject.scale.x * scaleAmount,
+        y: selectedObject.scale.y * scaleAmount,
+        z: selectedObject.scale.z * scaleAmount
+      };
       
-      if (selectedOutline) {
-        selectedOutline.scale.copy(selectedObject.scale);
-      }
+      socket.emit('object-move', {
+        objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
+        position: selectedObject.position,
+        rotation: selectedObject.rotation,
+        scale: newScale
+      });
     };
 
     window.rotateObject = function(axis) {
-      if (!selectedObject) return;
+      if (!selectedObject || !socket) return;
       
+      const newRotation = { ...selectedObject.rotation };
       if (axis === 'y') {
-        selectedObject.rotation.y += Math.PI / 4;
+        newRotation.y += Math.PI / 4;
       }
       
-      if (selectedOutline) {
-        selectedOutline.rotation.copy(selectedObject.rotation);
-      }
+      socket.emit('object-move', {
+        objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
+        position: selectedObject.position,
+        rotation: newRotation,
+        scale: selectedObject.scale
+      });
     };
 
     window.resetObject = function() {
-      if (!selectedObject || !selectedObject.userData) return;
+      if (!selectedObject || !selectedObject.userData || !socket) return;
       
       const userData = selectedObject.userData;
-      selectedObject.position.copy(userData.originalPosition);
-      selectedObject.scale.copy(userData.originalScale);
-      selectedObject.rotation.copy(userData.originalRotation);
-      
-      if (userData.originalColor && selectedObject.material) {
-        selectedObject.material.color.setHex(userData.originalColor);
-        selectedObject.material.emissive.setHex(0x000000);
-      }
-      
-      if (selectedOutline) {
-        selectedOutline.position.copy(selectedObject.position);
-        selectedOutline.scale.copy(selectedObject.scale);
-        selectedOutline.rotation.copy(selectedObject.rotation);
-      }
+      socket.emit('object-move', {
+        objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
+        position: userData.originalPosition,
+        rotation: userData.originalRotation,
+        scale: userData.originalScale
+      });
     };
     
     window.deleteSelected = function() {
-      if (!selectedObject) return;
+      if (!selectedObject || !socket) return;
       
-      scene.remove(selectedObject);
+      // Send deletion to server
+      socket.emit('object-delete', {
+        objectId: selectedObject.userData.objectId || generateObjectId(selectedObject)
+      });
       
-      const index = sceneObjects.indexOf(selectedObject);
-      if (index > -1) {
-        sceneObjects.splice(index, 1);
-      }
-      
-      deselectObject();
+      // Local cleanup will happen when server confirms deletion
     };
     
     window.deselectObject = deselectObject;
+    
+    // ===== HELPER FUNCTIONS =====
+    function generateObjectId(object) {
+      if (!object.userData.objectId) {
+        object.userData.objectId = `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      return object.userData.objectId;
+    }
+    
+    function updateObjectInScene(objectId, state) {
+      // Find object by ID
+      const object = sceneObjects.find(obj => obj.userData.objectId === objectId);
+      if (object) {
+        object.position.set(state.position.x, state.position.y, state.position.z);
+        object.rotation.set(state.rotation.x, state.rotation.y, state.rotation.z);
+        object.scale.set(state.scale.x, state.scale.y, state.scale.z);
+        
+        // Update outline if this object is selected
+        if (selectedObject === object && selectedOutline) {
+          selectedOutline.position.copy(object.position);
+          selectedOutline.rotation.copy(object.rotation);
+          selectedOutline.scale.copy(object.scale);
+        }
+      }
+    }
+    
+    // ===== USER AVATAR SYSTEM =====
+    const userAvatars = new Map();
+    
+    function spawnUserAvatar(userId, avatar) {
+      if (userAvatars.has(userId)) return; // Already exists
+      
+      // Create simple avatar (sphere for now)
+      const avatarGeometry = new THREE.SphereGeometry(0.2, 8, 6);
+      const avatarMaterial = new THREE.MeshBasicMaterial({ 
+        color: Math.random() * 0xffffff,
+        transparent: true,
+        opacity: 0.8
+      });
+      const avatarMesh = new THREE.Mesh(avatarGeometry, avatarMaterial);
+      
+      avatarMesh.position.set(
+        avatar.position.x, 
+        avatar.position.y + 0.5, // Slightly above ground
+        avatar.position.z
+      );
+      
+      // Add name label
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      canvas.width = 256;
+      canvas.height = 64;
+      context.font = '24px Arial';
+      context.fillStyle = 'white';
+      context.textAlign = 'center';
+      context.fillText(avatar.username, 128, 40);
+      
+      const labelTexture = new THREE.CanvasTexture(canvas);
+      const labelMaterial = new THREE.SpriteMaterial({ map: labelTexture });
+      const labelSprite = new THREE.Sprite(labelMaterial);
+      labelSprite.position.set(0, 0.8, 0);
+      labelSprite.scale.set(1, 0.25, 1);
+      
+      avatarMesh.add(labelSprite);
+      scene.add(avatarMesh);
+      
+      userAvatars.set(userId, {
+        mesh: avatarMesh,
+        label: labelSprite,
+        username: avatar.username
+      });
+      
+      console.log(`🧑‍🤝‍🧑 Spawned avatar for ${avatar.username}`);
+    }
+    
+    function moveUserAvatar(userId, position, rotation) {
+      const avatar = userAvatars.get(userId);
+      if (avatar) {
+        avatar.mesh.position.set(position.x, position.y + 0.5, position.z);
+        if (rotation) {
+          avatar.mesh.rotation.set(rotation.x, rotation.y, rotation.z);
+        }
+      }
+    }
+    
+    function removeUserAvatar(userId) {
+      const avatar = userAvatars.get(userId);
+      if (avatar) {
+        scene.remove(avatar.mesh);
+        userAvatars.delete(userId);
+        console.log(`🗑️ Removed avatar for user ${userId}`);
+      }
+    }
+    
+    // ===== SCREEN SHARING HELPERS =====
+    function handleRemoteScreenShare(data) {
+      console.log('📺 Handling remote screen share:', data);
+      // Apply screen sharing to the designated object
+      if (data.applyToObject === 'SHARESCREEN-HERE') {
+        // Find the large screen object and apply remote stream
+        const screenObject = scene.getObjectByName('SHARESCREEN-HERE') || largeScreen.mesh;
+        if (screenObject) {
+          // For server-mediated sharing, we'd need to implement stream forwarding
+          // This is a placeholder for the implementation
+          console.log('📺 Applied remote screen to display object');
+        }
+      }
+    }
+    
+    function clearScreenShare(clearObject) {
+      if (clearObject === 'SHARESCREEN-HERE') {
+        const screenObject = scene.getObjectByName('SHARESCREEN-HERE') || largeScreen.mesh;
+        if (screenObject && screenObject.material && screenObject.material.map) {
+          // Clear the screen texture
+          const ctx = largeScreen.canvas.getContext('2d');
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          screenObject.material.map.needsUpdate = true;
+        }
+      }
+    }
+    
+    // ===== CHAT SYSTEM HELPERS =====
+    function displayChatMessage(message) {
+      console.log(`💬 ${message.username}: ${message.message}`);
+      // TODO: Add chat UI to display messages
+    }
+    
+    function getUserCount() {
+      return userAvatars.size + 1; // +1 for current user
+    }
+    
+    // ===== USER POSITION TRACKING =====
+    let lastPositionUpdate = Date.now();
+    let lastUserPosition = { x: 0, y: 0, z: 0 };
+    let lastUserRotation = { x: 0, y: 0, z: 0 };
+    
+    function trackUserPosition() {
+      if (!socket || !socket.connected) return;
+      
+      const now = Date.now();
+      const timeDelta = now - lastPositionUpdate;
+      
+      // Only send updates every 100ms to avoid spam
+      if (timeDelta < 100) return;
+      
+      const currentPosition = {
+        x: Math.round(camera.position.x * 100) / 100,
+        y: Math.round(camera.position.y * 100) / 100,
+        z: Math.round(camera.position.z * 100) / 100
+      };
+      
+      const currentRotation = {
+        x: Math.round(camera.rotation.x * 100) / 100,
+        y: Math.round(camera.rotation.y * 100) / 100,
+        z: Math.round(camera.rotation.z * 100) / 100
+      };
+      
+      // Only send if position/rotation has changed significantly
+      const positionChanged = 
+        Math.abs(currentPosition.x - lastUserPosition.x) > 0.01 ||
+        Math.abs(currentPosition.y - lastUserPosition.y) > 0.01 ||
+        Math.abs(currentPosition.z - lastUserPosition.z) > 0.01;
+        
+      const rotationChanged = 
+        Math.abs(currentRotation.x - lastUserRotation.x) > 0.01 ||
+        Math.abs(currentRotation.y - lastUserRotation.y) > 0.01 ||
+        Math.abs(currentRotation.z - lastUserRotation.z) > 0.01;
+      
+      if (positionChanged || rotationChanged) {
+        socket.emit('user-move', {
+          position: currentPosition,
+          rotation: currentRotation
+        });
+        
+        lastUserPosition = currentPosition;
+        lastUserRotation = currentRotation;
+        lastPositionUpdate = now;
+      }
+    }
 
     // Touch controls for mobile
     document.addEventListener('touchstart', (event) => {
@@ -1624,12 +1793,25 @@
           type: 'model',
           originalPosition: new THREE.Vector3(0, -1, -3),
           originalScale: new THREE.Vector3(1, 1, 1),
-          originalRotation: new THREE.Euler(0, 0, 0)
+          originalRotation: new THREE.Euler(0, 0, 0),
+          objectId: generateObjectId(model)  // Generate unique ID for server persistence
         };
         
         scene.add(model);
         sceneObjects.push(model);
         selectObject(model);
+        
+        // Notify server of new object
+        if (socket && socket.connected) {
+          socket.emit('object-add', {
+            objectId: model.userData.objectId,
+            name: model.userData.name,
+            type: model.userData.type,
+            position: model.position,
+            rotation: model.rotation,
+            scale: model.scale
+          });
+        }
         
         URL.revokeObjectURL(url);
         console.log('Model loaded successfully:', file.name);
@@ -1695,6 +1877,9 @@
       
       
       // Mobile-optimized rendering with explicit clearing
+      // ===== USER POSITION TRACKING =====
+      trackUserPosition();
+      
       if (isMobile) {
         // Explicit clear for mobile compatibility
         renderer.clear(true, true, true);

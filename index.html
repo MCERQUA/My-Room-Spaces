@@ -309,6 +309,172 @@
         font-size: 9px;
       }
     }
+
+    /* User List Styles */
+    .user-list {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      z-index: 300;
+      color: #ffffff;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      text-align: right;
+      pointer-events: none;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    .user-list h3 {
+      margin: 0 0 8px 0;
+      color: #00ff88;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .user-item {
+      margin: 3px 0;
+      color: #ffffff;
+      font-size: 11px;
+    }
+
+    .user-item.self {
+      color: #ffaa00;
+      font-weight: bold;
+    }
+
+    /* Chat Interface Styles */
+    .chat-container {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      width: 350px;
+      height: 200px;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.85);
+      border: 1px solid #00ff88;
+      border-radius: 5px;
+      display: flex;
+      flex-direction: column;
+      font-family: 'Courier New', monospace;
+    }
+
+    .chat-header {
+      background: rgba(0, 255, 136, 0.1);
+      padding: 5px 10px;
+      border-bottom: 1px solid #00ff88;
+      color: #00ff88;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      font-size: 10px;
+      line-height: 1.3;
+    }
+
+    .chat-message {
+      margin: 2px 0;
+      word-wrap: break-word;
+    }
+
+    .chat-message .username {
+      color: #ffaa00;
+      font-weight: bold;
+    }
+
+    .chat-message .timestamp {
+      color: #888;
+      font-size: 9px;
+    }
+
+    .chat-message .content {
+      color: #ffffff;
+      margin-left: 5px;
+    }
+
+    .chat-input-container {
+      border-top: 1px solid #00ff88;
+      padding: 5px;
+      display: flex;
+      gap: 5px;
+    }
+
+    .chat-input {
+      flex: 1;
+      background: transparent;
+      border: 1px solid #00ff88;
+      color: #ffffff;
+      padding: 4px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+    }
+
+    .chat-input:focus {
+      outline: none;
+      border-color: #ffaa00;
+    }
+
+    .chat-send {
+      background: transparent;
+      border: 1px solid #00ff88;
+      color: #00ff88;
+      padding: 4px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+    }
+
+    .chat-send:hover {
+      background: rgba(0, 255, 136, 0.2);
+    }
+
+    .chat-toggle {
+      position: absolute;
+      bottom: 20px;
+      left: 380px;
+      z-index: 300;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid #00ff88;
+      color: #00ff88;
+      padding: 5px 8px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: 'Courier New', monospace;
+      font-size: 10px;
+    }
+
+    .chat-toggle:hover {
+      background: rgba(0, 255, 136, 0.2);
+    }
+
+    .chat-container.hidden {
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .user-list {
+        top: 10px;
+        right: 10px;
+        font-size: 10px;
+      }
+
+      .chat-container {
+        width: 280px;
+        height: 150px;
+        bottom: 10px;
+        left: 10px;
+      }
+
+      .chat-toggle {
+        left: 300px;
+        bottom: 10px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -377,6 +543,35 @@
       <button id="deselect-object">✖ Deselect</button>
     </div>
   </div>
+
+  <!-- User List in Top Right -->
+  <div class="user-list" id="user-list">
+    <h3>👥 Users Online</h3>
+    <div id="user-list-content">
+      <div class="user-item self" id="current-user">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Chat Interface -->
+  <div class="chat-container" id="chat-container">
+    <div class="chat-header">
+      💬 World Chat
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-message">
+        <span class="timestamp">[00:00]</span>
+        <span class="username">System:</span>
+        <span class="content">Welcome to the persistent 3D world!</span>
+      </div>
+    </div>
+    <div class="chat-input-container">
+      <input type="text" class="chat-input" id="chat-input" placeholder="Type message..." maxlength="200">
+      <button class="chat-send" id="chat-send">Send</button>
+    </div>
+  </div>
+
+  <!-- Chat Toggle Button -->
+  <button class="chat-toggle" id="chat-toggle">💬</button>
   
   <script src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.js"></script>
   <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
@@ -825,12 +1020,40 @@
     let currentStream = null;
     let currentVideo = null;
     
-    // User count display
+    // User count display and user list management
     function updateUserCount(count) {
       const userCountElement = document.getElementById('user-count');
       if (userCountElement) {
         userCountElement.textContent = `👥 Users: ${count}`;
       }
+    }
+
+    function updateUserList() {
+      const userListContent = document.getElementById('user-list-content');
+      const currentUserElement = document.getElementById('current-user');
+      
+      if (!userListContent) return;
+      
+      // Clear existing user items (except current user)
+      const userItems = userListContent.querySelectorAll('.user-item:not(.self)');
+      userItems.forEach(item => item.remove());
+      
+      // Update current user
+      if (currentUserElement && myUserId) {
+        const currentUser = Array.from(userAvatars.values()).find(u => u.id === myUserId) || 
+                           { username: `User${myUserId.substr(0,4)}` };
+        currentUserElement.textContent = `${currentUser.username} (You)`;
+      }
+      
+      // Add other users
+      userAvatars.forEach((avatar, userId) => {
+        if (userId !== myUserId) {
+          const userItem = document.createElement('div');
+          userItem.className = 'user-item';
+          userItem.textContent = avatar.username;
+          userListContent.appendChild(userItem);
+        }
+      });
     }
 
     // P2P Main Room functionality
@@ -869,6 +1092,9 @@
           inRoom = true;
           myUserId = socket.id;
           
+          // Update user interface
+          updateUserList();
+          
           // Spawn user avatar in world
           socket.emit('user-spawn', {
             position: { x: 0, y: 0, z: 5 },
@@ -905,12 +1131,14 @@
           }
           
           updateUserCount(worldData.users.length);
+          updateUserList();
         });
         
         socket.on('user-joined', (avatar) => {
           console.log(`👋 ${avatar.username} joined the world`);
           spawnUserAvatar(avatar.id, avatar);
           updateUserCount(userAvatars.size + 1); // Current avatars + self
+          updateUserList();
           
           // If we're currently screen sharing, establish P2P connection with new user
           if (isScreenSharing && currentStream && currentStream.active) {
@@ -923,6 +1151,7 @@
           console.log(`👋 ${data.username} left the world`);
           removeUserAvatar(data.userId);
           updateUserCount(userAvatars.size + 1); // Remaining avatars + self
+          updateUserList();
         });
         
         // ===== PERSISTENT OBJECT INTERACTIONS =====
@@ -1710,7 +1939,57 @@
     // ===== CHAT SYSTEM HELPERS =====
     function displayChatMessage(message) {
       console.log(`💬 ${message.username}: ${message.message}`);
-      // TODO: Add chat UI to display messages
+      
+      const chatMessages = document.getElementById('chat-messages');
+      if (!chatMessages) return;
+      
+      const messageElement = document.createElement('div');
+      messageElement.className = 'chat-message';
+      
+      const timestamp = new Date(message.timestamp || new Date()).toLocaleTimeString('en-US', { 
+        hour12: false, 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      
+      messageElement.innerHTML = `
+        <span class="timestamp">[${timestamp}]</span>
+        <span class="username">${message.username}:</span>
+        <span class="content">${message.message}</span>
+      `;
+      
+      chatMessages.appendChild(messageElement);
+      
+      // Scroll to bottom
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+      
+      // Keep only last 50 messages for performance
+      while (chatMessages.children.length > 50) {
+        chatMessages.removeChild(chatMessages.firstChild);
+      }
+    }
+
+    function sendChatMessage() {
+      const chatInput = document.getElementById('chat-input');
+      const message = chatInput.value.trim();
+      
+      if (!message || !socket || !socket.connected) return;
+      
+      socket.emit('chat-message', { message });
+      chatInput.value = '';
+    }
+
+    function toggleChat() {
+      const chatContainer = document.getElementById('chat-container');
+      const chatToggle = document.getElementById('chat-toggle');
+      
+      if (chatContainer.classList.contains('hidden')) {
+        chatContainer.classList.remove('hidden');
+        chatToggle.textContent = '❌';
+      } else {
+        chatContainer.classList.add('hidden');
+        chatToggle.textContent = '💬';
+      }
     }
     
     function getUserCount() {
@@ -2140,6 +2419,25 @@
       });
       
       console.log('Volume set to:', Math.round(volume * 100) + '%');
+    });
+
+    // Chat interface event listeners
+    document.getElementById('chat-send').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sendChatMessage();
+    });
+
+    document.getElementById('chat-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        sendChatMessage();
+      }
+      e.stopPropagation(); // Prevent triggering 3D scene controls
+    });
+
+    document.getElementById('chat-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleChat();
     });
 
 

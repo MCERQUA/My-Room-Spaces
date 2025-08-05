@@ -11,7 +11,7 @@
   for = "/*"
   [headers.values]
     # Enable HTTPS for screen sharing APIs
-    Content-Security-Policy = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.socket.io; media-src 'self' blob: data:; connect-src 'self' blob: data: wss://*.herokuapp.com https://*.herokuapp.com wss://*.railway.app https://*.railway.app wss://*.netlify.app https://*.netlify.app wss://*.workers.dev https://*.workers.dev https://screen-share-signaling.metamike.workers.dev https://test-worker.metamike.workers.dev ws://localhost:* http://localhost:*;"
+    Content-Security-Policy = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.socket.io; media-src 'self' blob: data:; connect-src 'self' blob: data: wss://*.railway.app https://*.railway.app ws://localhost:* http://localhost:*;"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"

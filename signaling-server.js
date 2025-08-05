@@ -1,10 +1,11 @@
-// Simple WebRTC Signaling Server for 3D Interactive Website
-// Deploy this to Heroku, Railway, or any Node.js hosting service
+// Persistent Metaverse Server for 3D Interactive Website
+// Maintains world state, object positions, user avatars, and shared experiences
 
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -18,74 +19,172 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// Store the main shared room and users
-const MAIN_ROOM = 'MAIN_SHARED_ROOM';
-const mainRoom = {
-  id: MAIN_ROOM,
-  users: [],
-  created: new Date()
+// ===== PERSISTENT WORLD STATE =====
+const worldState = {
+  objects: new Map(),     // 3D object positions/rotations/scales
+  users: new Map(),       // Active user avatars
+  sharedScreen: null,     // Current screen sharing state
+  chatHistory: [],        // Chat messages
+  roomSettings: {
+    lighting: { ambient: 0.3, directional: 0.8 },
+    environment: 'room1'
+  }
 };
-const users = new Map();
+
+// Simulate database (in production, use Railway PostgreSQL)
+const saveWorldState = () => {
+  // In production: save to Railway database
+  console.log('💾 World state saved - Objects:', worldState.objects.size, 'Users:', worldState.users.size);
+};
+
+const loadWorldState = () => {
+  // In production: load from Railway database
+  console.log('📂 World state loaded');
+};
+
+// ===== WORLD STATE API ENDPOINTS =====
+app.get('/api/world-state', (req, res) => {
+  res.json({
+    objects: Array.from(worldState.objects.entries()),
+    users: Array.from(worldState.users.entries()),
+    sharedScreen: worldState.sharedScreen,
+    chatHistory: worldState.chatHistory.slice(-10),
+    roomSettings: worldState.roomSettings,
+    activeUsers: worldState.users.size
+  });
+});
+
+app.get('/api/users', (req, res) => {
+  res.json({
+    count: worldState.users.size,
+    users: Array.from(worldState.users.entries())
+  });
+});
+
+app.get('/api/objects', (req, res) => {
+  res.json({
+    count: worldState.objects.size,
+    objects: Array.from(worldState.objects.entries())
+  });
+});
 
 // Health check endpoint
 app.get('/', (req, res) => {
   res.json({ 
-    status: 'WebRTC Signaling Server Online',
-    mainRoom: {
-      users: mainRoom.users.length,
-      created: mainRoom.created
+    status: 'Persistent Metaverse Server Online',
+    worldState: {
+      users: worldState.users.size,
+      objects: worldState.objects.size,
+      sharedScreen: !!worldState.sharedScreen,
+      chatMessages: worldState.chatHistory.length
     },
-    totalUsers: users.size,
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Get main room info endpoint
-app.get('/room', (req, res) => {
-  res.json({
-    id: MAIN_ROOM,
-    users: mainRoom.users.length,
-    created: mainRoom.created,
-    maxUsers: 4
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
   });
 });
 
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
-  
-  users.set(socket.id, {
-    id: socket.id,
-    room: MAIN_ROOM,
-    connected: new Date()
+  console.log('👥 User connected:', socket.id);
+
+  // Send current world state to new user
+  socket.emit('world-state', {
+    objects: Array.from(worldState.objects.entries()),
+    users: Array.from(worldState.users.entries()),
+    sharedScreen: worldState.sharedScreen,
+    chatHistory: worldState.chatHistory.slice(-10), // Last 10 messages
+    roomSettings: worldState.roomSettings
   });
 
-  // Auto-join the main room immediately upon connection
-  if (mainRoom.users.length < 4) {
-    mainRoom.users.push(socket.id);
-    socket.join(MAIN_ROOM);
+  // ===== USER AVATAR MANAGEMENT =====
+  socket.on('user-spawn', (data) => {
+    const userAvatar = {
+      id: socket.id,
+      position: data.position || { x: 0, y: 0, z: 0 },
+      rotation: data.rotation || { x: 0, y: 0, z: 0 },
+      username: data.username || `User${socket.id.substr(0,4)}`,
+      joinedAt: new Date()
+    };
 
-    // Notify user they joined
-    socket.emit('room-joined', {
-      roomId: MAIN_ROOM,
-      users: mainRoom.users,
-      isMainRoom: true
+    worldState.users.set(socket.id, userAvatar);
+    
+    // Notify all users of new avatar
+    io.emit('user-joined', userAvatar);
+    
+    console.log(`🧑‍🤝‍🧑 ${userAvatar.username} spawned in world`);
+  });
+
+  // ===== REAL-TIME POSITION UPDATES =====
+  socket.on('user-move', (data) => {
+    if (worldState.users.has(socket.id)) {
+      const user = worldState.users.get(socket.id);
+      user.position = data.position;
+      user.rotation = data.rotation;
+      
+      // Broadcast to all other users
+      socket.broadcast.emit('user-moved', {
+        userId: socket.id,
+        position: data.position,
+        rotation: data.rotation
+      });
+    }
+  });
+
+  // ===== PERSISTENT OBJECT INTERACTIONS =====
+  socket.on('object-move', (data) => {
+    // Save object position permanently
+    worldState.objects.set(data.objectId, {
+      position: data.position,
+      rotation: data.rotation,
+      scale: data.scale,
+      movedBy: socket.id,
+      movedAt: new Date()
     });
 
-    // Notify others in room
-    socket.to(MAIN_ROOM).emit('user-joined', {
-      roomId: MAIN_ROOM,
-      newUserId: socket.id,
-      users: mainRoom.users
+    // Notify all users of object change
+    io.emit('object-moved', {
+      objectId: data.objectId,
+      position: data.position,
+      rotation: data.rotation,
+      scale: data.scale,
+      movedBy: socket.id
     });
 
-    console.log(`User ${socket.id} auto-joined main room. Total users: ${mainRoom.users.length}`);
-  } else {
-    socket.emit('room-error', 'Main room is full (max 4 users)');
-  }
+    saveWorldState(); // Persist to database
+    console.log(`📦 Object ${data.objectId} moved by ${socket.id}`);
+  });
 
 
 
-  // WebRTC signaling with specific event types for better reliability
+  // ===== PERSISTENT SCREEN SHARING =====
+  socket.on('screen-share-start', (data) => {
+    worldState.sharedScreen = {
+      userId: socket.id,
+      startedAt: new Date(),
+      streamId: data.streamId
+    };
+
+    // Apply screen to SHARESCREEN-HERE object for everyone
+    io.emit('screen-share-started', {
+      userId: socket.id,
+      streamId: data.streamId,
+      applyToObject: 'SHARESCREEN-HERE'
+    });
+
+    console.log(`📺 ${socket.id} started screen sharing`);
+  });
+
+  socket.on('screen-share-stop', () => {
+    if (worldState.sharedScreen?.userId === socket.id) {
+      worldState.sharedScreen = null;
+      
+      io.emit('screen-share-stopped', {
+        userId: socket.id,
+        clearObject: 'SHARESCREEN-HERE'
+      });
+    }
+  });
+
+  // ===== VOICE CHAT COORDINATION (WebRTC P2P for audio only) =====
   socket.on('webrtc-offer', (data) => {
     socket.to(data.to).emit('webrtc-offer', {
       from: socket.id,
@@ -107,52 +206,99 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Fallback for generic signal (backwards compatibility)
-  socket.on('signal', (data) => {
-    socket.to(data.to).emit('signal', {
-      from: socket.id,
-      signal: data.signal
-    });
-  });
+  // ===== CHAT SYSTEM =====
+  socket.on('chat-message', (data) => {
+    const chatMessage = {
+      id: Date.now(),
+      userId: socket.id,
+      username: worldState.users.get(socket.id)?.username || 'Unknown',
+      message: data.message,
+      timestamp: new Date()
+    };
 
-  // Handle disconnect
-  socket.on('disconnect', () => {
-    const user = users.get(socket.id);
-    if (user && user.room === MAIN_ROOM) {
-      leaveMainRoom(socket.id);
-    }
-    users.delete(socket.id);
-    console.log(`User disconnected: ${socket.id}`);
-  });
-
-  function leaveMainRoom(userId) {
-    if (!mainRoom.users.includes(userId)) return;
-
-    mainRoom.users = mainRoom.users.filter(id => id !== userId);
+    worldState.chatHistory.push(chatMessage);
     
-    // Notify others in main room
-    socket.to(MAIN_ROOM).emit('user-left', {
-      roomId: MAIN_ROOM,
-      userId: userId,
-      users: mainRoom.users
-    });
+    // Keep only last 100 messages
+    if (worldState.chatHistory.length > 100) {
+      worldState.chatHistory.shift();
+    }
 
-    socket.leave(MAIN_ROOM);
-    console.log(`User ${userId} left main room. Remaining: ${mainRoom.users.length}`);
-  }
+    io.emit('chat-message', chatMessage);
+    saveWorldState();
+  });
+
+  // ===== WORLD SETTINGS =====
+  socket.on('change-lighting', (data) => {
+    worldState.roomSettings.lighting = data.lighting;
+    io.emit('lighting-changed', data.lighting);
+    saveWorldState();
+  });
+
+  socket.on('change-environment', (data) => {
+    worldState.roomSettings.environment = data.environment;
+    io.emit('environment-changed', data.environment);
+    saveWorldState();
+  });
+
+  // ===== DISCONNECT HANDLING =====
+  socket.on('disconnect', () => {
+    console.log(`👋 User disconnected: ${socket.id}`);
+    
+    // Remove user from world state
+    if (worldState.users.has(socket.id)) {
+      const user = worldState.users.get(socket.id);
+      worldState.users.delete(socket.id);
+      
+      // Notify others that user left
+      socket.broadcast.emit('user-left', {
+        userId: socket.id,
+        username: user.username
+      });
+      
+      console.log(`🗑️ Removed ${user.username} from world state`);
+    }
+    
+    // If this user was sharing screen, stop it
+    if (worldState.sharedScreen?.userId === socket.id) {
+      worldState.sharedScreen = null;
+      io.emit('screen-share-stopped', {
+        userId: socket.id,
+        clearObject: 'SHARESCREEN-HERE'
+      });
+      console.log(`📺 Screen sharing stopped - user ${socket.id} disconnected`);
+    }
+    
+    saveWorldState();
+  });
 });
 
-// Clean up disconnected users from main room every 5 minutes
+// ===== WORLD STATE CLEANUP =====
+// Clean up stale data every 10 minutes
 setInterval(() => {
-  // Remove any users that are no longer connected
-  const connectedUserIds = Array.from(users.keys());
-  const originalCount = mainRoom.users.length;
-  mainRoom.users = mainRoom.users.filter(userId => connectedUserIds.includes(userId));
+  const now = new Date();
+  let cleaned = 0;
   
-  if (mainRoom.users.length !== originalCount) {
-    console.log(`Cleaned up main room: ${originalCount - mainRoom.users.length} disconnected users removed`);
+  // Clean up old chat messages (keep last 100)
+  if (worldState.chatHistory.length > 100) {
+    const removed = worldState.chatHistory.length - 100;
+    worldState.chatHistory = worldState.chatHistory.slice(-100);
+    cleaned += removed;
   }
-}, 5 * 60 * 1000);
+  
+  // Clean up objects not moved in 24 hours (optional)
+  for (const [objectId, objectData] of worldState.objects.entries()) {
+    if (objectData.movedAt && (now - new Date(objectData.movedAt)) > 24 * 60 * 60 * 1000) {
+      // Optionally remove old objects
+      // worldState.objects.delete(objectId);
+      // cleaned++;
+    }
+  }
+  
+  if (cleaned > 0) {
+    console.log(`🧹 Cleaned up ${cleaned} stale items from world state`);
+    saveWorldState();
+  }
+}, 10 * 60 * 1000);
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {

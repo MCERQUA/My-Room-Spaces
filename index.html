@@ -1657,7 +1657,11 @@
       try {
         // Use Socket.IO for Railway server
         socket = io(SIGNALING_SERVER, {
-          transports: ['websocket', 'polling']
+          transports: ['websocket', 'polling'],
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionAttempts: 5,
+          autoConnect: true
         });
         
         socket.on('connect', () => {
@@ -1665,6 +1669,15 @@
           console.log('🎉 Server-mediated world sharing is now enabled!');
           inRoom = true;
           myUserId = socket.id;
+          
+          // Clear all existing avatars on reconnection
+          userAvatars.forEach((avatar, userId) => {
+            if (avatar.mesh) {
+              scene.remove(avatar.mesh);
+            }
+          });
+          userAvatars.clear();
+          customAvatarModels.clear();
           
           // Update user interface
           updateUserList();
@@ -3237,6 +3250,12 @@
         const file = event.target.files[0];
         if (file) {
           try {
+            // Check file size (limit to 2MB for data URLs)
+            if (file.size > 2 * 1024 * 1024) {
+              alert('Avatar file too large. Please use a file smaller than 2MB.');
+              return;
+            }
+            
             // Convert file to data URL for sharing
             const reader = new FileReader();
             reader.onload = (e) => {
@@ -3247,7 +3266,7 @@
                 socket.emit('user-avatar-update', {
                   customAvatarUrl: myCustomAvatarUrl
                 });
-                console.log('🎭 Custom avatar uploaded and shared');
+                console.log('🎭 Custom avatar uploaded (size: ' + (file.size / 1024).toFixed(2) + 'KB)');
               }
               
               // Update local user data

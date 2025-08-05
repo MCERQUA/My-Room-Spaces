@@ -156,10 +156,13 @@ io.on('connection', (socket) => {
       const user = worldState.users.get(socket.id);
       user.customAvatarUrl = data.customAvatarUrl;
       
-      console.log(`🎭 User ${socket.id} updated their avatar`);
+      // Log size info if available
+      const sizeInfo = data.customAvatarUrl ? 
+        ` (size: ${(data.customAvatarUrl.length / 1024).toFixed(2)}KB)` : '';
+      console.log(`🎭 User ${socket.id} updated their avatar${sizeInfo}`);
       
-      // Broadcast avatar update to all users
-      io.emit('user-avatar-updated', {
+      // Broadcast avatar update to all OTHER users (not sender)
+      socket.broadcast.emit('user-avatar-updated', {
         userId: socket.id,
         customAvatarUrl: data.customAvatarUrl,
         position: user.position,

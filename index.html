@@ -16,9 +16,9 @@
       margin: 0;
       padding: 0; /* Research shows this is critical for mobile */
       overflow: hidden;
-      font-family: 'Courier New', monospace;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background: #000;
-      color: #00ff00;
+      color: #ffffff;
     }
 
     #scene-container {
@@ -310,169 +310,372 @@
       }
     }
 
+    /* Glass Morphism Menu Styles */
+    .glass-menu {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 400;
+      display: flex;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 10px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    }
+
+    .glass-button {
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      color: #ffffff;
+      transition: all 0.3s ease;
+      position: relative;
+    }
+
+    .glass-button:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .glass-button .tooltip {
+      position: absolute;
+      bottom: -35px;
+      left: 50%;
+      transform: translateX(-50%) scale(0);
+      background: rgba(0, 0, 0, 0.9);
+      color: #ffffff;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      transition: all 0.3s ease;
+      pointer-events: none;
+      font-weight: 500;
+    }
+
+    .glass-button:hover .tooltip {
+      transform: translateX(-50%) scale(1);
+      opacity: 1;
+    }
+
     /* User List Styles */
     .user-list {
       position: absolute;
       top: 20px;
       right: 20px;
       z-index: 300;
-      color: #ffffff;
-      font-family: 'Courier New', monospace;
-      font-size: 12px;
-      text-align: right;
-      pointer-events: none;
-      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 15px 20px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      min-width: 150px;
     }
 
     .user-list h3 {
-      margin: 0 0 8px 0;
-      color: #00ff88;
+      margin: 0 0 10px 0;
+      color: #ffffff;
       font-size: 14px;
-      font-weight: bold;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .user-item {
-      margin: 3px 0;
+      margin: 6px 0;
       color: #ffffff;
-      font-size: 11px;
+      font-size: 12px;
+      padding: 4px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
     }
 
     .user-item.self {
-      color: #ffaa00;
-      font-weight: bold;
+      background: rgba(74, 144, 226, 0.2);
+      font-weight: 600;
+    }
+
+    .user-count {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-left: 4px;
     }
 
     /* Chat Interface Styles */
     .chat-container {
       position: absolute;
       bottom: 20px;
-      left: 20px;
+      right: 20px;
       width: 350px;
-      height: 200px;
+      height: 250px;
       z-index: 300;
-      background: rgba(0, 0, 0, 0.85);
-      border: 1px solid #00ff88;
-      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
       display: flex;
       flex-direction: column;
-      font-family: 'Courier New', monospace;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
     }
 
     .chat-header {
-      background: rgba(0, 255, 136, 0.1);
-      padding: 5px 10px;
-      border-bottom: 1px solid #00ff88;
-      color: #00ff88;
-      font-size: 12px;
-      font-weight: bold;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 12px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 16px 16px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .chat-messages {
       flex: 1;
       overflow-y: auto;
-      padding: 8px;
-      font-size: 10px;
-      line-height: 1.3;
+      padding: 12px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .chat-messages::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
     }
 
     .chat-message {
-      margin: 2px 0;
+      margin: 6px 0;
       word-wrap: break-word;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 8px 12px;
+      border-radius: 12px;
     }
 
     .chat-message .username {
-      color: #ffaa00;
-      font-weight: bold;
+      color: #4a90e2;
+      font-weight: 600;
     }
 
     .chat-message .timestamp {
-      color: #888;
-      font-size: 9px;
+      color: rgba(255, 255, 255, 0.5);
+      font-size: 10px;
     }
 
     .chat-message .content {
       color: #ffffff;
       margin-left: 5px;
+      font-size: 13px;
     }
 
     .chat-input-container {
-      border-top: 1px solid #00ff88;
-      padding: 5px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 12px;
       display: flex;
-      gap: 5px;
+      gap: 8px;
     }
 
     .chat-input {
       flex: 1;
-      background: transparent;
-      border: 1px solid #00ff88;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
       color: #ffffff;
-      padding: 4px 6px;
-      border-radius: 3px;
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      transition: all 0.3s ease;
     }
 
     .chat-input:focus {
       outline: none;
-      border-color: #ffaa00;
+      border-color: rgba(74, 144, 226, 0.5);
+      background: rgba(255, 255, 255, 0.15);
     }
 
     .chat-send {
-      background: transparent;
-      border: 1px solid #00ff88;
-      color: #00ff88;
-      padding: 4px 8px;
-      border-radius: 3px;
+      background: rgba(74, 144, 226, 0.2);
+      border: 1px solid rgba(74, 144, 226, 0.3);
+      color: #ffffff;
+      padding: 8px 16px;
+      border-radius: 12px;
       cursor: pointer;
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.3s ease;
     }
 
     .chat-send:hover {
-      background: rgba(0, 255, 136, 0.2);
+      background: rgba(74, 144, 226, 0.3);
+      transform: translateY(-1px);
     }
 
     .chat-toggle {
       position: absolute;
       bottom: 20px;
-      left: 380px;
-      z-index: 300;
-      background: rgba(0, 0, 0, 0.8);
-      border: 1px solid #00ff88;
-      color: #00ff88;
-      padding: 5px 8px;
-      border-radius: 3px;
+      right: 380px;
+      z-index: 301;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
       cursor: pointer;
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
     }
 
     .chat-toggle:hover {
-      background: rgba(0, 255, 136, 0.2);
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
     }
 
     .chat-container.hidden {
       display: none;
     }
 
+    /* Help Dialog Styles */
+    .help-dialog {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 400px;
+      max-width: 90vw;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      z-index: 500;
+      display: none;
+    }
+
+    .help-dialog.visible {
+      display: block;
+    }
+
+    .help-dialog h2 {
+      color: #ffffff;
+      margin: 0 0 16px 0;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .help-dialog .help-section {
+      margin-bottom: 16px;
+    }
+
+    .help-dialog h3 {
+      color: #4a90e2;
+      font-size: 14px;
+      margin: 0 0 8px 0;
+      font-weight: 600;
+    }
+
+    .help-dialog p {
+      color: #ffffff;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 4px 0;
+    }
+
+    .help-dialog .key {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .help-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      width: 32px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      color: #ffffff;
+      transition: all 0.3s ease;
+    }
+
+    .help-close:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
     @media (max-width: 768px) {
       .user-list {
         top: 10px;
         right: 10px;
-        font-size: 10px;
+        padding: 10px 15px;
+        min-width: 120px;
+      }
+
+      .user-list h3 {
+        font-size: 12px;
+      }
+
+      .user-item {
+        font-size: 11px;
       }
 
       .chat-container {
-        width: 280px;
-        height: 150px;
+        width: calc(100vw - 20px);
+        max-width: 350px;
+        height: 200px;
         bottom: 10px;
-        left: 10px;
+        right: 10px;
       }
 
       .chat-toggle {
-        left: 300px;
+        right: calc(100vw - 50px);
         bottom: 10px;
+      }
+
+      .help-dialog {
+        width: calc(100vw - 40px);
+        padding: 20px;
       }
     }
   </style>
@@ -493,14 +696,27 @@
     </div>
   </div>
   
-  <div class="controls-info">
-    <p>Click objects to select | Drag GLB files to load</p>
-    <p>WASD: move | Mouse: look | ENTER: hide screen</p>
-    <p>R: reset | Q: rotate | E/C: scale | DEL: delete</p>
-    <p id="user-count">👥 Users: 1</p>
+  <!-- Glass Menu -->
+  <div class="glass-menu" id="glass-menu">
+    <button class="glass-button" id="menu-home">
+      🏠
+      <span class="tooltip">Home</span>
+    </button>
+    <button class="glass-button" id="menu-screen">
+      🖥️
+      <span class="tooltip">Screen Share</span>
+    </button>
+    <button class="glass-button" id="menu-objects">
+      📦
+      <span class="tooltip">Objects</span>
+    </button>
+    <button class="glass-button" id="menu-help">
+      ❓
+      <span class="tooltip">Help</span>
+    </button>
   </div>
   
-  <div class="screen-controls" id="screen-controls">
+  <div class="screen-controls" id="screen-controls" style="display: none;">
     <h3>📺 Large Screen Controls</h3>
     <button id="share-screen">🖥️ Share Desktop Screen</button>
     <button id="stop-sharing">⏹️ Stop Sharing</button>
@@ -546,7 +762,7 @@
 
   <!-- User List in Top Right -->
   <div class="user-list" id="user-list">
-    <h3>👥 Users Online</h3>
+    <h3>👥 Users Online <span class="user-count" id="user-count-badge">(1)</span></h3>
     <div id="user-list-content">
       <div class="user-item self" id="current-user">Loading...</div>
     </div>
@@ -572,6 +788,37 @@
 
   <!-- Chat Toggle Button -->
   <button class="chat-toggle" id="chat-toggle">💬</button>
+
+  <!-- Help Dialog -->
+  <div class="help-dialog" id="help-dialog">
+    <button class="help-close" id="help-close">✖</button>
+    <h2>Controls & Help</h2>
+    
+    <div class="help-section">
+      <h3>Movement</h3>
+      <p><span class="key">W</span> <span class="key">A</span> <span class="key">S</span> <span class="key">D</span> - Move around</p>
+      <p><span class="key">Mouse</span> - Look around</p>
+      <p><span class="key">ENTER</span> - Hide/show screen</p>
+    </div>
+    
+    <div class="help-section">
+      <h3>Object Manipulation</h3>
+      <p><span class="key">Click</span> - Select object</p>
+      <p><span class="key">R</span> - Reset object</p>
+      <p><span class="key">Q</span> - Rotate object</p>
+      <p><span class="key">E</span> / <span class="key">C</span> - Scale up/down</p>
+      <p><span class="key">DEL</span> - Delete object</p>
+      <p>Drag GLB files to load 3D models</p>
+    </div>
+    
+    <div class="help-section">
+      <h3>Features</h3>
+      <p>🖥️ Screen sharing with other users</p>
+      <p>📦 Load and manipulate 3D objects</p>
+      <p>💬 Real-time chat with persistence</p>
+      <p>👥 See other users as avatars</p>
+    </div>
+  </div>
   
   <script src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.js"></script>
   <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
@@ -2555,6 +2802,48 @@
       deselectObject();
     });
 
+    // Glass menu event handlers
+    document.getElementById('menu-home').addEventListener('click', (e) => {
+      e.stopPropagation();
+      console.log('Home button clicked - future navigation');
+      // Future: Navigate to global directory
+    });
+    
+    document.getElementById('menu-screen').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const screenControls = document.getElementById('screen-controls');
+      if (screenControls.style.display === 'none') {
+        screenControls.style.display = 'block';
+      } else {
+        screenControls.style.display = 'none';
+      }
+    });
+    
+    document.getElementById('menu-objects').addEventListener('click', (e) => {
+      e.stopPropagation();
+      // Trigger file input for loading GLB models
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.glb,.gltf';
+      input.onchange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          loadGLBFile(file);
+        }
+      };
+      input.click();
+    });
+    
+    document.getElementById('menu-help').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('help-dialog').classList.add('visible');
+    });
+    
+    document.getElementById('help-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('help-dialog').classList.remove('visible');
+    });
+    
     // Screen control event listeners
     document.getElementById('share-screen').addEventListener('click', (e) => {
       e.stopPropagation();

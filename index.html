@@ -1054,11 +1054,30 @@
       const userItems = userListContent.querySelectorAll('.user-item:not(.self)');
       userItems.forEach(item => item.remove());
       
-      // Update current user
+      // Update current user with clickable name
       if (currentUserElement && myUserId) {
         const currentUser = Array.from(userAvatars.values()).find(u => u.id === myUserId) || 
                            { username: `User${myUserId.substr(0,4)}` };
-        currentUserElement.textContent = `${currentUser.username} (You)`;
+        
+        // Clear and recreate current user element
+        currentUserElement.innerHTML = '';
+        
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'editable-name';
+        nameSpan.textContent = currentUser.username;
+        nameSpan.style.cursor = 'pointer';
+        nameSpan.style.textDecoration = 'underline';
+        nameSpan.style.color = '#4CAF50';
+        nameSpan.title = 'Click to edit your name';
+        
+        nameSpan.addEventListener('click', () => editUserName());
+        
+        const youLabel = document.createElement('span');
+        youLabel.textContent = ' (You)';
+        youLabel.style.color = '#ccc';
+        
+        currentUserElement.appendChild(nameSpan);
+        currentUserElement.appendChild(youLabel);
       }
       
       // Add other users
@@ -1070,6 +1089,80 @@
           userListContent.appendChild(userItem);
         }
       });
+    }
+
+    function editUserName() {
+      const currentUserElement = document.getElementById('current-user');
+      if (!currentUserElement || !myUserId) return;
+      
+      const currentUser = Array.from(userAvatars.values()).find(u => u.id === myUserId) || 
+                         { username: `User${myUserId.substr(0,4)}` };
+      
+      // Create input field
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentUser.username;
+      input.maxLength = 20;
+      input.style.cssText = `
+        background: rgba(0,0,0,0.8);
+        border: 1px solid #4CAF50;
+        color: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 12px;
+        width: 80px;
+      `;
+      
+      // Replace name span with input
+      const nameSpan = currentUserElement.querySelector('.editable-name');
+      if (nameSpan) {
+        nameSpan.style.display = 'none';
+        currentUserElement.insertBefore(input, nameSpan);
+        input.focus();
+        input.select();
+        
+        const saveChanges = () => {
+          const newName = input.value.trim();
+          if (newName && newName !== currentUser.username && newName.length <= 20) {
+            // Update locally
+            if (userAvatars.has(myUserId)) {
+              userAvatars.get(myUserId).username = newName;
+            }
+            
+            // Emit name change to server
+            if (socket && socket.connected) {
+              socket.emit('user-name-change', { 
+                userId: myUserId, 
+                newName: newName 
+              });
+            }
+            
+            // Update avatar label
+            updateAvatarLabel(myUserId, newName);
+          }
+          
+          // Restore normal display
+          input.remove();
+          nameSpan.style.display = 'inline';
+          updateUserList();
+        };
+        
+        const cancelChanges = () => {
+          input.remove();
+          nameSpan.style.display = 'inline';
+        };
+        
+        input.addEventListener('blur', saveChanges);
+        input.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            saveChanges();
+          } else if (e.key === 'Escape') {
+            e.preventDefault();
+            cancelChanges();
+          }
+        });
+      }
     }
 
     // P2P Main Room functionality
@@ -1197,6 +1290,28 @@
         // ===== USER AVATAR EVENTS =====
         socket.on('user-moved', (data) => {
           moveUserAvatar(data.userId, data.position, data.rotation);
+        });
+        
+        socket.on('user-name-changed', (data) => {
+          console.log(`📝 User ${data.userId} changed name from "${data.oldName}" to "${data.newName}"`);
+          
+          // Update local avatar data
+          if (userAvatars.has(data.userId)) {
+            userAvatars.get(data.userId).username = data.newName;
+            updateAvatarLabel(data.userId, data.newName);
+          }
+          
+          // Update user list display
+          updateUserList();
+          
+          // Show notification in chat
+          const nameChangeMessage = {
+            username: 'System',
+            message: `${data.oldName} changed their name to ${data.newName}`,
+            timestamp: new Date().toISOString(),
+            isSystem: true
+          };
+          displayChatMessage(nameChangeMessage);
         });
         
         // ===== SCREEN SHARING EVENTS =====
@@ -1900,6 +2015,27 @@
       }
     }
     
+    function updateAvatarLabel(userId, newName) {
+      const avatar = userAvatars.get(userId);
+      if (avatar && avatar.label) {
+        // Update the canvas texture with new name
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = 256;
+        canvas.height = 64;
+        context.font = '24px Arial';
+        context.fillStyle = 'white';
+        context.textAlign = 'center';
+        context.fillText(newName, 128, 40);
+        
+        const labelTexture = new THREE.CanvasTexture(canvas);
+        avatar.label.material.map = labelTexture;
+        avatar.label.material.needsUpdate = true;
+        
+        console.log(`🏷️ Updated avatar label for ${userId}: ${newName}`);
+      }
+    }
+    
     // ===== SCREEN SHARING HELPERS =====
     function handleRemoteScreenShare(data) {
       console.log('📺 Handling remote screen share:', data);
@@ -1965,7 +2101,7 @@
       if (!chatMessages) return;
       
       const messageElement = document.createElement('div');
-      messageElement.className = 'chat-message';
+      messageElement.className = message.isSystem ? 'chat-message system-message' : 'chat-message';
       
       const timestamp = new Date(message.timestamp || new Date()).toLocaleTimeString('en-US', { 
         hour12: false, 
@@ -1973,11 +2109,20 @@
         minute: '2-digit' 
       });
       
-      messageElement.innerHTML = `
-        <span class="timestamp">[${timestamp}]</span>
-        <span class="username">${message.username}:</span>
-        <span class="content">${message.message}</span>
-      `;
+      if (message.isSystem) {
+        messageElement.innerHTML = `
+          <span class="timestamp">[${timestamp}]</span>
+          <span class="system-content">🔔 ${message.message}</span>
+        `;
+        messageElement.style.color = '#FFA500';
+        messageElement.style.fontStyle = 'italic';
+      } else {
+        messageElement.innerHTML = `
+          <span class="timestamp">[${timestamp}]</span>
+          <span class="username">${message.username}:</span>
+          <span class="content">${message.message}</span>
+        `;
+      }
       
       chatMessages.appendChild(messageElement);
       

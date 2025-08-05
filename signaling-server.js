@@ -129,6 +129,26 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ===== USER NAME CHANGES =====
+  socket.on('user-name-change', (data) => {
+    if (worldState.users.has(socket.id)) {
+      const user = worldState.users.get(socket.id);
+      const oldName = user.username;
+      user.username = data.newName;
+      
+      console.log(`📝 User ${socket.id} changed name from "${oldName}" to "${data.newName}"`);
+      
+      // Broadcast name change to all users (including sender for confirmation)
+      io.emit('user-name-changed', {
+        userId: socket.id,
+        oldName: oldName,
+        newName: data.newName
+      });
+      
+      saveWorldState();
+    }
+  });
+
   // ===== PERSISTENT OBJECT INTERACTIONS =====
   socket.on('object-add', (data) => {
     // Save new object permanently

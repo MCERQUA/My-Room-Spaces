@@ -92,7 +92,8 @@ docs/                   # Comprehensive documentation
 ├── netlify-deployment.md  # Frontend hosting setup
 ├── railway-deployment.md  # Backend server setup
 ├── TROUBLESHOOTING.md # Common issues and solutions
-└── CONTRIBUTING.md    # Development and contribution guide
+├── CONTRIBUTING.md    # Development and contribution guide
+└── UI_STYLING_GUIDE.md # Glassmorphism UI design system & guidelines
 
 models/                 # Optional GLB models directory
 netlify.toml           # Static site deployment configuration
@@ -182,28 +183,40 @@ function spawnUserAvatar(userId, avatar) {
 - Smooth avatar movement without performance impact
 
 ### Social Features & UI Components (v2.0)
-**User List (Top Right Corner):**
-```javascript
-function updateUserList() {
-  // Real-time user list with current user highlighted
-  // Updates automatically on user join/leave events
-  // Clean text styling with shadows for 3D background visibility
-}
-```
+**Modern Glassmorphism UI Design:**
+- **Design System**: Consistent glass-effect panels with backdrop blur
+- **Color Palette**: White text on transparent backgrounds with blue accents
+- **Component Library**: Glass menu, user list, chat, dialogs, controls
+- **Responsive**: Mobile-optimized with proper touch interactions
+- **Guidelines**: See `docs/UI_STYLING_GUIDE.md` for complete design system
 
-**Persistent World Chat Interface:**
-- **Location**: Bottom left corner (350x200px) with toggle functionality
-- **Features**: Scrollable messages, timestamps, usernames, server persistence
-- **Input**: Enter key or Send button support with 200 character limit
-- **Toggle**: 💬/❌ button to show/hide chat interface
-- **Integration**: Uses Railway backend `chat-message` events for real-time sync
-- **Performance**: Auto-scroll, 50 message limit, prevents 3D scene interference
+**Glass Menu (Top Left):**
+- Icon-based navigation with hover tooltips
+- Home, Screen Share, Objects, Help buttons
+- Minimalist design to maximize 3D scene visibility
 
-**Key Functions:**
-- `displayChatMessage(message)`: Renders chat messages with timestamps
-- `sendChatMessage()`: Emits messages to server via Socket.IO
-- `toggleChat()`: Show/hide chat interface
-- `updateUserList()`: Syncs user list with active avatars
+**User List (Top Right):**
+- Glass panel showing online users with count badge
+- Editable username with click-to-edit functionality
+- Real-time updates on user join/leave
+
+**Chat Interface (Bottom Right):**
+- Glass panel with scrollable message history
+- Persistent messages stored on server
+- 200 character limit with timestamp display
+- Toggle button for show/hide functionality
+
+**Welcome Dialog:**
+- Appears on first connection for name entry
+- Glass-styled modal with overlay
+- Mobile-friendly with button support
+- Falls back to generated username if empty
+
+**Key UI Functions:**
+- `showWelcomeDialog()`: Initial name entry modal
+- `displayChatMessage(message)`: Renders chat messages
+- `updateUserList()`: Syncs user list display
+- `editUserName()`: Inline username editing
 
 ### Mobile Touch Controls
 - **Single tap**: Object selection
@@ -303,6 +316,34 @@ The project now includes extensive documentation for users and developers:
 - **Test all examples** in documentation to ensure accuracy
 - **Include screenshots** for visual features when possible
 - **Provide troubleshooting** for common issues with new features
+
+## UI Styling Guidelines
+
+### Glassmorphism Design System
+The UI uses a modern glassmorphism design with:
+- **Backdrop blur** for frosted glass effect
+- **Semi-transparent backgrounds** (rgba white 0.1-0.2)
+- **Rounded corners** (16px for panels, 10-12px for buttons)
+- **Consistent shadows** for depth perception
+- **Smooth transitions** (0.3s ease) on all interactions
+
+### Maintaining UI Consistency
+When adding new UI elements:
+1. **Reference the style guide**: `docs/UI_STYLING_GUIDE.md`
+2. **Use existing components** as templates
+3. **Follow the color palette**:
+   - White text: `#ffffff`
+   - Muted text: `rgba(255, 255, 255, 0.7)`
+   - Accent blue: `#4a90e2` / `rgba(74, 144, 226, 0.3)`
+4. **Apply glass panel base styles**:
+   ```css
+   background: rgba(255, 255, 255, 0.1);
+   backdrop-filter: blur(10px);
+   border: 1px solid rgba(255, 255, 255, 0.2);
+   border-radius: 16px;
+   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+   ```
+5. **Test on mobile** for responsive behavior
 
 ## Recent Major Changes (v2.0 Architecture Upgrade)
 

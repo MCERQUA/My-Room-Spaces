@@ -86,180 +86,167 @@
 
     .model-controls {
       position: absolute;
-      top: 20px;
-      right: 20px;
-      z-index: 200;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 15px;
-      border-radius: 5px;
-      border: 1px solid #00ff00;
-      font-size: 12px;
+      top: 80px;
+      left: 20px;
+      z-index: 350;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       display: none;
+      min-width: 200px;
     }
 
     .model-controls.visible {
       display: block;
     }
 
+    .model-controls h3 {
+      color: #ffffff;
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
     .model-controls button {
-      background: transparent;
-      border: 1px solid #00ff00;
-      color: #00ff00;
-      padding: 5px 10px;
-      margin: 2px;
-      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 8px 12px;
+      margin: 4px;
+      border-radius: 10px;
       cursor: pointer;
-      font-family: 'Courier New', monospace;
-      font-size: 10px;
+      font-size: 12px;
+      transition: all 0.3s ease;
+      min-width: 40px;
     }
 
     .model-controls button:hover {
-      background: rgba(0, 255, 0, 0.2);
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .model-controls button#delete-selected {
+      background: rgba(255, 59, 48, 0.2);
+      border-color: rgba(255, 59, 48, 0.3);
+    }
+
+    .model-controls button#delete-selected:hover {
+      background: rgba(255, 59, 48, 0.3);
     }
 
     .screen-controls {
       position: absolute;
-      top: 20px;
+      top: 80px;
       left: 20px;
-      z-index: 200;
-      background: rgba(0, 0, 0, 0.9);
-      padding: 8px;
-      border-radius: 3px;
-      border: 1px solid #00ff00;
-      font-size: 10px;
-      width: 180px;
+      z-index: 350;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      width: 240px;
+      display: none;
     }
 
     .screen-controls h3 {
-      color: #00ff00;
-      margin: 0 0 5px 0;
-      font-size: 11px;
+      color: #ffffff;
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .screen-controls button {
-      background: transparent;
-      border: 1px solid #00ff00;
-      color: #00ff00;
-      padding: 4px 6px;
-      margin: 1px;
-      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 10px 16px;
+      margin: 4px 0;
+      border-radius: 10px;
       cursor: pointer;
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
+      font-size: 13px;
       width: 100%;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
     }
 
     .screen-controls button:hover {
-      background: rgba(0, 255, 0, 0.2);
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
     }
 
     .screen-controls input[type="file"] {
-      background: transparent;
-      border: 1px solid #00ff00;
-      color: #00ff00;
-      padding: 2px;
-      margin: 1px 0;
-      border-radius: 2px;
-      font-family: 'Courier New', monospace;
-      font-size: 8px;
-      width: 100%;
+      display: none;
     }
 
-    .screen-controls input[type="file"]::-webkit-file-upload-button {
-      background: transparent;
-      border: 1px solid #00ff00;
-      color: #00ff00;
-      padding: 2px 4px;
-      border-radius: 2px;
+    .screen-controls .file-input-wrapper {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 10px 16px;
+      margin: 4px 0;
+      border-radius: 10px;
       cursor: pointer;
-      font-family: 'Courier New', monospace;
-      font-size: 8px;
+      font-size: 13px;
+      width: 100%;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: center;
+    }
+
+    .screen-controls .file-input-wrapper:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .screen-controls .volume-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
     }
 
     .screen-controls input[type="range"] {
       appearance: none;
       background: transparent;
       cursor: pointer;
-      height: 15px;
+      height: 20px;
+      flex: 1;
     }
 
     .screen-controls input[type="range"]::-webkit-slider-track {
-      background: #00ff00;
-      height: 3px;
+      background: rgba(255, 255, 255, 0.2);
+      height: 4px;
       border-radius: 2px;
     }
 
     .screen-controls input[type="range"]::-webkit-slider-thumb {
       appearance: none;
-      background: #00ff00;
-      height: 12px;
-      width: 12px;
+      background: #ffffff;
+      height: 14px;
+      width: 14px;
       border-radius: 50%;
       cursor: pointer;
-      margin-top: -4px;
+      margin-top: -5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 
-    .room-controls {
-      position: absolute;
-      top: 20px;
-      left: 220px;
-      z-index: 200;
-      background: rgba(0, 0, 0, 0.9);
-      padding: 8px;
-      border-radius: 3px;
-      border: 1px solid #ffaa00;
-      font-size: 10px;
-      width: 200px;
-    }
-
-    .room-controls h3 {
-      color: #ffaa00;
-      margin: 0 0 5px 0;
-      font-size: 11px;
-    }
-
-    .room-controls button {
-      background: transparent;
-      border: 1px solid #ffaa00;
-      color: #ffaa00;
-      padding: 4px 6px;
-      margin: 1px;
-      border-radius: 2px;
-      cursor: pointer;
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      width: 100%;
-    }
-
-    .room-controls button:hover {
-      background: rgba(255, 170, 0, 0.2);
-    }
-
-    .room-controls input[type="text"] {
-      background: transparent;
-      border: 1px solid #ffaa00;
-      color: #ffaa00;
-      padding: 4px;
-      margin: 2px 0;
-      border-radius: 2px;
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      width: 100%;
-    }
-
-    .room-status {
-      margin-top: 5px;
-      font-size: 8px;
-      color: #ffaa88;
-    }
-
-    .room-status.connected {
-      color: #88ffaa;
-    }
-
-    .room-status.error {
-      color: #ff8888;
-    }
 
     #video-element {
       display: none;
@@ -271,15 +258,16 @@
       left: 0;
       width: 100%;
       height: 100%;
-      background: rgba(0, 255, 0, 0.1);
-      border: 3px dashed #00ff00;
+      background: rgba(74, 144, 226, 0.1);
+      border: 3px dashed rgba(74, 144, 226, 0.5);
       z-index: 300;
       display: none;
       align-items: center;
       justify-content: center;
       font-size: 24px;
-      color: #00ff00;
+      color: #ffffff;
       pointer-events: none;
+      backdrop-filter: blur(2px);
     }
 
     .drag-overlay.active {
@@ -297,16 +285,9 @@
         padding: 15px;
       }
       
-      .controls-info {
-        bottom: 10px;
-        left: 10px;
-        right: 10px;
-        font-size: 11px;
-      }
       
       .screen-controls {
-        width: 160px;
-        font-size: 9px;
+        width: 200px;
       }
     }
 
@@ -717,19 +698,17 @@
   </div>
   
   <div class="screen-controls" id="screen-controls" style="display: none;">
-    <h3>📺 Large Screen Controls</h3>
-    <button id="share-screen">🖥️ Share Desktop Screen</button>
-    <button id="stop-sharing">⏹️ Stop Sharing</button>
-    <input type="file" id="video-upload" accept="video/*" />
-    <button id="load-video">📁 Load Video File</button>
+    <h3>🖥️ Screen Controls</h3>
+    <button id="share-screen">🖥️ Share Desktop</button>
+    <button id="stop-sharing" style="display: none;">⏹️ Stop Sharing</button>
+    <label class="file-input-wrapper">
+      📁 Load Video File
+      <input type="file" id="video-upload" accept="video/*" />
+    </label>
     <button id="clear-screen">🧹 Clear Screen</button>
-    <div style="margin-top: 5px;">
-      <button id="toggle-audio">🔊 Audio ON</button>
-      <input type="range" id="volume-slider" min="0" max="100" value="100" style="width: 60px; margin-left: 5px;">
-    </div>
-    <div style="margin-top: 5px; font-size: 8px; color: #00ff88;">
-      <p style="margin: 2px 0;">Screen in 3D scene</p>
-      <p style="margin: 2px 0;">Click to move/resize</p>
+    <div class="volume-control">
+      <button id="toggle-audio" style="min-width: auto; padding: 6px 10px;">🔊</button>
+      <input type="range" id="volume-slider" min="0" max="100" value="100">
     </div>
   </div>
 
@@ -738,25 +717,25 @@
   
   <div class="model-controls" id="model-controls">
     <h3 id="selected-object-name">Object Controls</h3>
-    <div>
-      <button id="move-up">↑ Up</button>
-      <button id="move-down">↓ Down</button>
-      <button id="move-left">← Left</button>
-      <button id="move-right">→ Right</button>
+    <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+      <button id="move-up" title="Move Up">↑</button>
+      <button id="move-down" title="Move Down">↓</button>
+      <button id="move-left" title="Move Left">←</button>
+      <button id="move-right" title="Move Right">→</button>
+    </div>
+    <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+      <button id="move-forward" title="Move Forward">▲</button>
+      <button id="move-backward" title="Move Backward">▼</button>
+      <button id="scale-up" title="Scale Up">+</button>
+      <button id="scale-down" title="Scale Down">-</button>
+    </div>
+    <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+      <button id="rotate-y" title="Rotate">↻</button>
+      <button id="reset-object" title="Reset">⟲</button>
+      <button id="delete-selected" title="Delete">🗑</button>
     </div>
     <div>
-      <button id="move-forward">▲ Forward</button>
-      <button id="move-backward">▼ Backward</button>
-      <button id="scale-up">+ Scale</button>
-      <button id="scale-down">- Scale</button>
-    </div>
-    <div>
-      <button id="rotate-y">↻ Rotate</button>
-      <button id="reset-object">⟲ Reset</button>
-      <button id="delete-selected" style="background: rgba(255, 0, 0, 0.2); border-color: #ff0000; color: #ff0000;">🗑 Delete</button>
-    </div>
-    <div>
-      <button id="deselect-object">✖ Deselect</button>
+      <button id="deselect-object" style="width: 100%">✖ Deselect</button>
     </div>
   </div>
 
@@ -1514,6 +1493,7 @@
             worldData.chatHistory.forEach(msg => displayChatMessage(msg));
           }
           
+          // worldData.users.length already includes all users (including current user)
           updateUserCount(worldData.users.length);
           updateUserList();
         });
@@ -2862,10 +2842,7 @@
       }
     });
     
-    document.getElementById('load-video').addEventListener('click', (e) => {
-      e.stopPropagation();
-      document.getElementById('video-upload').click();
-    });
+    // Load video button removed - using label wrapper instead
     
     document.getElementById('clear-screen').addEventListener('click', (e) => {
       e.stopPropagation();

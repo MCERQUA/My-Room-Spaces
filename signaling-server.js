@@ -110,7 +110,7 @@ io.on('connection', (socket) => {
     // Notify all users of new avatar
     io.emit('user-joined', userAvatar);
     
-    console.log(`🧑‍🤝‍🧑 ${userAvatar.username} spawned in world`);
+    // Removed verbose spawning log
   });
 
   // ===== REAL-TIME POSITION UPDATES =====
@@ -225,17 +225,27 @@ io.on('connection', (socket) => {
     worldState.sharedScreen = {
       userId: socket.id,
       startedAt: new Date(),
-      streamId: data.streamId
+      streamId: data.streamId,
+      hasAudio: data.hasAudio,
+      isVideoFile: data.isVideoFile,
+      fileName: data.fileName
     };
 
     // Apply screen to SHARESCREEN-HERE object for everyone
     io.emit('screen-share-started', {
       userId: socket.id,
       streamId: data.streamId,
-      applyToObject: 'SHARESCREEN-HERE'
+      applyToObject: 'SHARESCREEN-HERE',
+      hasAudio: data.hasAudio,
+      isVideoFile: data.isVideoFile,
+      fileName: data.fileName
     });
 
-    console.log(`📺 ${socket.id} started screen sharing`);
+    if (data.isVideoFile) {
+      console.log(`📹 ${socket.id} started video file sharing: ${data.fileName}`);
+    } else {
+      console.log(`📺 ${socket.id} started screen sharing`);
+    }
   });
 
   socket.on('screen-share-stop', () => {

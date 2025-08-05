@@ -840,7 +840,7 @@
       <div class="chat-message">
         <span class="timestamp">[00:00]</span>
         <span class="username">System:</span>
-        <span class="content">Welcome to the persistent 3D world!</span>
+        <span class="content">Welcome!</span>
       </div>
     </div>
     <div class="chat-input-container">
@@ -886,7 +886,7 @@
   <!-- Welcome Dialog -->
   <div class="welcome-overlay" id="welcome-overlay"></div>
   <div class="welcome-dialog" id="welcome-dialog">
-    <h2>Welcome to the 3D World</h2>
+    <h2>Welcome</h2>
     <p>Enter your name to join</p>
     <input type="text" class="welcome-input" id="welcome-input" placeholder="Your name" maxlength="20" autocomplete="off">
     <button class="welcome-button" id="welcome-button">Join</button>
@@ -1632,7 +1632,6 @@
         });
         
         socket.on('user-joined', (avatar) => {
-          console.log(`👋 ${avatar.username} joined the world`);
           // Don't spawn avatar for current user (they have their own local avatar)
           if (avatar.id !== socket.id) {
             spawnUserAvatar(avatar.id, avatar);
@@ -1648,7 +1647,6 @@
         });
         
         socket.on('user-left', (data) => {
-          console.log(`👋 ${data.username} left the world`);
           removeUserAvatar(data.userId);
           updateUserCount(userAvatars.size + 1); // Remaining avatars + self
           updateUserList();
@@ -2066,7 +2064,6 @@
       videoEl.loop = true;
       videoEl.muted = false; // Ensure audio is not muted
       videoEl.volume = 1.0; // Set volume to maximum
-      videoEl.play();
       
       currentVideo = { file: file, url: url };
       
@@ -2082,9 +2079,99 @@
         }
       }
       
-      videoEl.addEventListener('loadeddata', () => updateVideoTexture());
+      videoEl.addEventListener('loadeddata', () => {
+        updateVideoTexture();
+        
+        // Create MediaStream from video element for WebRTC sharing
+        if (socket && socket.connected) {
+          try {
+            // Create canvas for video stream
+            const canvas = document.createElement('canvas');
+            canvas.width = 1920;
+            canvas.height = 1080;
+            const ctx = canvas.getContext('2d');
+            
+            // Function to draw video to canvas
+            function drawVideoToCanvas() {
+              if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
+                ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+              }
+              if (currentVideo && !videoEl.paused) {
+                requestAnimationFrame(drawVideoToCanvas);
+              }
+            }
+            
+            // Start drawing
+            drawVideoToCanvas();
+            
+            // Capture canvas as stream
+            const videoStream = canvas.captureStream(30); // 30 fps
+            
+            // Try to capture audio from the video element
+            let audioStream = null;
+            if (videoEl.captureStream) {
+              // Modern browsers support captureStream on video elements
+              const fullStream = videoEl.captureStream();
+              const audioTracks = fullStream.getAudioTracks();
+              if (audioTracks.length > 0) {
+                audioStream = new MediaStream(audioTracks);
+                console.log('🔊 Captured audio tracks from video:', audioTracks.length);
+              }
+            } else if (videoEl.mozCaptureStream) {
+              // Firefox compatibility
+              const fullStream = videoEl.mozCaptureStream();
+              const audioTracks = fullStream.getAudioTracks();
+              if (audioTracks.length > 0) {
+                audioStream = new MediaStream(audioTracks);
+                console.log('🔊 Captured audio tracks from video (Firefox):', audioTracks.length);
+              }
+            }
+            
+            // Combine video and audio streams
+            if (audioStream) {
+              audioStream.getAudioTracks().forEach(track => {
+                videoStream.addTrack(track);
+                console.log('🎵 Added audio track to stream');
+              });
+            } else {
+              console.log('⚠️ No audio tracks found in video file');
+            }
+            
+            currentStream = videoStream;
+            isScreenSharing = true;
+            
+            // Notify server about video file sharing
+            socket.emit('screen-share-start', {
+              streamId: videoStream.id,
+              hasVideo: true,
+              hasAudio: audioStream !== null,
+              isVideoFile: true,
+              fileName: file.name
+            });
+            
+            console.log('📹 Video file sharing started:', file.name);
+            
+            // Connect to existing users with P2P
+            userAvatars.forEach((avatar, userId) => {
+              if (userId !== myUserId) {
+                console.log(`🔗 Connecting to ${userId} for video file sharing`);
+                connectToPeer(userId, true);
+              }
+            });
+            
+            // Update UI
+            document.getElementById('share-screen').style.display = 'none';
+            document.getElementById('stop-sharing').style.display = 'inline-block';
+            
+          } catch (error) {
+            console.error('❌ Failed to create stream from video file:', error);
+          }
+        }
+      });
+      
       videoEl.addEventListener('play', () => updateVideoTexture());
       
+      videoEl.play();
       console.log('Video loaded:', file.name);
     }
     
@@ -2097,6 +2184,11 @@
         videoEl.src = '';
         URL.revokeObjectURL(currentVideo.url);
         currentVideo = null;
+        
+        // Also stop any WebRTC sharing
+        if (isScreenSharing) {
+          stopScreenShare();
+        }
       }
       
       resetScreenContent();
@@ -2453,15 +2545,31 @@
           ctx.fillStyle = '#00ff88';
           ctx.font = 'bold 64px Arial';
           ctx.textAlign = 'center';
-          ctx.fillText('🖥️ REMOTE SCREEN SHARE', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
+          
+          if (data.isVideoFile) {
+            ctx.fillText('📹 VIDEO FILE SHARE', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
+          } else {
+            ctx.fillText('🖥️ REMOTE SCREEN SHARE', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
+          }
           
           ctx.fillStyle = '#ffffff';
           ctx.font = '36px Arial';
-          ctx.fillText(`Shared by: ${data.userId.substr(0, 8)}...`, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 20);
+          
+          // Get username from userAvatars
+          const sharingUser = userAvatars.get(data.userId);
+          const username = sharingUser ? sharingUser.username : `User${data.userId.substr(0,4)}`;
+          ctx.fillText(`Shared by: ${username}`, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 20);
+          
+          if (data.fileName) {
+            ctx.font = '28px Arial';
+            ctx.fillStyle = '#ffcc00';
+            ctx.fillText(`File: ${data.fileName}`, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 60);
+          }
           
           ctx.font = '24px Arial';
           ctx.fillStyle = '#888888';
-          ctx.fillText('(Server-mediated coordination active)', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 60);
+          const audioText = data.hasAudio ? '🔊 Audio enabled' : '🔇 No audio';
+          ctx.fillText(audioText, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 100);
           
           largeScreen.texture.needsUpdate = true;
           console.log('📺 Updated screen with remote sharing indicator');

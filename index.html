@@ -844,14 +844,12 @@
     let activeStreams = new Map(); // Track active streams from other tabs
     
     function initializeRoomSystem() {
-      console.log('🚀 Initializing WebRTC P2P with Cloudflare Worker signaling...');
+      console.log('🚀 Initializing WebRTC P2P with Railway Socket.IO signaling...');
       
-      // Use Railway Socket.IO signaling server for live screen sharing
-      const SIGNALING_SERVERS = [
-        'https://threejs-signaling.up.railway.app',
-        'https://threejs-signaling-backup.up.railway.app'
-      ];
-      const SIGNALING_SERVER = SIGNALING_SERVERS[0];
+      // Auto-detect Railway URL or fallback to local/backup servers
+      const SIGNALING_SERVER = window.location.hostname === 'localhost' 
+        ? 'http://localhost:3001'  // Local development
+        : window.location.origin;  // Railway auto-detects deployed domain
       
       try {
         // Use Socket.IO for Railway server
@@ -896,12 +894,36 @@
           }
         });
         
+        // Handle specific WebRTC events for better reliability
+        socket.on('webrtc-offer', (data) => {
+          console.log(`📨 WebRTC offer from ${data.from}`);
+          if (peers[data.from]) {
+            peers[data.from].signal(data.offer);
+          } else {
+            connectToPeer(data.from, false, data.offer);
+          }
+        });
+        
+        socket.on('webrtc-answer', (data) => {
+          console.log(`📨 WebRTC answer from ${data.from}`);
+          if (peers[data.from]) {
+            peers[data.from].signal(data.answer);
+          }
+        });
+        
+        socket.on('webrtc-ice-candidate', (data) => {
+          console.log(`📨 WebRTC ICE candidate from ${data.from}`);
+          if (peers[data.from]) {
+            peers[data.from].signal(data.candidate);
+          }
+        });
+        
+        // Fallback for generic signal (backwards compatibility)
         socket.on('signal', (data) => {
           console.log(`📨 WebRTC signal from ${data.from}`);
           if (peers[data.from]) {
             peers[data.from].signal(data.signal);
           } else {
-            // Create peer for incoming signal
             connectToPeer(data.from, false, data.signal);
           }
         });
@@ -952,10 +974,30 @@
       
       peer.on('signal', (data) => {
         console.log(`📤 Sending WebRTC signal to ${userId}:`, data.type || 'offer');
-        socket.emit('signal', {
-          to: userId,
-          signal: data
-        });
+        
+        // Use specific events for better reliability
+        if (data.type === 'offer') {
+          socket.emit('webrtc-offer', {
+            to: userId,
+            offer: data
+          });
+        } else if (data.type === 'answer') {
+          socket.emit('webrtc-answer', {
+            to: userId,
+            answer: data
+          });
+        } else if (data.candidate) {
+          socket.emit('webrtc-ice-candidate', {
+            to: userId,
+            candidate: data
+          });
+        } else {
+          // Fallback to generic signal
+          socket.emit('signal', {
+            to: userId,
+            signal: data
+          });
+        }
       });
       
       peer.on('stream', (stream) => {

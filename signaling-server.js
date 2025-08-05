@@ -85,7 +85,29 @@ io.on('connection', (socket) => {
 
 
 
-  // Forward WebRTC signaling data
+  // WebRTC signaling with specific event types for better reliability
+  socket.on('webrtc-offer', (data) => {
+    socket.to(data.to).emit('webrtc-offer', {
+      from: socket.id,
+      offer: data.offer
+    });
+  });
+
+  socket.on('webrtc-answer', (data) => {
+    socket.to(data.to).emit('webrtc-answer', {
+      from: socket.id,
+      answer: data.answer
+    });
+  });
+
+  socket.on('webrtc-ice-candidate', (data) => {
+    socket.to(data.to).emit('webrtc-ice-candidate', {
+      from: socket.id,
+      candidate: data.candidate
+    });
+  });
+
+  // Fallback for generic signal (backwards compatibility)
   socket.on('signal', (data) => {
     socket.to(data.to).emit('signal', {
       from: socket.id,

@@ -846,10 +846,10 @@
     function initializeRoomSystem() {
       console.log('🚀 Initializing WebRTC P2P with Railway Socket.IO signaling...');
       
-      // Auto-detect Railway URL or fallback to local/backup servers
+      // Connect to Railway Socket.IO server (not Netlify which only serves static files)
       const SIGNALING_SERVER = window.location.hostname === 'localhost' 
         ? 'http://localhost:3001'  // Local development
-        : window.location.origin;  // Railway auto-detects deployed domain
+        : 'https://3d-threejs-site-production.up.railway.app';  // Railway backend
       
       try {
         // Use Socket.IO for Railway server

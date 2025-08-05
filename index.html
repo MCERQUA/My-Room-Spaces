@@ -448,6 +448,30 @@
       background: rgba(74, 144, 226, 0.2);
       font-weight: 600;
     }
+    
+    .avatar-upload-button {
+      background: rgba(74, 144, 226, 0.2);
+      border: 1px solid rgba(74, 144, 226, 0.3);
+      color: #4a90e2;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-top: 10px;
+      width: calc(100% - 20px);
+      margin-left: 10px;
+      margin-right: 10px;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    
+    .avatar-upload-button:hover {
+      background: rgba(74, 144, 226, 0.3);
+      transform: translateY(-1px);
+    }
 
     .user-count {
       font-size: 11px;
@@ -884,6 +908,9 @@
     <div id="user-list-content">
       <div class="user-item self" id="current-user">Loading...</div>
     </div>
+    <button class="avatar-upload-button" id="upload-avatar">
+      🎭 Upload Custom Avatar
+    </button>
   </div>
 
   <!-- Chat Interface -->
@@ -1650,7 +1677,8 @@
           socket.emit('user-spawn', {
             position: { x: 0, y: 0, z: 5 },
             rotation: { x: 0, y: 0, z: 0 },
-            username: initialUsername
+            username: initialUsername,
+            customAvatarUrl: myCustomAvatarUrl
           });
         });
         
@@ -1763,6 +1791,30 @@
             isSystem: true
           };
           displayChatMessage(nameChangeMessage);
+        });
+        
+        socket.on('user-avatar-updated', (data) => {
+          console.log(`🎭 User ${data.userId} updated their avatar`);
+          
+          // Remove old avatar
+          removeUserAvatar(data.userId);
+          
+          // Spawn new avatar with custom model
+          const userInfo = userAvatars.get(data.userId);
+          if (userInfo) {
+            const avatarData = {
+              id: data.userId,
+              position: data.position || { x: 0, y: 0, z: 0 },
+              rotation: data.rotation || { x: 0, y: 0, z: 0 },
+              username: userInfo.username,
+              customAvatarUrl: data.customAvatarUrl
+            };
+            
+            // Only spawn avatar for other users (not self)
+            if (data.userId !== myUserId) {
+              spawnUserAvatar(data.userId, avatarData);
+            }
+          }
         });
         
         // ===== SCREEN SHARING EVENTS =====
@@ -2494,20 +2546,53 @@
     
     // ===== USER AVATAR SYSTEM =====
     const userAvatars = new Map();
+    const customAvatarModels = new Map(); // Store custom avatar GLB models
+    let myCustomAvatarUrl = null; // Store custom avatar data URL
     
     function spawnUserAvatar(userId, avatar) {
       if (userAvatars.has(userId)) return; // Already exists
       
-      // Create simple avatar (sphere for now)
-      const avatarGeometry = new THREE.SphereGeometry(0.2, 8, 6);
-      const avatarMaterial = new THREE.MeshBasicMaterial({ 
-        color: Math.random() * 0xffffff,
-        transparent: true,
-        opacity: 0.8
-      });
-      const avatarMesh = new THREE.Mesh(avatarGeometry, avatarMaterial);
+      // Create avatar container group
+      const avatarGroup = new THREE.Group();
       
-      avatarMesh.position.set(
+      // Check if user has custom avatar
+      if (avatar.customAvatarUrl) {
+        // Load custom GLB model
+        const loader = new THREE.GLTFLoader();
+        loader.load(avatar.customAvatarUrl, (gltf) => {
+          const model = gltf.scene;
+          model.scale.set(0.5, 0.5, 0.5); // Scale down to appropriate size
+          
+          // Center the model
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          model.position.sub(center);
+          model.position.y = 0; // Keep at ground level
+          
+          // Add to avatar group
+          avatarGroup.add(model);
+          customAvatarModels.set(userId, model);
+          
+          // Update lighting for the model
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
+          });
+        }, 
+        undefined,
+        (error) => {
+          console.error('Error loading custom avatar:', error);
+          // Fall back to default sphere
+          createDefaultAvatar(avatarGroup, avatar);
+        });
+      } else {
+        // Create default sphere avatar
+        createDefaultAvatar(avatarGroup, avatar);
+      }
+      
+      avatarGroup.position.set(
         avatar.position.x, 
         avatar.position.y + 0.5, // Slightly above ground
         avatar.position.z
@@ -2529,16 +2614,28 @@
       labelSprite.position.set(0, 0.8, 0);
       labelSprite.scale.set(1, 0.25, 1);
       
-      avatarMesh.add(labelSprite);
-      scene.add(avatarMesh);
+      avatarGroup.add(labelSprite);
+      scene.add(avatarGroup);
       
       userAvatars.set(userId, {
-        mesh: avatarMesh,
+        mesh: avatarGroup,
         label: labelSprite,
-        username: avatar.username
+        username: avatar.username,
+        customAvatarUrl: avatar.customAvatarUrl
       });
       
       console.log(`🧑‍🤝‍🧑 Spawned avatar for ${avatar.username}`);
+    }
+    
+    function createDefaultAvatar(avatarGroup, avatar) {
+      const avatarGeometry = new THREE.SphereGeometry(0.2, 8, 6);
+      const avatarMaterial = new THREE.MeshBasicMaterial({ 
+        color: Math.random() * 0xffffff,
+        transparent: true,
+        opacity: 0.8
+      });
+      const avatarMesh = new THREE.Mesh(avatarGeometry, avatarMaterial);
+      avatarGroup.add(avatarMesh);
     }
     
     function moveUserAvatar(userId, position, rotation) {
@@ -3128,6 +3225,44 @@
     document.getElementById('help-close').addEventListener('click', (e) => {
       e.stopPropagation();
       document.getElementById('help-dialog').classList.remove('visible');
+    });
+    
+    // Custom avatar upload
+    document.getElementById('upload-avatar').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.glb,.gltf';
+      input.onchange = async (event) => {
+        const file = event.target.files[0];
+        if (file) {
+          try {
+            // Convert file to data URL for sharing
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              myCustomAvatarUrl = e.target.result;
+              
+              // Notify server of custom avatar update
+              if (socket && socket.connected) {
+                socket.emit('user-avatar-update', {
+                  customAvatarUrl: myCustomAvatarUrl
+                });
+                console.log('🎭 Custom avatar uploaded and shared');
+              }
+              
+              // Update local user data
+              if (userAvatars.has(myUserId)) {
+                userAvatars.get(myUserId).customAvatarUrl = myCustomAvatarUrl;
+              }
+            };
+            reader.readAsDataURL(file);
+          } catch (error) {
+            console.error('Error uploading avatar:', error);
+            alert('Failed to upload avatar');
+          }
+        }
+      };
+      input.click();
     });
     
     // Screen control event listeners

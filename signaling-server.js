@@ -102,6 +102,7 @@ io.on('connection', (socket) => {
       position: data.position || { x: 0, y: 0, z: 0 },
       rotation: data.rotation || { x: 0, y: 0, z: 0 },
       username: data.username || `User${socket.id.substr(0,4)}`,
+      customAvatarUrl: data.customAvatarUrl || null,
       joinedAt: new Date()
     };
 
@@ -143,6 +144,26 @@ io.on('connection', (socket) => {
         userId: socket.id,
         oldName: oldName,
         newName: data.newName
+      });
+      
+      saveWorldState();
+    }
+  });
+
+  // ===== CUSTOM AVATAR UPDATES =====
+  socket.on('user-avatar-update', (data) => {
+    if (worldState.users.has(socket.id)) {
+      const user = worldState.users.get(socket.id);
+      user.customAvatarUrl = data.customAvatarUrl;
+      
+      console.log(`🎭 User ${socket.id} updated their avatar`);
+      
+      // Broadcast avatar update to all users
+      io.emit('user-avatar-updated', {
+        userId: socket.id,
+        customAvatarUrl: data.customAvatarUrl,
+        position: user.position,
+        rotation: user.rotation
       });
       
       saveWorldState();

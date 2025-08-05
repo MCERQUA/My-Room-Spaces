@@ -3,7 +3,7 @@
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/MCERQUA/3D-threejs-site)
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/MCERQUA/3D-threejs-site)
 
-A modern, real-time 3D virtual world that multiple users can join and interact with together. Built with Three.js, Node.js, and WebRTC for seamless multi-user experiences with persistent world state.
+A modern, real-time 3D virtual world that multiple users can join and interact with together. Built with Three.js, Node.js, and WebRTC for seamless multi-user experiences with persistent world state and visitor tracking.
 
 ## ✨ Features
 

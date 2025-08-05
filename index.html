@@ -2658,7 +2658,11 @@
       if (!selectedObject || !socket) return;
       
       const moveAmount = 0.5;
-      const newPosition = { ...selectedObject.position };
+      const newPosition = {
+        x: selectedObject.position.x,
+        y: selectedObject.position.y,
+        z: selectedObject.position.z
+      };
       
       switch(direction) {
         case 'up': newPosition.y += moveAmount; break;
@@ -2669,12 +2673,23 @@
         case 'backward': newPosition.z += moveAmount; break;
       }
       
+      // Update the object locally first
+      selectedObject.position.set(newPosition.x, newPosition.y, newPosition.z);
+      
       // Send to server for persistence and sync
       socket.emit('object-move', {
         objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
         position: newPosition,
-        rotation: selectedObject.rotation,
-        scale: selectedObject.scale
+        rotation: {
+          x: selectedObject.rotation.x,
+          y: selectedObject.rotation.y,
+          z: selectedObject.rotation.z
+        },
+        scale: {
+          x: selectedObject.scale.x,
+          y: selectedObject.scale.y,
+          z: selectedObject.scale.z
+        }
       });
     };
 
@@ -2688,10 +2703,21 @@
         z: selectedObject.scale.z * scaleAmount
       };
       
+      // Update the object locally first
+      selectedObject.scale.set(newScale.x, newScale.y, newScale.z);
+      
       socket.emit('object-move', {
         objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
-        position: selectedObject.position,
-        rotation: selectedObject.rotation,
+        position: {
+          x: selectedObject.position.x,
+          y: selectedObject.position.y,
+          z: selectedObject.position.z
+        },
+        rotation: {
+          x: selectedObject.rotation.x,
+          y: selectedObject.rotation.y,
+          z: selectedObject.rotation.z
+        },
         scale: newScale
       });
     };
@@ -2699,16 +2725,32 @@
     window.rotateObject = function(axis) {
       if (!selectedObject || !socket) return;
       
-      const newRotation = { ...selectedObject.rotation };
+      const newRotation = {
+        x: selectedObject.rotation.x,
+        y: selectedObject.rotation.y,
+        z: selectedObject.rotation.z
+      };
+      
       if (axis === 'y') {
         newRotation.y += Math.PI / 4;
       }
       
+      // Update the object locally first
+      selectedObject.rotation.set(newRotation.x, newRotation.y, newRotation.z);
+      
       socket.emit('object-move', {
         objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
-        position: selectedObject.position,
+        position: {
+          x: selectedObject.position.x,
+          y: selectedObject.position.y,
+          z: selectedObject.position.z
+        },
         rotation: newRotation,
-        scale: selectedObject.scale
+        scale: {
+          x: selectedObject.scale.x,
+          y: selectedObject.scale.y,
+          z: selectedObject.scale.z
+        }
       });
     };
 
@@ -2716,11 +2758,29 @@
       if (!selectedObject || !selectedObject.userData || !socket) return;
       
       const userData = selectedObject.userData;
+      
+      // Update the object locally first
+      selectedObject.position.copy(userData.originalPosition);
+      selectedObject.rotation.copy(userData.originalRotation);
+      selectedObject.scale.copy(userData.originalScale);
+      
       socket.emit('object-move', {
         objectId: selectedObject.userData.objectId || generateObjectId(selectedObject),
-        position: userData.originalPosition,
-        rotation: userData.originalRotation,
-        scale: userData.originalScale
+        position: {
+          x: userData.originalPosition.x,
+          y: userData.originalPosition.y,
+          z: userData.originalPosition.z
+        },
+        rotation: {
+          x: userData.originalRotation.x,
+          y: userData.originalRotation.y,
+          z: userData.originalRotation.z
+        },
+        scale: {
+          x: userData.originalScale.x,
+          y: userData.originalScale.y,
+          z: userData.originalScale.z
+        }
       });
     };
     
@@ -3065,30 +3125,40 @@
           if (obj.userData && obj.userData.name) {
             const item = document.createElement('div');
             item.className = 'object-list-item';
-            item.innerHTML = `
-              <span>${obj.userData.name}</span>
-              <button class="object-delete-btn" data-index="${index}">🗑️ Delete</button>
-            `;
-            container.appendChild(item);
             
-            // Add delete event listener
-            item.querySelector('.object-delete-btn').addEventListener('click', (e) => {
-              e.stopPropagation();
-              const objToDelete = sceneObjects[index];
-              if (objToDelete && objToDelete.userData.objectId) {
-                // Send deletion to server
-                socket.emit('object-delete', {
-                  objectId: objToDelete.userData.objectId
-                });
-                
-                // Remove from scene
-                scene.remove(objToDelete);
-                sceneObjects.splice(index, 1);
-                
-                // Refresh the list
-                showObjectsList();
-              }
-            });
+            // Check if this is the display screen (type: 'display') - it shouldn't have a delete button
+            if (obj.userData.type === 'display') {
+              item.innerHTML = `
+                <span>${obj.userData.name}</span>
+                <span style="color: rgba(255,255,255,0.5); font-size: 12px;">Built-in</span>
+              `;
+            } else {
+              item.innerHTML = `
+                <span>${obj.userData.name}</span>
+                <button class="object-delete-btn" data-index="${index}">🗑️ Delete</button>
+              `;
+              
+              // Add delete event listener only for deletable objects
+              item.querySelector('.object-delete-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                const objToDelete = sceneObjects[index];
+                if (objToDelete && objToDelete.userData.objectId) {
+                  // Send deletion to server
+                  socket.emit('object-delete', {
+                    objectId: objToDelete.userData.objectId
+                  });
+                  
+                  // Remove from scene
+                  scene.remove(objToDelete);
+                  sceneObjects.splice(index, 1);
+                  
+                  // Refresh the list
+                  showObjectsList();
+                }
+              });
+            }
+            
+            container.appendChild(item);
           }
         });
       }

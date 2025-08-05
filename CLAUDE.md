@@ -64,12 +64,23 @@ This is a **single-file Three.js application** (`index.html`) containing:
 
 ### File Structure
 ```
-index.html              # Main application (entire app in one file)
+index.html              # Main application with social features (2400+ lines)
+├── 3D Scene Components # Three.js setup, lighting, objects, cameras
+├── User Avatar System  # Real-time multi-user presence with 3D spheres
+├── Screen Sharing      # Hybrid server coordination + WebRTC P2P video
+├── Social Features     # User list (top right) + persistent chat interface
+├── Object Manipulation # Server-mediated 3D object interactions
+└── Mobile Touch        # Touch controls and responsive design
+
+signaling-server.js     # Railway persistent world server (350+ lines)
+├── World State API     # /api/world-state, /api/users, /api/objects
+├── Real-time Events    # Socket.IO user/object/chat/screen sharing
+├── Avatar Management   # User spawning, position tracking, cleanup
+└── Chat System         # Message persistence and broadcasting
+
 models/                 # Optional GLB models directory
-signaling-server.js     # P2P signaling server (deploy separately)
-server-package.json     # Signaling server dependencies
-netlify.toml           # Deployment configuration
-ROOM-SHARING-SETUP.md  # P2P setup instructions
+netlify.toml           # Static site deployment configuration
+CLAUDE.md              # Complete v2.0 architecture documentation
 ```
 
 ## Important Implementation Details
@@ -153,6 +164,30 @@ function spawnUserAvatar(userId, avatar) {
 - `user-move` events broadcast to all connected users via server
 - Smooth avatar movement without performance impact
 
+### Social Features & UI Components (v2.0)
+**User List (Top Right Corner):**
+```javascript
+function updateUserList() {
+  // Real-time user list with current user highlighted
+  // Updates automatically on user join/leave events
+  // Clean text styling with shadows for 3D background visibility
+}
+```
+
+**Persistent World Chat Interface:**
+- **Location**: Bottom left corner (350x200px) with toggle functionality
+- **Features**: Scrollable messages, timestamps, usernames, server persistence
+- **Input**: Enter key or Send button support with 200 character limit
+- **Toggle**: 💬/❌ button to show/hide chat interface
+- **Integration**: Uses Railway backend `chat-message` events for real-time sync
+- **Performance**: Auto-scroll, 50 message limit, prevents 3D scene interference
+
+**Key Functions:**
+- `displayChatMessage(message)`: Renders chat messages with timestamps
+- `sendChatMessage()`: Emits messages to server via Socket.IO
+- `toggleChat()`: Show/hide chat interface
+- `updateUserList()`: Syncs user list with active avatars
+
 ### Mobile Touch Controls
 - **Single tap**: Object selection
 - **Double tap**: Move forward
@@ -220,6 +255,13 @@ function spawnUserAvatar(userId, avatar) {
    - Add/move/delete objects, verify persistence across sessions
    - Check user count updates properly
 
+4. **Social Features Testing**:
+   - **User List**: Open multiple tabs, verify all usernames appear in top right
+   - **Chat Interface**: Type messages in one tab, see them in all other tabs
+   - **Chat Toggle**: Click 💬 button to show/hide chat interface
+   - **Message Persistence**: Refresh page, verify chat history is restored
+   - **Real-time Updates**: Join/leave users, verify user list updates immediately
+
 ## Recent Major Changes (v2.0 Architecture Upgrade)
 
 ### Migration from Cloudflare Workers to Railway (August 2025)
@@ -229,10 +271,17 @@ function spawnUserAvatar(userId, avatar) {
 
 ### Key Files Modified:
 - `signaling-server.js`: Comprehensive persistent world server (300+ lines)
-- `index.html`: Added server-mediated events, avatar system, hybrid screen sharing
+- `index.html`: Added server-mediated events, avatar system, hybrid screen sharing, social features
 - `CLAUDE.md`: Complete documentation of v2.0 architecture
+
+### Recent Feature Additions (August 2025):
+- **Social Features**: User list (top right) and persistent world chat interface
+- **Real-time Communication**: Chat messages with timestamps and server persistence
+- **UI Components**: Toggleable chat interface with mobile responsive design
+- **WebRTC P2P Video Streaming**: Fixed actual video sharing between users
 
 ### Breaking Changes:
 - Object manipulation now server-mediated (not pure P2P)
 - User avatars require server connection
 - Screen sharing uses hybrid approach (coordination + P2P video)
+- Chat interface adds new UI elements and Socket.IO events

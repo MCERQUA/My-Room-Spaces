@@ -973,23 +973,32 @@
         
         // ===== WEBRTC P2P SIGNALING =====
         socket.on('webrtc-offer', (data) => {
-          console.log(`📨 WebRTC offer from ${data.from}`);
+          console.log(`📨 *** RECEIVED WEBRTC OFFER FROM ${data.from} ***`);
+          console.log('📨 Offer data:', data.offer);
           if (!peers[data.from]) {
+            console.log(`🔗 Creating peer connection to handle offer from ${data.from}`);
             connectToPeer(data.from, false, data.offer);
+          } else {
+            console.log(`⚠️ Peer ${data.from} already exists, ignoring offer`);
           }
         });
         
         socket.on('webrtc-answer', (data) => {
-          console.log(`📨 WebRTC answer from ${data.from}`);
+          console.log(`📨 *** RECEIVED WEBRTC ANSWER FROM ${data.from} ***`);
           if (peers[data.from]) {
+            console.log(`✅ Signaling answer to existing peer ${data.from}`);
             peers[data.from].signal(data.answer);
+          } else {
+            console.log(`❌ No peer found for answer from ${data.from}`);
           }
         });
         
         socket.on('webrtc-ice-candidate', (data) => {
-          console.log(`📨 WebRTC ICE candidate from ${data.from}`);
+          console.log(`📨 *** RECEIVED WEBRTC ICE CANDIDATE FROM ${data.from} ***`);
           if (peers[data.from]) {
             peers[data.from].signal(data.candidate);
+          } else {
+            console.log(`❌ No peer found for ICE candidate from ${data.from}`);
           }
         });
         
@@ -1034,6 +1043,11 @@
         return;
       }
       
+      console.log(`🔧 Creating SimplePeer for ${userId}: initiator=${initiator}, hasStream=${!!currentStream}`);
+      if (currentStream) {
+        console.log(`📹 currentStream details: active=${currentStream.active}, tracks=${currentStream.getTracks().length}`);
+      }
+      
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
@@ -1043,25 +1057,31 @@
       peers[userId] = peer;
       
       peer.on('signal', (data) => {
-        console.log(`📤 Sending WebRTC signal to ${userId}:`, data.type || 'offer');
+        console.log(`📤 *** SENDING WEBRTC SIGNAL TO ${userId} ***`);
+        console.log(`📤 Signal type: ${data.type || 'unknown'}`);
+        console.log(`📤 Signal data:`, data);
         
         // Use specific events for better reliability
         if (data.type === 'offer') {
+          console.log(`📤 Emitting webrtc-offer to ${userId}`);
           socket.emit('webrtc-offer', {
             to: userId,
             offer: data
           });
         } else if (data.type === 'answer') {
+          console.log(`📤 Emitting webrtc-answer to ${userId}`);
           socket.emit('webrtc-answer', {
             to: userId,
             answer: data
           });
         } else if (data.candidate) {
+          console.log(`📤 Emitting webrtc-ice-candidate to ${userId}`);
           socket.emit('webrtc-ice-candidate', {
             to: userId,
             candidate: data
           });
         } else {
+          console.log(`📤 Emitting generic signal to ${userId}`);
           // Fallback to generic signal
           socket.emit('signal', {
             to: userId,
@@ -1071,9 +1091,15 @@
       });
       
       peer.on('stream', (stream) => {
-        console.log(`🎥 Received stream from peer ${userId}:`, stream);
-        console.log(`🎥 Stream has ${stream.getTracks().length} tracks`);
+        console.log(`🎥 *** RECEIVED STREAM FROM PEER ${userId} ***`, stream);
+        console.log(`🎥 Stream active: ${stream.active}, tracks: ${stream.getTracks().length}`);
+        
+        stream.getTracks().forEach((track, index) => {
+          console.log(`🎵 Track ${index}: kind=${track.kind}, enabled=${track.enabled}, readyState=${track.readyState}`);
+        });
+        
         // Display received stream on the large screen
+        console.log(`🖥️ Calling displaySharedStream...`);
         displaySharedStream(stream);
       });
       
@@ -1086,11 +1112,17 @@
       });
       
       peer.on('connect', () => {
-        console.log('Peer connected:', userId);
+        console.log(`🤝 *** PEER CONNECTED: ${userId} ***`);
+        console.log(`🤝 P2P connection established successfully with ${userId}`);
         // If we have an active screen share, add it to the new peer
         if (currentStream && currentStream.active) {
-          console.log('Adding existing screen share to new peer');
-          peer.addStream(currentStream);
+          console.log(`📹 Adding existing screen share to newly connected peer ${userId}`);
+          try {
+            peer.addStream(currentStream);
+            console.log(`✅ Successfully added stream to peer ${userId}`);
+          } catch (error) {
+            console.error(`❌ Failed to add stream to peer ${userId}:`, error);
+          }
         }
       });
       
@@ -1113,6 +1145,9 @@
     }
     
     function displaySharedStream(stream) {
+      console.log(`🖥️ *** DISPLAYING SHARED STREAM ***`);
+      console.log(`📺 Stream details: active=${stream.active}, tracks=${stream.getTracks().length}`);
+      
       const videoEl = document.createElement('video');
       videoEl.srcObject = stream;
       videoEl.autoplay = true;
@@ -1121,20 +1156,43 @@
       videoEl.style.display = 'none';
       document.body.appendChild(videoEl);
       
+      console.log(`📺 Created video element, autoplay=${videoEl.autoplay}`);
+      
       function updateScreenFromPeer() {
         if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
           ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           largeScreen.texture.needsUpdate = true;
+          // Only log occasionally to avoid spam
+          if (Math.random() < 0.01) {
+            console.log(`🎬 Updating screen texture from P2P video (${videoEl.videoWidth}x${videoEl.videoHeight})`);
+          }
+        } else {
+          console.log(`⏸️ Video not ready: readyState=${videoEl.readyState}, hasScreen=${!!largeScreen}`);
         }
         
         if (stream.active) {
           requestAnimationFrame(updateScreenFromPeer);
+        } else {
+          console.log(`🛑 P2P stream no longer active, stopping updates`);
         }
       }
       
       videoEl.addEventListener('loadeddata', () => {
+        console.log(`📹 Video loadeddata event: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
         updateScreenFromPeer();
+      });
+      
+      videoEl.addEventListener('loadedmetadata', () => {
+        console.log(`📹 Video metadata loaded: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
+      });
+      
+      videoEl.addEventListener('canplay', () => {
+        console.log(`📹 Video can play`);
+      });
+      
+      videoEl.addEventListener('error', (e) => {
+        console.error('📹 Video error:', e);
       });
     }
     
@@ -1182,8 +1240,12 @@
         // ===== WEBRTC P2P FOR ACTUAL VIDEO STREAMING =====
         isScreenSharing = true;
         
-        // Connect to existing users for direct video streaming
-        Object.keys(peers).forEach(userId => {
+        // Connect to ALL users in the room for direct video streaming
+        console.log(`🔗 Establishing P2P connections with ${userAvatars.size} users for screen sharing`);
+        
+        Array.from(userAvatars.keys()).forEach(userId => {
+          console.log(`🔗 Connecting to user ${userId} for screen sharing`);
+          
           if (peers[userId]) {
             try {
               peers[userId].addStream(stream);
@@ -1192,8 +1254,12 @@
               console.log(`⚠️ Recreating connection with ${userId} for screen share`);
               peers[userId].destroy();
               delete peers[userId];
-              connectToPeer(userId, true); // Use existing function which handles streams
+              connectToPeer(userId, true); // Recreate with new stream
             }
+          } else {
+            // Create new P2P connection with this user
+            console.log(`🆕 Creating new P2P connection with ${userId}`);
+            connectToPeer(userId, true); // We're the initiator (screen sharer)
           }
         });
         

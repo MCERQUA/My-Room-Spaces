@@ -1167,8 +1167,7 @@
         // Notify server about screen sharing
         sendMessage({ type: 'start-screen-share' });
         
-        // Start broadcasting to Cloudflare Worker for all visitors
-        startWorkerBroadcast();
+        // Note: Cloudflare Worker broadcasting removed - using Railway P2P only
         
         // Broadcast to other tabs
         if (broadcastChannel) {
@@ -1196,8 +1195,7 @@
         // Notify server about stopping screen sharing
         sendMessage({ type: 'stop-screen-share' });
         
-        // Stop broadcasting to Cloudflare Worker
-        stopWorkerBroadcast();
+        // Note: Cloudflare Worker stop removed - using Railway P2P only
         
         // Broadcast to other tabs
         if (broadcastChannel) {
@@ -1805,134 +1803,22 @@
     });
 
 
-    // Cloudflare Worker broadcast system for live screen sharing
-    const WORKER_URL = 'https://screen-share-signaling.metamike.workers.dev';
-    let workerWebSocket = null;
-    let isSharer = false;
-    let broadcastInterval = null;
+    // Note: Cloudflare Worker system removed - using Railway P2P WebRTC only
     
-    // Initialize Worker WebSocket connection for receiving broadcasts
-    function initializeWorkerConnection() {
-      try {
-        const wsUrl = WORKER_URL.replace('https://', 'wss://');
-        workerWebSocket = new WebSocket(wsUrl);
-        
-        workerWebSocket.onopen = () => {
-          console.log('✅ Connected to Cloudflare Worker for live screen sharing!');
-        };
-        
-        workerWebSocket.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data);
-            handleWorkerMessage(data);
-          } catch (error) {
-            console.error('Error parsing Worker message:', error);
-          }
-        };
-        
-        workerWebSocket.onclose = () => {
-          console.log('❌ Disconnected from Worker. Attempting reconnection in 5s...');
-          setTimeout(initializeWorkerConnection, 5000);
-        };
-        
-        workerWebSocket.onerror = (error) => {
-          console.error('Worker WebSocket error:', error);
-        };
-        
-      } catch (error) {
-        console.error('Failed to connect to Worker:', error);
-        console.log('💡 Live screen sharing may not work without Worker connection');
-      }
-    }
+    // Note: initializeWorkerConnection removed - using Railway P2P only
     
-    // Handle messages from Cloudflare Worker
-    function handleWorkerMessage(data) {
-      switch (data.type) {
-        case 'frame':
-          if (!isSharer && largeScreen && largeScreen.canvas) {
-            displayWorkerFrame(data);
-          }
-          break;
-        case 'stop':
-          resetScreenContent();
-          break;
-      }
-    }
+    // Note: handleWorkerMessage removed - using Railway P2P only
     
-    // Display frame received from Worker
-    function displayWorkerFrame(messageData) {
-      try {
-        const frameData = messageData.frame?.data || messageData.data;
-        if (!frameData) return;
-        
-        const img = new Image();
-        img.onload = () => {
-          if (largeScreen && largeScreen.canvas) {
-            const ctx = largeScreen.canvas.getContext('2d');
-            ctx.drawImage(img, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
-            largeScreen.texture.needsUpdate = true;
-          }
-        };
-        img.src = frameData;
-      } catch (error) {
-        console.error('Error displaying Worker frame:', error);
-      }
-    }
+    // Note: displayWorkerFrame removed - using Railway P2P only
     
-    // Start broadcasting screen frames to Worker
-    function startWorkerBroadcast() {
-      if (broadcastInterval) return;
-      
-      isSharer = true;
-      console.log('🚀 Starting live broadcast to all site visitors...');
-      
-      broadcastInterval = setInterval(() => {
-        if (largeScreen && largeScreen.canvas && currentStream && currentStream.active) {
-          try {
-            const frameData = largeScreen.canvas.toDataURL('image/jpeg', 0.8);
-            
-            fetch(`${WORKER_URL}/broadcast`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                frameData: frameData,
-                width: largeScreen.canvas.width,
-                height: largeScreen.canvas.height
-              })
-            }).catch(error => {
-              console.error('Error sending frame to Worker:', error);
-            });
-          } catch (error) {
-            console.error('Error capturing frame for broadcast:', error);
-          }
-        }
-      }, 100); // Send frame every 100ms (10 FPS)
-    }
+    // Note: startWorkerBroadcast removed - using Railway P2P only
     
-    // Stop broadcasting to Worker
-    function stopWorkerBroadcast() {
-      if (broadcastInterval) {
-        clearInterval(broadcastInterval);
-        broadcastInterval = null;
-      }
-      
-      isSharer = false;
-      
-      // Notify Worker to stop sharing
-      fetch(`${WORKER_URL}/stop`, {
-        method: 'POST'
-      }).catch(error => {
-        console.error('Error stopping Worker broadcast:', error);
-      });
-      
-      console.log('🛑 Stopped live broadcast');
-    }
+    // Note: stopWorkerBroadcast removed - using Railway P2P only
     
     // Note: loadCurrentWorkerFrame removed - using P2P WebRTC instead of worker frame streaming
 
-    // Initialize both room system and Worker connection
+    // Initialize Railway Socket.IO signaling only
     initializeRoomSystem();
-    initializeWorkerConnection();
     
     // Note: Auto-loading current frame removed - using P2P WebRTC instead
 

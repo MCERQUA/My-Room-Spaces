@@ -86,7 +86,7 @@
 
     .model-controls {
       position: absolute;
-      top: 80px;
+      top: 90px;
       left: 20px;
       z-index: 350;
       background: rgba(255, 255, 255, 0.1);
@@ -94,10 +94,67 @@
       -webkit-backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 16px;
-      padding: 20px;
+      padding: 16px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       display: none;
-      min-width: 200px;
+      min-width: 220px;
+      transition: all 0.3s ease;
+    }
+    
+    .model-controls h3 {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 12px 0;
+      text-align: center;
+      opacity: 0.9;
+    }
+    
+    .model-controls .control-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      justify-content: center;
+    }
+    
+    .model-controls button {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+      padding: 8px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.3s ease;
+    }
+    
+    .model-controls button:hover {
+      background: rgba(255, 255, 255, 0.2);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .model-controls button:active {
+      transform: translateY(0);
+      background: rgba(255, 255, 255, 0.15);
+    }
+    
+    .model-controls .delete-button {
+      background: rgba(255, 77, 77, 0.2);
+      border-color: rgba(255, 77, 77, 0.3);
+      color: #ff6666;
+      width: 100%;
+      margin-top: 8px;
+    }
+    
+    .model-controls .delete-button:hover {
+      background: rgba(255, 77, 77, 0.3);
+      border-color: rgba(255, 77, 77, 0.4);
     }
 
     .model-controls.visible {
@@ -773,7 +830,7 @@
     </button>
     <button class="glass-button" id="menu-objects">
       📦
-      <span class="tooltip">Objects</span>
+      <span class="tooltip">Load GLB Model</span>
     </button>
     <button class="glass-button" id="menu-help">
       ❓
@@ -801,26 +858,24 @@
   
   <div class="model-controls" id="model-controls">
     <h3 id="selected-object-name">Object Controls</h3>
-    <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+    <div class="control-row">
       <button id="move-up" title="Move Up">↑</button>
       <button id="move-down" title="Move Down">↓</button>
       <button id="move-left" title="Move Left">←</button>
       <button id="move-right" title="Move Right">→</button>
     </div>
-    <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+    <div class="control-row">
       <button id="move-forward" title="Move Forward">▲</button>
       <button id="move-backward" title="Move Backward">▼</button>
       <button id="scale-up" title="Scale Up">+</button>
       <button id="scale-down" title="Scale Down">-</button>
     </div>
-    <div style="display: flex; gap: 4px; margin-bottom: 8px;">
+    <div class="control-row">
       <button id="rotate-y" title="Rotate">↻</button>
       <button id="reset-object" title="Reset">⟲</button>
-      <button id="delete-selected" title="Delete">🗑</button>
+      <button id="deselect-object" title="Deselect">✖</button>
     </div>
-    <div>
-      <button id="deselect-object" style="width: 100%">✖ Deselect</button>
-    </div>
+    <button id="delete-selected" class="delete-button">🗑️ Delete Object</button>
   </div>
 
   <!-- User List in Top Right -->
@@ -3059,7 +3114,7 @@
       input.onchange = (event) => {
         const file = event.target.files[0];
         if (file) {
-          loadGLBFile(file);
+          loadModelFromFile(file);
         }
       };
       input.click();

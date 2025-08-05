@@ -841,6 +841,10 @@
     let roomUsers = [];
     let myUserId = null;
     
+    // WebRTC P2P for video streaming (separate from server coordination)
+    const videoPeers = {};
+    let isScreenSharing = false;
+    
     // Simple P2P using BroadcastChannel for same-origin communication
     let broadcastChannel = null;
     let activeStreams = new Map(); // Track active streams from other tabs
@@ -907,6 +911,12 @@
           console.log(`👋 ${avatar.username} joined the world`);
           spawnUserAvatar(avatar.id, avatar);
           updateUserCount(userAvatars.size + 1); // Current avatars + self
+          
+          // If we're currently screen sharing, establish P2P connection with new user
+          if (isScreenSharing && currentStream && currentStream.active) {
+            console.log(`🔗 Establishing P2P connection with new user ${avatar.id} for screen sharing`);
+            connectToPeer(avatar.id, true); // We're the initiator since we're sharing
+          }
         });
         
         socket.on('user-left', (data) => {
@@ -945,11 +955,42 @@
         socket.on('screen-share-started', (data) => {
           console.log(`📺 Screen sharing started by ${data.userId}:`, data);
           handleRemoteScreenShare(data);
+          
+          // Don't initiate P2P connection here - let the screen sharer do it
+          console.log(`🔗 Ready to receive P2P connection from ${data.userId} for screen sharing`);
         });
         
         socket.on('screen-share-stopped', (data) => {
           console.log(`📺 Screen sharing stopped by ${data.userId}:`, data);
           clearScreenShare(data.clearObject);
+          
+          // Close P2P connection
+          if (peers[data.userId]) {
+            peers[data.userId].destroy();
+            delete peers[data.userId];
+          }
+        });
+        
+        // ===== WEBRTC P2P SIGNALING =====
+        socket.on('webrtc-offer', (data) => {
+          console.log(`📨 WebRTC offer from ${data.from}`);
+          if (!peers[data.from]) {
+            connectToPeer(data.from, false, data.offer);
+          }
+        });
+        
+        socket.on('webrtc-answer', (data) => {
+          console.log(`📨 WebRTC answer from ${data.from}`);
+          if (peers[data.from]) {
+            peers[data.from].signal(data.answer);
+          }
+        });
+        
+        socket.on('webrtc-ice-candidate', (data) => {
+          console.log(`📨 WebRTC ICE candidate from ${data.from}`);
+          if (peers[data.from]) {
+            peers[data.from].signal(data.candidate);
+          }
         });
         
         // ===== CHAT SYSTEM =====
@@ -1138,6 +1179,26 @@
           console.log('📺 Notified server of screen sharing start');
         }
         
+        // ===== WEBRTC P2P FOR ACTUAL VIDEO STREAMING =====
+        isScreenSharing = true;
+        
+        // Connect to existing users for direct video streaming
+        Object.keys(peers).forEach(userId => {
+          if (peers[userId]) {
+            try {
+              peers[userId].addStream(stream);
+              console.log(`✅ Added screen stream to existing peer ${userId}`);
+            } catch (error) {
+              console.log(`⚠️ Recreating connection with ${userId} for screen share`);
+              peers[userId].destroy();
+              delete peers[userId];
+              connectToPeer(userId, true); // Use existing function which handles streams
+            }
+          }
+        });
+        
+        // For users who join later, they'll connect via the screen-share-started event
+        
         console.log('✅ Screen sharing started successfully!');
         
       } catch (error) {
@@ -1157,6 +1218,9 @@
           socket.emit('screen-share-stop');
           console.log('📺 Notified server of screen sharing stop');
         }
+        
+        // ===== WEBRTC P2P CLEANUP =====
+        isScreenSharing = false;
         
         console.log('🛑 Screen sharing stopped');
         

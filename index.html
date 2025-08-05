@@ -1584,6 +1584,13 @@
           userListContent.appendChild(userItem);
         }
       });
+      
+      // Update user count badge
+      const userCountBadge = document.getElementById('user-count-badge');
+      const totalUsers = userAvatars.size; // This includes all users including the current user
+      if (userCountBadge) {
+        userCountBadge.textContent = `(${totalUsers})`;
+      }
     }
 
     function editUserName() {

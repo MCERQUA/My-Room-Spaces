@@ -130,9 +130,40 @@ io.on('connection', (socket) => {
   });
 
   // ===== PERSISTENT OBJECT INTERACTIONS =====
-  socket.on('object-move', (data) => {
-    // Save object position permanently
+  socket.on('object-add', (data) => {
+    // Save new object permanently
     worldState.objects.set(data.objectId, {
+      name: data.name,
+      type: data.type,
+      position: data.position,
+      rotation: data.rotation,
+      scale: data.scale,
+      addedBy: socket.id,
+      addedAt: new Date()
+    });
+
+    // Notify all other users of new object
+    socket.broadcast.emit('object-added', {
+      objectId: data.objectId,
+      name: data.name,
+      type: data.type,
+      position: data.position,
+      rotation: data.rotation,
+      scale: data.scale,
+      addedBy: socket.id
+    });
+
+    saveWorldState();
+    console.log(`📦 Object ${data.objectId} (${data.name}) added by ${socket.id}`);
+  });
+
+  socket.on('object-move', (data) => {
+    // Get existing object data or create new entry
+    const existingObject = worldState.objects.get(data.objectId) || {};
+    
+    // Update object position permanently, preserving other properties
+    worldState.objects.set(data.objectId, {
+      ...existingObject,  // Preserve name, type, etc.
       position: data.position,
       rotation: data.rotation,
       scale: data.scale,
@@ -151,6 +182,20 @@ io.on('connection', (socket) => {
 
     saveWorldState(); // Persist to database
     console.log(`📦 Object ${data.objectId} moved by ${socket.id}`);
+  });
+
+  socket.on('object-delete', (data) => {
+    // Remove object permanently
+    worldState.objects.delete(data.objectId);
+
+    // Notify all users of object deletion
+    io.emit('object-deleted', {
+      objectId: data.objectId,
+      deletedBy: socket.id
+    });
+
+    saveWorldState();
+    console.log(`🗑️ Object ${data.objectId} deleted by ${socket.id}`);
   });
 
 

@@ -759,7 +759,8 @@
             type: 'display',
             originalPosition: shareScreenObject.position.clone(),
             originalScale: shareScreenObject.scale.clone(),
-            originalRotation: shareScreenObject.rotation.clone()
+            originalRotation: shareScreenObject.rotation.clone(),
+            objectId: 'SHARESCREEN-HERE'  // Fixed ID for server reference
           };
           
           sceneObjects.push(shareScreenObject);
@@ -813,7 +814,8 @@
         type: 'display',
         originalPosition: displayScreen.position.clone(),
         originalScale: displayScreen.scale.clone(),
-        originalRotation: displayScreen.rotation.clone()
+        originalRotation: displayScreen.rotation.clone(),
+        objectId: 'SHARESCREEN-HERE'  // Fixed ID for server reference
       };
       
       sceneObjects.push(displayScreen);
@@ -903,16 +905,22 @@
         socket.on('user-joined', (avatar) => {
           console.log(`👋 ${avatar.username} joined the world`);
           spawnUserAvatar(avatar.id, avatar);
-          updateUserCount(getUserCount() + 1);
+          updateUserCount(userAvatars.size + 1); // Current avatars + self
         });
         
         socket.on('user-left', (data) => {
           console.log(`👋 ${data.username} left the world`);
           removeUserAvatar(data.userId);
-          updateUserCount(getUserCount() - 1);
+          updateUserCount(userAvatars.size + 1); // Remaining avatars + self
         });
         
         // ===== PERSISTENT OBJECT INTERACTIONS =====
+        socket.on('object-added', (data) => {
+          console.log(`📦 New object ${data.objectId} (${data.name}) added by ${data.addedBy}`);
+          // TODO: Need to create object in scene from server data
+          // This would require storing object type/model data on server
+        });
+
         socket.on('object-moved', (data) => {
           console.log(`📦 Object ${data.objectId} moved by ${data.movedBy}`);
           updateObjectInScene(data.objectId, {
@@ -920,6 +928,11 @@
             rotation: data.rotation,
             scale: data.scale
           });
+        });
+
+        socket.on('object-deleted', (data) => {
+          console.log(`🗑️ Object ${data.objectId} deleted by ${data.deletedBy}`);
+          removeObjectFromScene(data.objectId);
         });
         
         // ===== USER AVATAR EVENTS =====
@@ -1416,6 +1429,25 @@
           selectedOutline.rotation.copy(object.rotation);
           selectedOutline.scale.copy(object.scale);
         }
+      }
+    }
+    
+    function removeObjectFromScene(objectId) {
+      // Find and remove object by ID
+      const objectIndex = sceneObjects.findIndex(obj => obj.userData.objectId === objectId);
+      if (objectIndex > -1) {
+        const object = sceneObjects[objectIndex];
+        
+        // If this object is selected, deselect it
+        if (selectedObject === object) {
+          deselectObject();
+        }
+        
+        // Remove from scene and array
+        scene.remove(object);
+        sceneObjects.splice(objectIndex, 1);
+        
+        console.log(`🗑️ Removed object ${objectId} from scene`);
       }
     }
     

@@ -1286,13 +1286,12 @@
       
       // Update current user with clickable name
       if (currentUserElement && myUserId) {
-        // Find current user data or create fallback
-        let currentUser;
-        if (userAvatars.has(myUserId)) {
-          currentUser = userAvatars.get(myUserId);
-        } else {
-          // Fallback when avatar hasn't been created yet
+        // Find current user data
+        let currentUser = userAvatars.get(myUserId);
+        if (!currentUser) {
+          // This should not happen, but provide fallback
           currentUser = { username: `User${myUserId.substr(0,4)}` };
+          userAvatars.set(myUserId, currentUser);
         }
         console.log('🔧 Current user for name editing:', currentUser);
         
@@ -1342,13 +1341,12 @@
         return;
       }
       
-      // Find current user data or create fallback
-      let currentUser;
-      if (userAvatars.has(myUserId)) {
-        currentUser = userAvatars.get(myUserId);
-      } else {
-        // Fallback when avatar hasn't been created yet
+      // Find current user data
+      let currentUser = userAvatars.get(myUserId);
+      if (!currentUser) {
+        // This should not happen, but provide fallback
         currentUser = { username: `User${myUserId.substr(0,4)}` };
+        userAvatars.set(myUserId, currentUser);
       }
       console.log('🔧 editUserName currentUser:', currentUser);
       
@@ -1458,11 +1456,15 @@
           // Update user interface
           updateUserList();
           
+          // Initialize current user data
+          const initialUsername = `User${socket.id.substr(0,4)}`;
+          userAvatars.set(myUserId, { username: initialUsername });
+          
           // Spawn user avatar in world
           socket.emit('user-spawn', {
             position: { x: 0, y: 0, z: 5 },
             rotation: { x: 0, y: 0, z: 0 },
-            username: `User${socket.id.substr(0,4)}`
+            username: initialUsername
           });
         });
         
@@ -1554,6 +1556,16 @@
           if (userAvatars.has(data.userId)) {
             userAvatars.get(data.userId).username = data.newName;
             updateAvatarLabel(data.userId, data.newName);
+          }
+          
+          // IMPORTANT: If this is the current user, update their stored username
+          if (data.userId === myUserId) {
+            // Create/update the current user's avatar data
+            if (!userAvatars.has(myUserId)) {
+              userAvatars.set(myUserId, { username: data.newName });
+            } else {
+              userAvatars.get(myUserId).username = data.newName;
+            }
           }
           
           // Update user list display

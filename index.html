@@ -1517,6 +1517,12 @@
         visitorCountElement.textContent = formattedCount;
       }
     }
+    
+    // Space name display
+    function updateSpaceName(spaceName) {
+      // You can add space name display if needed
+      console.log('Connected to space:', spaceName);
+    }
 
     function updateUserList() {
       console.log('🔧 updateUserList called, myUserId:', myUserId, 'userAvatars size:', userAvatars.size);
@@ -1802,6 +1808,11 @@
           // Update visitor count if provided
           if (worldData.visitorCount !== undefined) {
             updateVisitorCount(worldData.visitorCount);
+          }
+          
+          // Update space name if provided
+          if (worldData.spaceName) {
+            updateSpaceName(worldData.spaceName);
           }
         });
         

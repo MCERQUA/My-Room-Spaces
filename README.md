@@ -40,6 +40,7 @@ A modern, real-time 3D virtual world that multiple users can join and interact w
 - **Persistent Object State**: All 3D object manipulations saved server-side and restored on connect
 - **Auto-scaling Backend**: Railway handles traffic and server resources automatically
 - **CDN Frontend**: Netlify-hosted static site with global CDN distribution
+- **Visitor Counter**: Persistent visitor tracking that survives server restarts
 
 ## 🎯 **Live Demo**
 

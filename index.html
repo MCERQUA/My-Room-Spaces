@@ -1044,44 +1044,6 @@
       }
     }
     
-    // Handle remote screen share from other tabs
-    function handleRemoteScreenShare(data, senderId) {
-      console.log('🔄 Attempting to display remote screen share (limited by browser security)');
-      
-      // Note: BroadcastChannel can't transfer MediaStreams directly
-      // This is a limitation - we can only sync the UI state, not the actual video
-      
-      // Show indicator that another tab is sharing
-      const indicator = document.createElement('div');
-      indicator.id = `remote-indicator-${senderId}`;
-      indicator.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: rgba(0, 255, 0, 0.8);
-        color: black;
-        padding: 10px;
-        border-radius: 5px;
-        z-index: 1000;
-        font-size: 14px;
-      `;
-      indicator.textContent = `📺 Another tab is sharing screen`;
-      document.body.appendChild(indicator);
-      
-      // Update screen with message
-      if (largeScreen && largeScreen.canvas) {
-        const ctx = largeScreen.canvas.getContext('2d');
-        ctx.fillStyle = '#001122';
-        ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
-        ctx.fillStyle = '#00ff00';
-        ctx.font = 'bold 48px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Another Tab is Screen Sharing', largeScreen.canvas.width/2, largeScreen.canvas.height/2);
-        ctx.font = '32px Arial';
-        ctx.fillText('(BroadcastChannel limitation - can\'t share video)', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 50);
-        largeScreen.texture.needsUpdate = true;
-      }
-    }
     
     function handleRemoteScreenStop(senderId) {
       const indicator = document.getElementById(`remote-indicator-${senderId}`);
@@ -1432,6 +1394,7 @@
     window.deselectObject = deselectObject;
     
     // ===== HELPER FUNCTIONS =====
+    // Move this function early since it's used by object manipulation functions
     function generateObjectId(object) {
       if (!object.userData.objectId) {
         object.userData.objectId = `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;

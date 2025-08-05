@@ -7,6 +7,8 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const fetch = require('node-fetch');
+const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -20,15 +22,67 @@ const io = socketIo(server, {
 app.use(cors());
 app.use(express.json());
 
-// Cloudflare Worker API endpoint for visitor tracking
-const VISITOR_COUNTER_API = process.env.VISITOR_COUNTER_API || 'https://visitor-counter.YOUR-SUBDOMAIN.workers.dev';
+// Environment configuration
 const SPACE_NAME = process.env.SPACE_NAME || 'main-world';
 
-// Check if using default API (not configured)
-if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
-  console.warn('⚠️  WARNING: Using default Cloudflare Worker URL. Please set VISITOR_COUNTER_API environment variable!');
-  console.warn('⚠️  Visitor counting will not work until you deploy the Cloudflare Worker and set the URL.');
+// Database setup for persistent visitor tracking
+const DB_DIR = process.env.DB_DIR || './data';
+const DB_PATH = path.join(DB_DIR, 'visitors.db');
+
+// Ensure data directory exists
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+  console.log(`📁 Created database directory: ${DB_DIR}`);
 }
+
+// Initialize SQLite database
+const db = new sqlite3.Database(DB_PATH, (err) => {
+  if (err) {
+    console.error('❌ Error opening database:', err);
+  } else {
+    console.log(`✅ Connected to SQLite database at ${DB_PATH}`);
+  }
+});
+
+// Create tables if they don't exist
+db.serialize(() => {
+  // Visitor tracking table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS visitors (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      space_name TEXT NOT NULL,
+      visitor_id TEXT NOT NULL,
+      first_visit DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_visit DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(space_name, visitor_id)
+    )
+  `, (err) => {
+    if (err) console.error('Error creating visitors table:', err);
+    else console.log('✅ Visitors table ready');
+  });
+
+  // Space statistics table
+  db.run(`
+    CREATE TABLE IF NOT EXISTS space_stats (
+      space_name TEXT PRIMARY KEY,
+      total_visitors INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `, (err) => {
+    if (err) console.error('Error creating space_stats table:', err);
+    else console.log('✅ Space stats table ready');
+  });
+
+  // Initialize space if it doesn't exist
+  db.run(`
+    INSERT OR IGNORE INTO space_stats (space_name, total_visitors) 
+    VALUES (?, 0)
+  `, [SPACE_NAME], (err) => {
+    if (err) console.error('Error initializing space:', err);
+    else console.log(`✅ Space "${SPACE_NAME}" initialized`);
+  });
+});
 
 // ===== PERSISTENT WORLD STATE =====
 const worldState = {
@@ -44,111 +98,94 @@ const worldState = {
   spaceName: SPACE_NAME   // The name of this space
 };
 
-// Cloudflare Worker API functions
-const getVisitorCount = async () => {
-  // Skip if using default URL
-  if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
-    return worldState.visitorCount || 0;
-  }
-  
-  try {
-    console.log(`📊 Fetching visitor count from: ${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
-    const response = await fetch(`${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log(`✅ Visitor count fetched:`, data);
-      return data.visitorCount || 0;
-    } else {
-      console.error(`❌ Failed to fetch visitor count: ${response.status} ${response.statusText}`);
-      const errorText = await response.text();
-      console.error('Error details:', errorText);
-    }
-  } catch (error) {
-    console.error('❌ Error fetching visitor count:', error.message);
-  }
-  return 0;
-};
-
-const recordVisitor = async (visitorId) => {
-  // Skip if using default URL
-  if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
-    // Use local counting as fallback
-    if (!worldState.localVisitors) {
-      worldState.localVisitors = new Set();
-    }
-    
-    if (!worldState.localVisitors.has(visitorId)) {
-      worldState.localVisitors.add(visitorId);
-      worldState.visitorCount = worldState.localVisitors.size;
-      return {
-        visitorCount: worldState.visitorCount,
-        isNewVisitor: true,
-        message: 'Local visitor tracking (Cloudflare Worker not configured)'
-      };
-    }
-    return {
-      visitorCount: worldState.visitorCount,
-      isNewVisitor: false
-    };
-  }
-  
-  try {
-    console.log(`📊 Recording visitor ${visitorId} to: ${VISITOR_COUNTER_API}/api/space/visit`);
-    const response = await fetch(`${VISITOR_COUNTER_API}/api/space/visit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spaceName: SPACE_NAME, visitorId })
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      console.log(`✅ Visitor recorded for space ${SPACE_NAME}:`, data);
-      return data;
-    } else {
-      console.error(`❌ Failed to record visitor: ${response.status} ${response.statusText}`);
-      const errorText = await response.text();
-      console.error('Error details:', errorText);
-    }
-  } catch (error) {
-    console.error('❌ Error recording visitor:', error.message);
-  }
-  return null;
-};
-
-const createSpaceIfNeeded = async () => {
-  // Skip if using default URL
-  if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
-    console.log('⚠️  Skipping space creation - Cloudflare Worker not configured');
-    return;
-  }
-  
-  try {
-    console.log(`🔍 Checking if space exists: ${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
-    // First check if space exists
-    const checkResponse = await fetch(`${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
-    
-    if (checkResponse.status === 404 || !checkResponse.ok) {
-      console.log(`📦 Space ${SPACE_NAME} not found, creating...`);
-      // Create the space
-      const createResponse = await fetch(`${VISITOR_COUNTER_API}/api/space/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ spaceName: SPACE_NAME })
-      });
-      
-      if (createResponse.ok) {
-        console.log(`✅ Created new space: ${SPACE_NAME}`);
-      } else {
-        console.error(`❌ Failed to create space: ${createResponse.status} ${createResponse.statusText}`);
+// Database functions for persistent visitor tracking
+const getVisitorCount = () => {
+  return new Promise((resolve, reject) => {
+    db.get(
+      `SELECT total_visitors FROM space_stats WHERE space_name = ?`,
+      [SPACE_NAME],
+      (err, row) => {
+        if (err) {
+          console.error('❌ Error fetching visitor count:', err);
+          resolve(0);
+        } else {
+          const count = row ? row.total_visitors : 0;
+          console.log(`📊 Visitor count for ${SPACE_NAME}: ${count}`);
+          resolve(count);
+        }
       }
-    } else {
-      console.log(`✅ Space ${SPACE_NAME} already exists`);
-    }
-  } catch (error) {
-    console.error('❌ Error checking/creating space:', error.message);
-  }
+    );
+  });
 };
+
+const recordVisitor = (visitorId) => {
+  return new Promise((resolve, reject) => {
+    // First, check if visitor already exists
+    db.get(
+      `SELECT visitor_id FROM visitors WHERE space_name = ? AND visitor_id = ?`,
+      [SPACE_NAME, visitorId],
+      (err, row) => {
+        if (err) {
+          console.error('❌ Error checking visitor:', err);
+          resolve({ visitorCount: worldState.visitorCount, isNewVisitor: false });
+          return;
+        }
+
+        if (row) {
+          // Existing visitor - update last visit
+          db.run(
+            `UPDATE visitors SET last_visit = CURRENT_TIMESTAMP WHERE space_name = ? AND visitor_id = ?`,
+            [SPACE_NAME, visitorId],
+            (err) => {
+              if (err) console.error('Error updating visitor:', err);
+            }
+          );
+          resolve({ visitorCount: worldState.visitorCount, isNewVisitor: false });
+        } else {
+          // New visitor - insert and update count
+          db.run(
+            `INSERT INTO visitors (space_name, visitor_id) VALUES (?, ?)`,
+            [SPACE_NAME, visitorId],
+            (err) => {
+              if (err) {
+                console.error('Error inserting visitor:', err);
+                resolve({ visitorCount: worldState.visitorCount, isNewVisitor: false });
+                return;
+              }
+
+              // Update total visitor count
+              db.run(
+                `UPDATE space_stats 
+                 SET total_visitors = total_visitors + 1, 
+                     last_updated = CURRENT_TIMESTAMP 
+                 WHERE space_name = ?`,
+                [SPACE_NAME],
+                async (err) => {
+                  if (err) {
+                    console.error('Error updating visitor count:', err);
+                  }
+                  
+                  // Get updated count
+                  const newCount = await getVisitorCount();
+                  worldState.visitorCount = newCount;
+                  console.log(`🎉 New visitor! Total visitors for ${SPACE_NAME}: ${newCount}`);
+                  
+                  resolve({
+                    visitorCount: newCount,
+                    isNewVisitor: true,
+                    message: 'New visitor recorded in database'
+                  });
+                }
+              );
+            }
+          );
+        }
+      }
+    );
+  });
+};
+
+// Space initialization is handled by the database setup above
 
 // Simulate database (in production, use Railway PostgreSQL)
 const saveWorldState = () => {
@@ -157,12 +194,12 @@ const saveWorldState = () => {
 };
 
 const loadWorldState = async () => {
-  // In production: load from Railway database
-  console.log('📂 World state loaded');
-  
-  // Load visitor count from Cloudflare
+  // Load visitor count from database
   worldState.visitorCount = await getVisitorCount();
   console.log(`📊 Loaded visitor count for space ${SPACE_NAME}: ${worldState.visitorCount}`);
+  
+  // In production: load other world state from database
+  console.log('📂 World state loaded');
 };
 
 // ===== WORLD STATE API ENDPOINTS =====
@@ -190,6 +227,49 @@ app.get('/api/objects', (req, res) => {
     count: worldState.objects.size,
     objects: Array.from(worldState.objects.entries())
   });
+});
+
+// Get visitor statistics from database
+app.get('/api/visitor-stats', async (req, res) => {
+  try {
+    const stats = await new Promise((resolve, reject) => {
+      db.get(
+        `SELECT * FROM space_stats WHERE space_name = ?`,
+        [SPACE_NAME],
+        (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        }
+      );
+    });
+    
+    const recentVisitors = await new Promise((resolve, reject) => {
+      db.all(
+        `SELECT visitor_id, first_visit, last_visit 
+         FROM visitors 
+         WHERE space_name = ? 
+         ORDER BY last_visit DESC 
+         LIMIT 10`,
+        [SPACE_NAME],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+    
+    res.json({
+      space: SPACE_NAME,
+      totalVisitors: stats ? stats.total_visitors : 0,
+      createdAt: stats ? stats.created_at : null,
+      lastUpdated: stats ? stats.last_updated : null,
+      recentVisitors: recentVisitors,
+      databasePath: DB_PATH
+    });
+  } catch (error) {
+    console.error('Error fetching visitor stats:', error);
+    res.status(500).json({ error: 'Failed to fetch visitor statistics' });
+  }
 });
 
 // Health check endpoint
@@ -551,14 +631,38 @@ setInterval(() => {
 // Initialize server and load visitor stats
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, async () => {
-  console.log(`WebRTC Signaling Server running on port ${PORT}`);
+  console.log(`\n🌍 3D World Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/`);
   console.log(`Space name: ${SPACE_NAME}`);
-  console.log(`Visitor API: ${VISITOR_COUNTER_API}`);
+  console.log(`Database: ${DB_PATH}`);
   
-  // Create space if needed and load visitor statistics
-  await createSpaceIfNeeded();
+  // Load visitor statistics and world state from database
   await loadWorldState();
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, closing database and server...');
+  db.close((err) => {
+    if (err) console.error('Error closing database:', err);
+    else console.log('Database closed');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, closing database and server...');
+  db.close((err) => {
+    if (err) console.error('Error closing database:', err);
+    else console.log('Database closed');
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  });
 });
 
 module.exports = server;

@@ -49,3 +49,8 @@ logs
 
 # Persistent data (visitor stats, etc.)
 data/
+*.db
+*.sqlite
+*.sqlite3
+cloudflare-data/
+visitor-data/

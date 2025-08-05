@@ -1045,10 +1045,14 @@
     }
 
     function updateUserList() {
+      console.log('🔧 updateUserList called, myUserId:', myUserId, 'userAvatars size:', userAvatars.size);
       const userListContent = document.getElementById('user-list-content');
       const currentUserElement = document.getElementById('current-user');
       
-      if (!userListContent) return;
+      if (!userListContent) {
+        console.log('❌ userListContent not found');
+        return;
+      }
       
       // Clear existing user items (except current user)
       const userItems = userListContent.querySelectorAll('.user-item:not(.self)');
@@ -1056,8 +1060,15 @@
       
       // Update current user with clickable name
       if (currentUserElement && myUserId) {
-        const currentUser = Array.from(userAvatars.values()).find(u => u.id === myUserId) || 
-                           { username: `User${myUserId.substr(0,4)}` };
+        // Find current user data or create fallback
+        let currentUser;
+        if (userAvatars.has(myUserId)) {
+          currentUser = userAvatars.get(myUserId);
+        } else {
+          // Fallback when avatar hasn't been created yet
+          currentUser = { username: `User${myUserId.substr(0,4)}` };
+        }
+        console.log('🔧 Current user for name editing:', currentUser);
         
         // Clear and recreate current user element
         currentUserElement.innerHTML = '';
@@ -1070,7 +1081,12 @@
         nameSpan.style.color = '#4CAF50';
         nameSpan.title = 'Click to edit your name';
         
-        nameSpan.addEventListener('click', () => editUserName());
+        nameSpan.addEventListener('click', (e) => {
+          console.log('📝 Name span clicked!', e);
+          e.preventDefault();
+          e.stopPropagation();
+          editUserName();
+        });
         
         const youLabel = document.createElement('span');
         youLabel.textContent = ' (You)';
@@ -1092,11 +1108,23 @@
     }
 
     function editUserName() {
+      console.log('🔧 editUserName called, myUserId:', myUserId);
       const currentUserElement = document.getElementById('current-user');
-      if (!currentUserElement || !myUserId) return;
+      console.log('🔧 currentUserElement:', currentUserElement);
+      if (!currentUserElement || !myUserId) {
+        console.log('❌ editUserName: Missing currentUserElement or myUserId');
+        return;
+      }
       
-      const currentUser = Array.from(userAvatars.values()).find(u => u.id === myUserId) || 
-                         { username: `User${myUserId.substr(0,4)}` };
+      // Find current user data or create fallback
+      let currentUser;
+      if (userAvatars.has(myUserId)) {
+        currentUser = userAvatars.get(myUserId);
+      } else {
+        // Fallback when avatar hasn't been created yet
+        currentUser = { username: `User${myUserId.substr(0,4)}` };
+      }
+      console.log('🔧 editUserName currentUser:', currentUser);
       
       // Create input field
       const input = document.createElement('input');

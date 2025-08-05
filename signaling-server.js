@@ -24,6 +24,12 @@ app.use(express.json());
 const VISITOR_COUNTER_API = process.env.VISITOR_COUNTER_API || 'https://visitor-counter.YOUR-SUBDOMAIN.workers.dev';
 const SPACE_NAME = process.env.SPACE_NAME || 'main-world';
 
+// Check if using default API (not configured)
+if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
+  console.warn('⚠️  WARNING: Using default Cloudflare Worker URL. Please set VISITOR_COUNTER_API environment variable!');
+  console.warn('⚠️  Visitor counting will not work until you deploy the Cloudflare Worker and set the URL.');
+}
+
 // ===== PERSISTENT WORLD STATE =====
 const worldState = {
   objects: new Map(),     // 3D object positions/rotations/scales
@@ -40,20 +46,55 @@ const worldState = {
 
 // Cloudflare Worker API functions
 const getVisitorCount = async () => {
+  // Skip if using default URL
+  if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
+    return worldState.visitorCount || 0;
+  }
+  
   try {
+    console.log(`📊 Fetching visitor count from: ${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
     const response = await fetch(`${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
+    
     if (response.ok) {
       const data = await response.json();
+      console.log(`✅ Visitor count fetched:`, data);
       return data.visitorCount || 0;
+    } else {
+      console.error(`❌ Failed to fetch visitor count: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Error details:', errorText);
     }
   } catch (error) {
-    console.error('Error fetching visitor count:', error);
+    console.error('❌ Error fetching visitor count:', error.message);
   }
   return 0;
 };
 
 const recordVisitor = async (visitorId) => {
+  // Skip if using default URL
+  if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
+    // Use local counting as fallback
+    if (!worldState.localVisitors) {
+      worldState.localVisitors = new Set();
+    }
+    
+    if (!worldState.localVisitors.has(visitorId)) {
+      worldState.localVisitors.add(visitorId);
+      worldState.visitorCount = worldState.localVisitors.size;
+      return {
+        visitorCount: worldState.visitorCount,
+        isNewVisitor: true,
+        message: 'Local visitor tracking (Cloudflare Worker not configured)'
+      };
+    }
+    return {
+      visitorCount: worldState.visitorCount,
+      isNewVisitor: false
+    };
+  }
+  
   try {
+    console.log(`📊 Recording visitor ${visitorId} to: ${VISITOR_COUNTER_API}/api/space/visit`);
     const response = await fetch(`${VISITOR_COUNTER_API}/api/space/visit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -62,20 +103,33 @@ const recordVisitor = async (visitorId) => {
     
     if (response.ok) {
       const data = await response.json();
-      console.log(`📊 Visitor recorded for space ${SPACE_NAME}:`, data);
+      console.log(`✅ Visitor recorded for space ${SPACE_NAME}:`, data);
       return data;
+    } else {
+      console.error(`❌ Failed to record visitor: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.error('Error details:', errorText);
     }
   } catch (error) {
-    console.error('Error recording visitor:', error);
+    console.error('❌ Error recording visitor:', error.message);
   }
   return null;
 };
 
 const createSpaceIfNeeded = async () => {
+  // Skip if using default URL
+  if (VISITOR_COUNTER_API.includes('YOUR-SUBDOMAIN')) {
+    console.log('⚠️  Skipping space creation - Cloudflare Worker not configured');
+    return;
+  }
+  
   try {
+    console.log(`🔍 Checking if space exists: ${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
     // First check if space exists
     const checkResponse = await fetch(`${VISITOR_COUNTER_API}/api/space/${SPACE_NAME}`);
+    
     if (checkResponse.status === 404 || !checkResponse.ok) {
+      console.log(`📦 Space ${SPACE_NAME} not found, creating...`);
       // Create the space
       const createResponse = await fetch(`${VISITOR_COUNTER_API}/api/space/create`, {
         method: 'POST',
@@ -84,11 +138,15 @@ const createSpaceIfNeeded = async () => {
       });
       
       if (createResponse.ok) {
-        console.log(`🌍 Created new space: ${SPACE_NAME}`);
+        console.log(`✅ Created new space: ${SPACE_NAME}`);
+      } else {
+        console.error(`❌ Failed to create space: ${createResponse.status} ${createResponse.statusText}`);
       }
+    } else {
+      console.log(`✅ Space ${SPACE_NAME} already exists`);
     }
   } catch (error) {
-    console.error('Error creating space:', error);
+    console.error('❌ Error checking/creating space:', error.message);
   }
 };
 

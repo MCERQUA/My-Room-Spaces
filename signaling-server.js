@@ -6,6 +6,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs').promises;
 
 const app = express();
 const server = http.createServer(app);
@@ -28,6 +29,51 @@ const worldState = {
   roomSettings: {
     lighting: { ambient: 0.3, directional: 0.8 },
     environment: 'room1'
+  },
+  visitorCount: 0,        // Total unique visitors
+  uniqueVisitors: new Set() // Track unique visitor IDs
+};
+
+// Data persistence file path
+const DATA_DIR = path.join(__dirname, 'data');
+const VISITOR_DATA_FILE = path.join(DATA_DIR, 'visitor-stats.json');
+
+// Ensure data directory exists
+const ensureDataDir = async () => {
+  try {
+    await fs.mkdir(DATA_DIR, { recursive: true });
+  } catch (error) {
+    console.error('Error creating data directory:', error);
+  }
+};
+
+// Save visitor statistics
+const saveVisitorStats = async () => {
+  try {
+    const stats = {
+      visitorCount: worldState.visitorCount,
+      uniqueVisitors: Array.from(worldState.uniqueVisitors),
+      lastUpdated: new Date().toISOString()
+    };
+    await fs.writeFile(VISITOR_DATA_FILE, JSON.stringify(stats, null, 2));
+    console.log('💾 Visitor stats saved - Total visitors:', worldState.visitorCount);
+  } catch (error) {
+    console.error('Error saving visitor stats:', error);
+  }
+};
+
+// Load visitor statistics
+const loadVisitorStats = async () => {
+  try {
+    const data = await fs.readFile(VISITOR_DATA_FILE, 'utf8');
+    const stats = JSON.parse(data);
+    worldState.visitorCount = stats.visitorCount || 0;
+    worldState.uniqueVisitors = new Set(stats.uniqueVisitors || []);
+    console.log('📂 Visitor stats loaded - Total visitors:', worldState.visitorCount);
+  } catch (error) {
+    console.log('📂 No existing visitor stats found, starting fresh');
+    worldState.visitorCount = 0;
+    worldState.uniqueVisitors = new Set();
   }
 };
 
@@ -35,11 +81,13 @@ const worldState = {
 const saveWorldState = () => {
   // In production: save to Railway database
   console.log('💾 World state saved - Objects:', worldState.objects.size, 'Users:', worldState.users.size);
+  saveVisitorStats(); // Also save visitor stats
 };
 
-const loadWorldState = () => {
+const loadWorldState = async () => {
   // In production: load from Railway database
   console.log('📂 World state loaded');
+  await loadVisitorStats(); // Also load visitor stats
 };
 
 // ===== WORLD STATE API ENDPOINTS =====
@@ -50,7 +98,8 @@ app.get('/api/world-state', (req, res) => {
     sharedScreen: worldState.sharedScreen,
     chatHistory: worldState.chatHistory.slice(-10),
     roomSettings: worldState.roomSettings,
-    activeUsers: worldState.users.size
+    activeUsers: worldState.users.size,
+    visitorCount: worldState.visitorCount
   });
 });
 
@@ -76,7 +125,8 @@ app.get('/', (req, res) => {
       users: worldState.users.size,
       objects: worldState.objects.size,
       sharedScreen: !!worldState.sharedScreen,
-      chatMessages: worldState.chatHistory.length
+      chatMessages: worldState.chatHistory.length,
+      visitorCount: worldState.visitorCount
     },
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
@@ -86,13 +136,25 @@ app.get('/', (req, res) => {
 io.on('connection', (socket) => {
   console.log('👥 User connected:', socket.id);
 
+  // Track unique visitor
+  if (!worldState.uniqueVisitors.has(socket.id)) {
+    worldState.uniqueVisitors.add(socket.id);
+    worldState.visitorCount++;
+    saveVisitorStats(); // Save the updated count
+    
+    // Broadcast updated visitor count to all users
+    io.emit('visitor-count-update', { visitorCount: worldState.visitorCount });
+    console.log('🎉 New visitor! Total visitors:', worldState.visitorCount);
+  }
+
   // Send current world state to new user
   socket.emit('world-state', {
     objects: Array.from(worldState.objects.entries()),
     users: Array.from(worldState.users.entries()),
     sharedScreen: worldState.sharedScreen,
     chatHistory: worldState.chatHistory.slice(-10), // Last 10 messages
-    roomSettings: worldState.roomSettings
+    roomSettings: worldState.roomSettings,
+    visitorCount: worldState.visitorCount
   });
 
   // ===== USER AVATAR MANAGEMENT =====
@@ -399,10 +461,15 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
+// Initialize server and load visitor stats
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
   console.log(`WebRTC Signaling Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/`);
+  
+  // Load visitor statistics on startup
+  await ensureDataDir();
+  await loadWorldState();
 });
 
 module.exports = server;

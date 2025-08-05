@@ -790,7 +790,60 @@
       z-index: 599;
     }
 
+    /* Visitor Counter Styles */
+    .visitor-counter {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 8px 24px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      z-index: 400;
+      transition: all 0.3s ease;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .visitor-counter:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateX(-50%) translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .visitor-count {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      text-align: center;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .visitor-count-number {
+      color: #4a90e2;
+      font-size: 16px;
+      font-weight: 700;
+    }
+
     @media (max-width: 768px) {
+      .visitor-counter {
+        top: 65px; /* Move below menu on mobile */
+        padding: 6px 20px;
+      }
+
+      .visitor-count {
+        font-size: 12px;
+      }
+
+      .visitor-count-number {
+        font-size: 14px;
+      }
+
       .user-list {
         top: 10px;
         right: 10px;
@@ -860,6 +913,14 @@
       ❓
       <span class="tooltip">Help</span>
     </button>
+  </div>
+  
+  <!-- Visitor Counter -->
+  <div class="visitor-counter" id="visitor-counter">
+    <div class="visitor-count">
+      <span class="visitor-count-number" id="visitor-count-number">0</span>
+      <span>visitors</span>
+    </div>
   </div>
   
   <div class="screen-controls" id="screen-controls" style="display: none;">
@@ -1372,7 +1433,8 @@
             originalPosition: shareScreenObject.position.clone(),
             originalScale: shareScreenObject.scale.clone(),
             originalRotation: shareScreenObject.rotation.clone(),
-            objectId: 'SHARESCREEN-HERE'  // Fixed ID for server reference
+            objectId: 'SHARESCREEN-HERE',  // Fixed ID for server reference
+            isSelectable: false  // Mark screen as non-selectable
           };
           
           sceneObjects.push(shareScreenObject);
@@ -1427,7 +1489,8 @@
         originalPosition: displayScreen.position.clone(),
         originalScale: displayScreen.scale.clone(),
         originalRotation: displayScreen.rotation.clone(),
-        objectId: 'SHARESCREEN-HERE'  // Fixed ID for server reference
+        objectId: 'SHARESCREEN-HERE',  // Fixed ID for server reference
+        isSelectable: false  // Mark screen as non-selectable
       };
       
       sceneObjects.push(displayScreen);
@@ -1442,6 +1505,16 @@
       const userCountElement = document.getElementById('user-count');
       if (userCountElement) {
         userCountElement.textContent = `👥 Users: ${count}`;
+      }
+    }
+    
+    // Visitor count display
+    function updateVisitorCount(count) {
+      const visitorCountElement = document.getElementById('visitor-count-number');
+      if (visitorCountElement) {
+        // Format number with commas for large numbers
+        const formattedCount = count.toLocaleString();
+        visitorCountElement.textContent = formattedCount;
       }
     }
 
@@ -1725,6 +1798,11 @@
           // worldData.users.length already includes all users (including current user)
           updateUserCount(worldData.users.length);
           updateUserList();
+          
+          // Update visitor count if provided
+          if (worldData.visitorCount !== undefined) {
+            updateVisitorCount(worldData.visitorCount);
+          }
         });
         
         socket.on('user-joined', (avatar) => {
@@ -1884,6 +1962,13 @@
         // ===== CHAT SYSTEM =====
         socket.on('chat-message', (message) => {
           displayChatMessage(message);
+        });
+        
+        // ===== VISITOR COUNT UPDATE =====
+        socket.on('visitor-count-update', (data) => {
+          if (data.visitorCount !== undefined) {
+            updateVisitorCount(data.visitorCount);
+          }
         });
         
         socket.on('disconnect', () => {
@@ -2382,7 +2467,10 @@
         }
         
         if (sceneObjects.includes(targetObject)) {
-          selectObject(targetObject);
+          // Check if object is selectable (skip the share screen)
+          if (targetObject.userData.isSelectable !== false) {
+            selectObject(targetObject);
+          }
         }
       } else {
         deselectObject();

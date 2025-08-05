@@ -46,3 +46,6 @@ logs
 # Backup files
 *.bak
 *.backup
+
+# Persistent data (visitor stats, etc.)
+data/

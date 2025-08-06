@@ -2233,7 +2233,18 @@
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
-        stream: currentStream || undefined // Share current stream if available
+        stream: currentStream || undefined, // Share current stream if available
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' }
+          ]
+        },
+        offerOptions: {
+          offerToReceiveVideo: true,
+          offerToReceiveAudio: true
+        }
       });
       
       peers[userId] = peer;
@@ -2330,47 +2341,80 @@
       console.log(`🖥️ *** DISPLAYING SHARED STREAM ***`);
       console.log(`📺 Stream details: active=${stream.active}, tracks=${stream.getTracks().length}`);
       
+      // Remove any existing video element
+      const existingVideo = document.getElementById('remote-screen-video');
+      if (existingVideo) {
+        existingVideo.remove();
+      }
+      
       const videoEl = document.createElement('video');
+      videoEl.id = 'remote-screen-video';
       videoEl.srcObject = stream;
       videoEl.autoplay = true;
-      videoEl.controls = true;
+      videoEl.muted = false; // Allow audio playback
+      videoEl.playsInline = true;
       videoEl.volume = 1.0; // Full volume
       videoEl.style.display = 'none';
       document.body.appendChild(videoEl);
       
       console.log(`📺 Created video element, autoplay=${videoEl.autoplay}`);
       
+      // Store reference for cleanup
+      window.remoteVideoElement = videoEl;
+      
       function updateScreenFromPeer() {
         if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
-          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
-          largeScreen.texture.needsUpdate = true;
-          // Only log occasionally to avoid spam
-          if (Math.random() < 0.01) {
-            console.log(`🎬 Updating screen texture from P2P video (${videoEl.videoWidth}x${videoEl.videoHeight})`);
+          
+          // Clear canvas first
+          ctx.clearRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          
+          // Draw video to fit canvas
+          if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+            ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+            largeScreen.texture.needsUpdate = true;
+            
+            // Only log occasionally to avoid spam
+            if (Math.random() < 0.01) {
+              console.log(`🎬 Updating screen texture from P2P video (${videoEl.videoWidth}x${videoEl.videoHeight})`);
+            }
           }
-        } else {
-          console.log(`⏸️ Video not ready: readyState=${videoEl.readyState}, hasScreen=${!!largeScreen}`);
         }
         
-        if (stream.active) {
+        if (stream.active && !videoEl.paused) {
           requestAnimationFrame(updateScreenFromPeer);
         } else {
-          console.log(`🛑 P2P stream no longer active, stopping updates`);
+          console.log(`🛑 P2P stream stopped: active=${stream.active}, paused=${videoEl.paused}`);
         }
       }
       
-      videoEl.addEventListener('loadeddata', () => {
-        console.log(`📹 Video loadeddata event: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
-        updateScreenFromPeer();
-      });
+      // Ensure video plays
+      const playVideo = async () => {
+        try {
+          await videoEl.play();
+          console.log(`▶️ Video playing successfully`);
+          updateScreenFromPeer();
+        } catch (err) {
+          console.error('Failed to play video:', err);
+          // Retry with muted if autoplay policy blocks it
+          videoEl.muted = true;
+          try {
+            await videoEl.play();
+            console.log(`▶️ Video playing (muted due to autoplay policy)`);
+            updateScreenFromPeer();
+          } catch (err2) {
+            console.error('Failed to play video even when muted:', err2);
+          }
+        }
+      };
       
       videoEl.addEventListener('loadedmetadata', () => {
         console.log(`📹 Video metadata loaded: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
+        playVideo();
       });
       
       videoEl.addEventListener('canplay', () => {
-        console.log(`📹 Video can play`);
+        console.log(`📹 Video can play: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
       });
       
       videoEl.addEventListener('error', (e) => {
@@ -2621,6 +2665,17 @@
       if (!largeScreen || !largeScreen.canvas) {
         console.warn('Cannot reset screen content - largeScreen not ready');
         return;
+      }
+      
+      // Clean up any remote video elements
+      const remoteVideo = document.getElementById('remote-screen-video');
+      if (remoteVideo) {
+        if (remoteVideo.srcObject) {
+          remoteVideo.srcObject.getTracks().forEach(track => track.stop());
+          remoteVideo.srcObject = null;
+        }
+        remoteVideo.remove();
+        window.remoteVideoElement = null;
       }
       
       const ctx = largeScreen.canvas.getContext('2d');

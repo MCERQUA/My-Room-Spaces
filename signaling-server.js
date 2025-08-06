@@ -7,7 +7,7 @@ const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const fetch = require('node-fetch');
-const sqlite3 = require('sqlite3').verbose();
+// const sqlite3 = require('sqlite3').verbose(); // Disabled for visitor counter
 const fs = require('fs');
 
 const app = express();

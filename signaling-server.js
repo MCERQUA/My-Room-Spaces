@@ -198,9 +198,9 @@ const saveWorldState = () => {
 };
 
 const loadWorldState = async () => {
-  // Load visitor count from database
-  worldState.visitorCount = await getVisitorCount();
-  console.log(`📊 Loaded visitor count for space ${SPACE_NAME}: ${worldState.visitorCount}`);
+  // Load visitor count from database (Disabled)
+  // worldState.visitorCount = await getVisitorCount();
+  // console.log(`📊 Loaded visitor count for space ${SPACE_NAME}: ${worldState.visitorCount}`);
   
   // In production: load other world state from database
   console.log('📂 World state loaded');
@@ -676,27 +676,29 @@ server.listen(PORT, async () => {
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, closing database and server...');
-  db.close((err) => {
-    if (err) console.error('Error closing database:', err);
-    else console.log('Database closed');
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
+  console.log('SIGTERM received, closing server...');
+  // Database closing disabled
+  // db.close((err) => {
+  //   if (err) console.error('Error closing database:', err);
+  //   else console.log('Database closed');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
   });
+  // });
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, closing database and server...');
-  db.close((err) => {
-    if (err) console.error('Error closing database:', err);
-    else console.log('Database closed');
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
+  console.log('SIGINT received, closing server...');
+  // Database closing disabled
+  // db.close((err) => {
+  //   if (err) console.error('Error closing database:', err);
+  //   else console.log('Database closed');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
   });
+  // });
 });
 
 module.exports = server;

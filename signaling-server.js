@@ -516,6 +516,14 @@ io.on('connection', async (socket) => {
     }
   });
 
+  // ===== SCREEN SHARE REQUEST (For users who join later) =====
+  socket.on('request-screen-stream', (data) => {
+    console.log(`📨 Relaying screen stream request from ${socket.id} to ${data.to}`);
+    socket.to(data.to).emit('request-screen-stream', {
+      from: socket.id
+    });
+  });
+  
   // ===== VOICE CHAT COORDINATION (WebRTC P2P for audio only) =====
   socket.on('webrtc-offer', (data) => {
     socket.to(data.to).emit('webrtc-offer', {

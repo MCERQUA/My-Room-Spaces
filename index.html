@@ -2122,8 +2122,12 @@
           console.log(`📺 Screen sharing started by ${data.userId}:`, data);
           handleRemoteScreenShare(data);
           
-          // Don't initiate P2P connection here - let the screen sharer do it
-          console.log(`🔗 Ready to receive P2P connection from ${data.userId} for screen sharing`);
+          // If we're not the screen sharer, we need to request a P2P connection
+          if (data.userId !== socket.id) {
+            console.log(`🔗 Requesting P2P connection from screen sharer ${data.userId}`);
+            // Send a signal to the screen sharer that we need a connection
+            socket.emit('request-screen-stream', { to: data.userId });
+          }
         });
         
         socket.on('screen-share-stopped', (data) => {
@@ -2134,6 +2138,18 @@
           if (peers[data.userId]) {
             peers[data.userId].destroy();
             delete peers[data.userId];
+          }
+        });
+        
+        // Handle requests for screen stream from users who joined later
+        socket.on('request-screen-stream', (data) => {
+          console.log(`📨 Received screen stream request from ${data.from}`);
+          // If we're currently sharing our screen, create a P2P connection to the requester
+          if (currentStream && currentStream.active) {
+            console.log(`📺 Sending screen stream to ${data.from}`);
+            if (!peers[data.from]) {
+              connectToPeer(data.from, true); // We're the initiator
+            }
           }
         });
         

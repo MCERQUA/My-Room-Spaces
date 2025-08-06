@@ -79,12 +79,25 @@ This document chronicles all attempts to fix the screen sharing feature that bro
   - Identified as NAT/firewall traversal issue
 
 ### Fix Attempt #6: TURN Servers (Commit `113be33`)
-- **Status**: 🔄 Current attempt
+- **Status**: ❌ Did not fix the issue
 - **What was added**:
   - OpenRelay TURN servers for traffic relay
   - Fallback when direct P2P fails
   - Both port 80 and 443 for firewall compatibility
-- **Expected**: Should relay traffic when P2P fails due to NAT
+- **Result**: Connection still failed - was not a NAT issue
+
+### Fix Attempt #7: P2P Connection for Late-Joining Users ✅ SOLUTION FOUND
+- **Status**: ✅ FIXED THE ISSUE!
+- **Root Cause Discovered**:
+  - When User A starts screen sharing, they connect to existing users
+  - When User B receives `screen-share-started`, they did NOT request P2P connection
+  - User A had no way to know User B needed a connection
+  - **Critical bug**: Comment said "let the screen sharer do it" but sharer only connects to users present at start
+- **What was fixed**:
+  - Added `request-screen-stream` event when users receive `screen-share-started`
+  - Screen sharer now responds to requests by creating P2P connections
+  - Server relays the request properly
+- **Result**: Screen sharing now works for all users, including those who join after sharing starts
 
 ## Key Findings
 

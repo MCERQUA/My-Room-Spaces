@@ -109,12 +109,25 @@ This document chronicles all attempts to fix the screen sharing feature that bro
 - **Result**: ICE connection still fails (checking → disconnected → failed)
 
 ### Fix Attempt #9: Always Recreate Connections for Screen Sharing
-- **Status**: 🔄 Current attempt
+- **Status**: ❌ Revealed deeper issue
 - **What changed**:
   - Always destroy and recreate P2P connections when screen sharing starts
   - Removed `addStream()` usage entirely
   - Ensures stream is included from connection creation
-- **Rationale**: `addStream()` may not work properly with SimplePeer when trickle:false
+- **Result**: Found socket disconnections causing duplicate IDs and failed connections
+
+### Fix Attempt #10: Fix Socket Disconnection Issues
+- **Status**: 🔄 Current attempt
+- **Root Cause Found**:
+  - Socket.IO disconnecting and reconnecting during screen share
+  - Creates new socket IDs, invalidating peer connections
+  - Causes duplicate avatars and wrong peer routing
+- **What fixed**:
+  - Added keepalive ping every 25 seconds
+  - Clean up peer connections on disconnect
+  - Stop screen sharing on disconnect
+  - Clear ping interval on disconnect
+- **Rationale**: Keep socket connection stable to maintain peer connections
 
 ## Key Findings
 

@@ -1943,6 +1943,16 @@
         socket.on('connect', () => {
           console.log('✅ Connected to persistent world server!');
           console.log('🎉 Server-mediated world sharing is now enabled!');
+          
+          // Send periodic pings to keep connection alive
+          if (window.pingInterval) {
+            clearInterval(window.pingInterval);
+          }
+          window.pingInterval = setInterval(() => {
+            if (socket.connected) {
+              socket.emit('ping');
+            }
+          }, 25000); // Ping every 25 seconds
           inRoom = true;
           myUserId = socket.id;
           
@@ -2205,9 +2215,34 @@
           }
         });
         
-        socket.on('disconnect', () => {
-          console.log('🔌 Disconnected from signaling server');
+        socket.on('disconnect', (reason) => {
+          console.log(`🔌 Disconnected from signaling server. Reason: ${reason}`);
           inRoom = false;
+          
+          // Clear ping interval
+          if (window.pingInterval) {
+            clearInterval(window.pingInterval);
+            window.pingInterval = null;
+          }
+          
+          // Clean up all peer connections on disconnect
+          Object.keys(peers).forEach(peerId => {
+            if (peers[peerId]) {
+              console.log(`🧹 Cleaning up peer connection with ${peerId}`);
+              peers[peerId].destroy();
+              delete peers[peerId];
+            }
+          });
+          
+          // Stop screen sharing if active
+          if (currentStream) {
+            console.log('🛑 Stopping screen share due to disconnect');
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+            isScreenSharing = false;
+            document.getElementById('video-element').srcObject = null;
+            resetScreenContent();
+          }
         });
         
         socket.on('error', (error) => {

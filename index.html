@@ -2284,7 +2284,12 @@
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
-        stream: currentStream || undefined // Share current stream if available
+        stream: currentStream || undefined, // Share current stream if available
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' }
+          ]
+        }
       });
       
       peers[userId] = peer;

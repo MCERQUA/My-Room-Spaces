@@ -117,7 +117,7 @@ This document chronicles all attempts to fix the screen sharing feature that bro
 - **Result**: Found socket disconnections causing duplicate IDs and failed connections
 
 ### Fix Attempt #10: Fix Socket Disconnection Issues
-- **Status**: 🔄 Current attempt
+- **Status**: ✅ Fixed disconnections but P2P still fails
 - **Root Cause Found**:
   - Socket.IO disconnecting and reconnecting during screen share
   - Creates new socket IDs, invalidating peer connections
@@ -127,7 +127,15 @@ This document chronicles all attempts to fix the screen sharing feature that bro
   - Clean up peer connections on disconnect
   - Stop screen sharing on disconnect
   - Clear ping interval on disconnect
-- **Rationale**: Keep socket connection stable to maintain peer connections
+- **Result**: Socket stable but ICE negotiation still fails
+
+### Fix Attempt #11: Minimal STUN with Trickle Disabled
+- **Status**: 🔄 Current attempt
+- **What changed**:
+  - Added single Google STUN server
+  - Kept trickle: false (as in working version)
+  - Minimal config for NAT discovery
+- **Rationale**: Need STUN for NAT discovery but keep simple like working version
 
 ## Key Findings
 

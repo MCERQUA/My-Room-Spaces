@@ -2132,12 +2132,8 @@
           console.log(`📺 Screen sharing started by ${data.userId}:`, data);
           handleRemoteScreenShare(data);
           
-          // If we're not the screen sharer, we need to request a P2P connection
-          if (data.userId !== socket.id) {
-            console.log(`🔗 Requesting P2P connection from screen sharer ${data.userId}`);
-            // Send a signal to the screen sharer that we need a connection
-            socket.emit('request-screen-stream', { to: data.userId });
-          }
+          // Don't initiate P2P connection here - let the screen sharer do it
+          console.log(`🔗 Ready to receive P2P connection from ${data.userId} for screen sharing`);
         });
         
         socket.on('screen-share-stopped', (data) => {
@@ -2148,18 +2144,6 @@
           if (peers[data.userId]) {
             peers[data.userId].destroy();
             delete peers[data.userId];
-          }
-        });
-        
-        // Handle requests for screen stream from users who joined later
-        socket.on('request-screen-stream', (data) => {
-          console.log(`📨 Received screen stream request from ${data.from}`);
-          // If we're currently sharing our screen, create a P2P connection to the requester
-          if (currentStream && currentStream.active) {
-            console.log(`📺 Sending screen stream to ${data.from}`);
-            if (!peers[data.from]) {
-              connectToPeer(data.from, true); // We're the initiator
-            }
           }
         });
         
@@ -2284,12 +2268,7 @@
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
-        stream: currentStream || undefined, // Share current stream if available
-        config: {
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' }
-          ]
-        }
+        stream: currentStream || undefined // Share current stream if available
       });
       
       peers[userId] = peer;
@@ -2504,9 +2483,8 @@
         // ===== WEBRTC P2P FOR ACTUAL VIDEO STREAMING =====
         isScreenSharing = true;
         
-        // Connect to ALL users in the room for direct video streaming
+        // Connect to existing users for P2P
         console.log(`🔗 Establishing P2P connections with ${userAvatars.size} users for screen sharing`);
-        
         Array.from(userAvatars.keys()).forEach(userId => {
           // Skip self - don't create P2P connection to ourselves
           if (userId === socket.id) {
@@ -2516,17 +2494,21 @@
           
           console.log(`🔗 Connecting to user ${userId} for screen sharing`);
           
-          // Always destroy and recreate connection for screen sharing
-          // This ensures the stream is properly included from the start
           if (peers[userId]) {
-            console.log(`🔧 Destroying existing peer connection with ${userId} to recreate with stream`);
-            peers[userId].destroy();
-            delete peers[userId];
+            try {
+              peers[userId].addStream(stream);
+              console.log(`✅ Added screen stream to existing peer ${userId}`);
+            } catch (error) {
+              console.log(`⚠️ Recreating connection with ${userId} for screen share`);
+              peers[userId].destroy();
+              delete peers[userId];
+              connectToPeer(userId, true); // Recreate with new stream
+            }
+          } else {
+            // Create new P2P connection with this user
+            console.log(`🆕 Creating new P2P connection with ${userId}`);
+            connectToPeer(userId, true); // We're the initiator (screen sharer)
           }
-          
-          // Create new P2P connection with screen sharing stream
-          console.log(`🆕 Creating new P2P connection with ${userId} for screen sharing`);
-          connectToPeer(userId, true); // We're the initiator (screen sharer)
         });
         
         // For users who join later, they'll connect via the screen-share-started event

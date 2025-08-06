@@ -2233,7 +2233,12 @@
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
-        stream: currentStream || undefined // Share current stream if available
+        stream: currentStream || undefined, // Share current stream if available
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' }
+          ]
+        }
       });
       
       peers[userId] = peer;
@@ -2330,13 +2335,23 @@
       console.log(`🖥️ *** DISPLAYING SHARED STREAM ***`);
       console.log(`📺 Stream details: active=${stream.active}, tracks=${stream.getTracks().length}`);
       
+      // Remove any existing remote video element
+      const existingVideo = document.getElementById('remote-screen-video');
+      if (existingVideo) {
+        existingVideo.remove();
+      }
+      
       const videoEl = document.createElement('video');
+      videoEl.id = 'remote-screen-video';
       videoEl.srcObject = stream;
       videoEl.autoplay = true;
       videoEl.controls = true;
       videoEl.volume = 1.0; // Full volume
       videoEl.style.display = 'none';
       document.body.appendChild(videoEl);
+      
+      // Store reference globally to prevent garbage collection
+      window.remoteScreenVideo = videoEl;
       
       console.log(`📺 Created video element, autoplay=${videoEl.autoplay}`);
       

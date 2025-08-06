@@ -1629,8 +1629,12 @@
     // Initialize Cloudflare visitor counter
     async function initializeCloudflareVisitorCounter() {
       try {
-        // Define the API URL here since it's called before initializeRoomSystem
-        const CLOUDFLARE_API = 'https://visitor-counter.mikecerqua.workers.dev';
+        // Try multiple possible worker URLs
+        const WORKER_URLS = [
+          'https://visitor-counter.metamike.workers.dev',
+          'https://visitor-counter.mikecerqua.workers.dev',
+          'https://visitor-counter.threejs-multiuser.workers.dev'
+        ];
         
         // Generate or retrieve a unique visitor ID for this browser
         let visitorId = localStorage.getItem('visitorId');
@@ -1639,34 +1643,59 @@
           localStorage.setItem('visitorId', visitorId);
         }
         
-        // Increment the visitor count
-        const response = await fetch(`${CLOUDFLARE_API}/increment`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.count !== undefined) {
-            updateVisitorCount(data.count);
-            console.log(`✅ Cloudflare visitor count: ${data.count}`);
-          }
-        } else {
-          console.error('Failed to increment visitor count:', response.status);
-          // Fallback to getting current count
-          const getResponse = await fetch(`${CLOUDFLARE_API}/count`);
-          if (getResponse.ok) {
-            const data = await getResponse.json();
-            if (data.count !== undefined) {
-              updateVisitorCount(data.count);
+        // Try each URL until one works
+        let success = false;
+        for (const CLOUDFLARE_API of WORKER_URLS) {
+          try {
+            // Increment the visitor count
+            const response = await fetch(`${CLOUDFLARE_API}/increment`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.count !== undefined) {
+                updateVisitorCount(data.count);
+                console.log(`✅ Cloudflare visitor count: ${data.count} from ${CLOUDFLARE_API}`);
+                success = true;
+                break;
+              }
             }
+          } catch (err) {
+            console.log(`Failed to connect to ${CLOUDFLARE_API}:`, err.message);
           }
+        }
+        
+        if (!success) {
+          console.warn('Could not connect to any Cloudflare Worker URL');
+          // Use Railway backend as fallback for visitor counting
+          useRailwayVisitorCounter();
         }
       } catch (error) {
         console.error('Error connecting to Cloudflare visitor counter:', error);
         // Continue with the app even if visitor counter fails
+        useRailwayVisitorCounter();
+      }
+    }
+    
+    // Fallback visitor counter using Railway backend
+    async function useRailwayVisitorCounter() {
+      try {
+        // Use the Railway backend to store visitor count
+        if (socket && socket.connected) {
+          socket.emit('visitor-increment', { visitorId: localStorage.getItem('visitorId') });
+          socket.on('visitor-count', (data) => {
+            if (data.count !== undefined) {
+              updateVisitorCount(data.count);
+              console.log(`✅ Railway visitor count: ${data.count}`);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('Error with Railway visitor counter:', error);
       }
     }
     

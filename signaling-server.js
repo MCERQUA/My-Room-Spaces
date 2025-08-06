@@ -564,6 +564,30 @@ io.on('connection', async (socket) => {
     saveWorldState();
   });
 
+  // ===== VISITOR COUNTER =====
+  socket.on('visitor-increment', async (data) => {
+    const visitorId = data.visitorId || socket.id;
+    const visitorData = await recordVisitor(visitorId);
+    
+    if (visitorData) {
+      // Send the visitor count back to the requesting client
+      socket.emit('visitor-count', { 
+        count: visitorData.visitorCount,
+        isNewVisitor: visitorData.isNewVisitor
+      });
+      
+      // If it's a new visitor, broadcast to all clients
+      if (visitorData.isNewVisitor) {
+        io.emit('visitor-count-update', { 
+          visitorCount: visitorData.visitorCount,
+          spaceName: worldState.spaceName 
+        });
+      }
+      
+      console.log(`📊 Visitor count requested by ${socket.id}: ${visitorData.visitorCount}`);
+    }
+  });
+  
   // ===== DISCONNECT HANDLING =====
   socket.on('disconnect', () => {
     console.log(`👋 User disconnected: ${socket.id}`);

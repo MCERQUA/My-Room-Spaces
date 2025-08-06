@@ -2426,6 +2426,12 @@
         console.log(`🔗 Establishing P2P connections with ${userAvatars.size} users for screen sharing`);
         
         Array.from(userAvatars.keys()).forEach(userId => {
+          // Skip self - don't create P2P connection to ourselves
+          if (userId === socket.id) {
+            console.log(`⏭️ Skipping self connection for ${userId}`);
+            return;
+          }
+          
           console.log(`🔗 Connecting to user ${userId} for screen sharing`);
           
           if (peers[userId]) {

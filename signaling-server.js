@@ -25,7 +25,8 @@ app.use(express.json());
 // Environment configuration
 const SPACE_NAME = process.env.SPACE_NAME || 'main-world';
 
-// Database setup for persistent visitor tracking
+// Database setup for persistent visitor tracking (Disabled)
+/*
 const DB_DIR = process.env.DB_DIR || './data';
 const DB_PATH = path.join(DB_DIR, 'visitors.db');
 
@@ -83,6 +84,7 @@ db.serialize(() => {
     else console.log(`✅ Space "${SPACE_NAME}" initialized`);
   });
 });
+*/
 
 // ===== PERSISTENT WORLD STATE =====
 const worldState = {
@@ -94,11 +96,12 @@ const worldState = {
     lighting: { ambient: 0.3, directional: 0.8 },
     environment: 'room1'
   },
-  visitorCount: 0,        // Total unique visitors (will be fetched from Cloudflare)
+  // visitorCount: 0,        // Total unique visitors (Disabled)
   spaceName: SPACE_NAME   // The name of this space
 };
 
-// Database functions for persistent visitor tracking
+// Database functions for persistent visitor tracking (Disabled)
+/*
 const getVisitorCount = () => {
   return new Promise((resolve, reject) => {
     db.get(
@@ -184,6 +187,7 @@ const recordVisitor = (visitorId) => {
     );
   });
 };
+*/
 
 // Space initialization is handled by the database setup above
 
@@ -211,7 +215,7 @@ app.get('/api/world-state', (req, res) => {
     chatHistory: worldState.chatHistory.slice(-10),
     roomSettings: worldState.roomSettings,
     activeUsers: worldState.users.size,
-    visitorCount: worldState.visitorCount
+    // visitorCount: worldState.visitorCount // Disabled
   });
 });
 
@@ -229,7 +233,8 @@ app.get('/api/objects', (req, res) => {
   });
 });
 
-// Get visitor statistics from database
+// Get visitor statistics from database (Disabled)
+/*
 app.get('/api/visitor-stats', async (req, res) => {
   try {
     const stats = await new Promise((resolve, reject) => {
@@ -271,6 +276,7 @@ app.get('/api/visitor-stats', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch visitor statistics' });
   }
 });
+*/
 
 // Health check endpoint
 app.get('/', (req, res) => {
@@ -281,7 +287,7 @@ app.get('/', (req, res) => {
       objects: worldState.objects.size,
       sharedScreen: !!worldState.sharedScreen,
       chatMessages: worldState.chatHistory.length,
-      visitorCount: worldState.visitorCount
+      // visitorCount: worldState.visitorCount // Disabled
     },
     timestamp: new Date().toISOString(),
     uptime: process.uptime()
@@ -291,7 +297,8 @@ app.get('/', (req, res) => {
 io.on('connection', async (socket) => {
   console.log('👥 User connected:', socket.id);
 
-  // Track unique visitor with Cloudflare Worker
+  // Track unique visitor with Cloudflare Worker (Disabled)
+  /*
   const visitorData = await recordVisitor(socket.id);
   if (visitorData) {
     worldState.visitorCount = visitorData.visitorCount;
@@ -306,6 +313,7 @@ io.on('connection', async (socket) => {
       console.log(`🎉 New visitor to space ${SPACE_NAME}! Total visitors: ${worldState.visitorCount}`);
     }
   }
+  */
 
   // Send current world state to new user
   socket.emit('world-state', {
@@ -314,7 +322,7 @@ io.on('connection', async (socket) => {
     sharedScreen: worldState.sharedScreen,
     chatHistory: worldState.chatHistory.slice(-10), // Last 10 messages
     roomSettings: worldState.roomSettings,
-    visitorCount: worldState.visitorCount,
+    // visitorCount: worldState.visitorCount // Disabled,
     spaceName: worldState.spaceName
   });
 
@@ -564,7 +572,8 @@ io.on('connection', async (socket) => {
     saveWorldState();
   });
 
-  // ===== VISITOR COUNTER =====
+  // ===== VISITOR COUNTER (Disabled) =====
+  /*
   socket.on('visitor-increment', async (data) => {
     const visitorId = data.visitorId || socket.id;
     const visitorData = await recordVisitor(visitorId);
@@ -587,6 +596,7 @@ io.on('connection', async (socket) => {
       console.log(`📊 Visitor count requested by ${socket.id}: ${visitorData.visitorCount}`);
     }
   });
+  */
   
   // ===== DISCONNECT HANDLING =====
   socket.on('disconnect', () => {
@@ -652,15 +662,15 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-// Initialize server and load visitor stats
+// Initialize server (visitor stats disabled)
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, async () => {
   console.log(`\n🌍 3D World Server running on port ${PORT}`);
   console.log(`Health check: http://localhost:${PORT}/`);
   console.log(`Space name: ${SPACE_NAME}`);
-  console.log(`Database: ${DB_PATH}`);
+  // console.log(`Database: ${DB_PATH}`); // Disabled
   
-  // Load visitor statistics and world state from database
+  // Load world state from database (visitor statistics disabled)
   await loadWorldState();
 });
 

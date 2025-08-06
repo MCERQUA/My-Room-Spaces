@@ -1006,13 +1006,13 @@
     </button>
   </div>
   
-  <!-- Visitor Counter -->
-  <div class="visitor-counter" id="visitor-counter">
+  <!-- Visitor Counter (Disabled) -->
+  <!-- <div class="visitor-counter" id="visitor-counter">
     <div class="visitor-count">
       <span class="visitor-count-number" id="visitor-count-number">0</span>
       <span>visitors</span>
     </div>
-  </div>
+  </div> -->
   
   <div class="screen-controls" id="screen-controls" style="display: none;">
     <h3>🖥️ Screen Controls</h3>
@@ -1616,7 +1616,8 @@
       }
     }
     
-    // Visitor count display
+    // Visitor count display (Disabled)
+    /*
     function updateVisitorCount(count) {
       const visitorCountElement = document.getElementById('visitor-count-number');
       if (visitorCountElement) {
@@ -1625,8 +1626,10 @@
         visitorCountElement.textContent = formattedCount;
       }
     }
+    */
     
-    // Initialize Cloudflare visitor counter
+    // Initialize Cloudflare visitor counter (Disabled)
+    /*
     async function initializeCloudflareVisitorCounter() {
       try {
         // Try multiple possible worker URLs
@@ -1680,8 +1683,10 @@
         useRailwayVisitorCounter();
       }
     }
+    */
     
-    // Fallback visitor counter using Railway backend
+    // Fallback visitor counter using Railway backend (Disabled)
+    /*
     async function useRailwayVisitorCounter() {
       try {
         // Use the Railway backend to store visitor count
@@ -1698,6 +1703,7 @@
         console.error('Error with Railway visitor counter:', error);
       }
     }
+    */
     
     // Space name display
     function updateSpaceName(spaceName) {
@@ -3827,8 +3833,8 @@
     // Show welcome dialog first, then initialize room system
     showWelcomeDialog();
     
-    // Initialize Cloudflare visitor counter immediately (separate from Socket.IO)
-    initializeCloudflareVisitorCounter();
+    // Initialize Cloudflare visitor counter immediately (Disabled)
+    // initializeCloudflareVisitorCounter();
     
     // Note: Auto-loading current frame removed - using P2P WebRTC instead
 

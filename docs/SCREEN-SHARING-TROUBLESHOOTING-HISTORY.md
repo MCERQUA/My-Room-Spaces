@@ -100,13 +100,21 @@ This document chronicles all attempts to fix the screen sharing feature that bro
 - **Result**: Logic fixed but ICE connection still fails with same 2x2 pixel issue
 
 ### Fix Attempt #8: Revert to EXACT Working SimplePeer Config
-- **Status**: 🔄 Current attempt
+- **Status**: ❌ Still failing with same issue
 - **What changed**:
   - Removed ALL ICE server configuration
   - Set `trickle: false` (as in working version)
   - Removed STUN/TURN servers completely
   - Exact match to commit `01b5adf` SimplePeer setup
-- **Rationale**: The working version had NO ICE configuration at all
+- **Result**: ICE connection still fails (checking → disconnected → failed)
+
+### Fix Attempt #9: Always Recreate Connections for Screen Sharing
+- **Status**: 🔄 Current attempt
+- **What changed**:
+  - Always destroy and recreate P2P connections when screen sharing starts
+  - Removed `addStream()` usage entirely
+  - Ensures stream is included from connection creation
+- **Rationale**: `addStream()` may not work properly with SimplePeer when trickle:false
 
 ## Key Findings
 

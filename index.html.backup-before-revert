@@ -2233,7 +2233,18 @@
       const peer = new SimplePeer({
         initiator: initiator,
         trickle: false,
-        stream: currentStream || undefined // Share current stream if available
+        stream: currentStream || undefined, // Share current stream if available
+        config: {
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' }
+          ]
+        },
+        offerOptions: {
+          offerToReceiveVideo: true,
+          offerToReceiveAudio: true
+        }
       });
       
       peers[userId] = peer;
@@ -2330,47 +2341,80 @@
       console.log(`🖥️ *** DISPLAYING SHARED STREAM ***`);
       console.log(`📺 Stream details: active=${stream.active}, tracks=${stream.getTracks().length}`);
       
+      // Remove any existing video element
+      const existingVideo = document.getElementById('remote-screen-video');
+      if (existingVideo) {
+        existingVideo.remove();
+      }
+      
       const videoEl = document.createElement('video');
+      videoEl.id = 'remote-screen-video';
       videoEl.srcObject = stream;
       videoEl.autoplay = true;
-      videoEl.controls = true;
+      videoEl.muted = false; // Allow audio playback
+      videoEl.playsInline = true;
       videoEl.volume = 1.0; // Full volume
       videoEl.style.display = 'none';
       document.body.appendChild(videoEl);
       
       console.log(`📺 Created video element, autoplay=${videoEl.autoplay}`);
       
+      // Store reference for cleanup
+      window.remoteVideoElement = videoEl;
+      
       function updateScreenFromPeer() {
         if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
-          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
-          largeScreen.texture.needsUpdate = true;
-          // Only log occasionally to avoid spam
-          if (Math.random() < 0.01) {
-            console.log(`🎬 Updating screen texture from P2P video (${videoEl.videoWidth}x${videoEl.videoHeight})`);
+          
+          // Clear canvas first
+          ctx.clearRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          
+          // Draw video to fit canvas
+          if (videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+            ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+            largeScreen.texture.needsUpdate = true;
+            
+            // Only log occasionally to avoid spam
+            if (Math.random() < 0.01) {
+              console.log(`🎬 Updating screen texture from P2P video (${videoEl.videoWidth}x${videoEl.videoHeight})`);
+            }
           }
-        } else {
-          console.log(`⏸️ Video not ready: readyState=${videoEl.readyState}, hasScreen=${!!largeScreen}`);
         }
         
-        if (stream.active) {
+        if (stream.active && !videoEl.paused) {
           requestAnimationFrame(updateScreenFromPeer);
         } else {
-          console.log(`🛑 P2P stream no longer active, stopping updates`);
+          console.log(`🛑 P2P stream stopped: active=${stream.active}, paused=${videoEl.paused}`);
         }
       }
       
-      videoEl.addEventListener('loadeddata', () => {
-        console.log(`📹 Video loadeddata event: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
-        updateScreenFromPeer();
-      });
+      // Ensure video plays
+      const playVideo = async () => {
+        try {
+          await videoEl.play();
+          console.log(`▶️ Video playing successfully`);
+          updateScreenFromPeer();
+        } catch (err) {
+          console.error('Failed to play video:', err);
+          // Retry with muted if autoplay policy blocks it
+          videoEl.muted = true;
+          try {
+            await videoEl.play();
+            console.log(`▶️ Video playing (muted due to autoplay policy)`);
+            updateScreenFromPeer();
+          } catch (err2) {
+            console.error('Failed to play video even when muted:', err2);
+          }
+        }
+      };
       
       videoEl.addEventListener('loadedmetadata', () => {
         console.log(`📹 Video metadata loaded: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
+        playVideo();
       });
       
       videoEl.addEventListener('canplay', () => {
-        console.log(`📹 Video can play`);
+        console.log(`📹 Video can play: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
       });
       
       videoEl.addEventListener('error', (e) => {
@@ -2383,16 +2427,36 @@
     async function startScreenShare() {
       try {
         const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
-          audio: true
+          video: { 
+            width: { ideal: 1920, max: 1920 }, 
+            height: { ideal: 1080, max: 1080 },
+            frameRate: { ideal: 30, max: 60 }
+          },
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 44100
+          }
         });
         
         currentStream = stream;
+        
+        // Validate stream
+        console.log(`📺 Got screen share stream: ${stream.id}`);
+        console.log(`📺 Video tracks: ${stream.getVideoTracks().length}`);
+        console.log(`📺 Audio tracks: ${stream.getAudioTracks().length}`);
+        
         const videoEl = document.getElementById('video-element');
         videoEl.srcObject = stream;
         videoEl.muted = false; // Ensure screen sharing audio is not muted
         videoEl.volume = 1.0; // Set volume to maximum
-        videoEl.play();
+        
+        // Force play
+        videoEl.play().catch(err => {
+          console.warn('Autoplay failed, trying muted:', err);
+          videoEl.muted = true;
+          videoEl.play();
+        });
         
         function updateScreenTexture() {
           if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
@@ -2406,7 +2470,11 @@
           }
         }
         
-        videoEl.addEventListener('loadeddata', () => updateScreenTexture());
+        videoEl.addEventListener('loadeddata', () => {
+          console.log(`📺 Screen share video loaded: ${videoEl.videoWidth}x${videoEl.videoHeight}`);
+          updateScreenTexture();
+        });
+        
         stream.getVideoTracks()[0].addEventListener('ended', () => stopScreenShare());
         
         // ===== SERVER-MEDIATED SCREEN SHARING =====
@@ -2422,28 +2490,28 @@
         // ===== WEBRTC P2P FOR ACTUAL VIDEO STREAMING =====
         isScreenSharing = true;
         
-        // Connect to ALL users in the room for direct video streaming
-        console.log(`🔗 Establishing P2P connections with ${userAvatars.size} users for screen sharing`);
-        
-        Array.from(userAvatars.keys()).forEach(userId => {
-          console.log(`🔗 Connecting to user ${userId} for screen sharing`);
+        // Small delay to ensure stream is fully initialized
+        setTimeout(() => {
+          // Connect to ALL users in the room for direct video streaming
+          console.log(`🔗 Establishing P2P connections with ${userAvatars.size} users for screen sharing`);
+          console.log(`🔗 Current stream active: ${currentStream.active}, video tracks: ${currentStream.getVideoTracks().length}`);
           
-          if (peers[userId]) {
-            try {
-              peers[userId].addStream(stream);
-              console.log(`✅ Added screen stream to existing peer ${userId}`);
-            } catch (error) {
-              console.log(`⚠️ Recreating connection with ${userId} for screen share`);
+          // Destroy existing peers and recreate with stream
+          Array.from(userAvatars.keys()).forEach(userId => {
+            console.log(`🔗 Connecting to user ${userId} for screen sharing`);
+            
+            // Always recreate peer connection with stream for screen sharing
+            if (peers[userId]) {
+              console.log(`🔄 Destroying existing peer connection with ${userId}`);
               peers[userId].destroy();
               delete peers[userId];
-              connectToPeer(userId, true); // Recreate with new stream
             }
-          } else {
-            // Create new P2P connection with this user
-            console.log(`🆕 Creating new P2P connection with ${userId}`);
+            
+            // Create new P2P connection with the stream
+            console.log(`🆕 Creating new P2P connection with ${userId} for screen sharing`);
             connectToPeer(userId, true); // We're the initiator (screen sharer)
-          }
-        });
+          });
+        }, 100);
         
         // For users who join later, they'll connect via the screen-share-started event
         

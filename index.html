@@ -2232,16 +2232,31 @@
       
       const peer = new SimplePeer({
         initiator: initiator,
-        trickle: false,
+        trickle: true, // Enable trickle ICE for better connectivity
         stream: currentStream || undefined, // Share current stream if available
         config: {
           iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' }
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' }
           ]
         }
       });
       
       peers[userId] = peer;
+      
+      // Monitor ICE connection state
+      if (peer._pc) {
+        peer._pc.oniceconnectionstatechange = () => {
+          console.log(`🧊 ICE connection state with ${userId}: ${peer._pc.iceConnectionState}`);
+          if (peer._pc.iceConnectionState === 'failed') {
+            console.error(`❌ ICE connection failed with ${userId}. This might be a firewall/NAT issue.`);
+          }
+        };
+        
+        peer._pc.onconnectionstatechange = () => {
+          console.log(`🔗 Connection state with ${userId}: ${peer._pc.connectionState}`);
+        };
+      }
       
       peer.on('signal', (data) => {
         console.log(`📤 *** SENDING WEBRTC SIGNAL TO ${userId} ***`);
@@ -2291,10 +2306,12 @@
       });
       
       peer.on('error', (err) => {
-        console.error('Peer error:', err);
+        console.error(`❌ Peer error with ${userId}:`, err);
+        console.error('Error details:', err.message);
       });
       
       peer.on('close', () => {
+        console.log(`🔌 Peer connection closed with ${userId}`);
         delete peers[userId];
       });
       

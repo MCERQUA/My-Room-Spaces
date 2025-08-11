@@ -1167,6 +1167,86 @@
 
     // Enhanced mobile detection - define FIRST
     const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Mobile texture optimization utilities
+    function getMobileTextureSettings() {
+      const testRenderer = new THREE.WebGLRenderer();
+      const gl = testRenderer.getContext();
+      const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      testRenderer.dispose();
+      
+      // Detect iOS specifically as it has unique texture issues
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      const isMobileSafari = isIOS && /Version\/[\d\.]+.*Safari/.test(navigator.userAgent);
+      
+      console.log('📱 Mobile texture settings:', {
+        maxTextureSize,
+        isIOS,
+        isAndroid,
+        isMobileSafari,
+        userAgent: navigator.userAgent
+      });
+      
+      return {
+        maxTextureSize,
+        isIOS,
+        isAndroid,
+        isMobileSafari
+      };
+    }
+    
+    const mobileSettings = getMobileTextureSettings();
+    
+    // Helper to get optimal canvas size for mobile
+    function getOptimalCanvasSize(desiredWidth, desiredHeight, isMobile) {
+      if (!isMobile) {
+        // Desktop: use square power-of-2 dimensions  
+        return { width: 2048, height: 2048 };
+      }
+      
+      // Mobile: use smaller square power-of-2 dimensions
+      const maxSize = Math.min(mobileSettings.maxTextureSize, 1024);
+      
+      // Square power-of-2 dimensions for maximum compatibility
+      let size = 512;  // Default mobile size
+      
+      if (maxSize >= 1024) {
+        size = 1024;  // Larger devices can handle 1024x1024
+      } else if (maxSize < 512) {
+        size = 256;  // Very low-end devices
+      }
+      
+      console.log(`📐 Optimal canvas size for mobile: ${size}x${size} (square)`);
+      return { width: size, height: size };
+    }
+    
+    // Helper to configure texture for mobile compatibility
+    function configureMobileTexture(texture) {
+      // Critical for non-power-of-2 textures on mobile
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.generateMipmaps = false;
+      
+      // Ensure proper color space
+      texture.colorSpace = THREE.SRGBColorSpace;
+      
+      // Additional mobile-specific settings
+      texture.anisotropy = 1;  // Disable anisotropic filtering on mobile
+      texture.format = THREE.RGBAFormat;  // Ensure RGBA format
+      texture.type = THREE.UnsignedByteType;  // Standard type for mobile
+      
+      texture.needsUpdate = true;
+      
+      console.log('✅ Configured texture for mobile compatibility');
+      return texture;
+    }
+    
+    // Create texture loader with CORS support for future use
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.crossOrigin = 'anonymous';  // Enable CORS for external textures
 
     // Scene setup
     const scene = new THREE.Scene();
@@ -1247,6 +1327,7 @@
     
     renderer.setSize(actualWidth, actualHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Research-backed pixel ratio handling
+    console.log(`🖥️ Renderer pixel ratio: ${Math.min(window.devicePixelRatio, 2)} (device: ${window.devicePixelRatio})`);
     
     // Essential renderer settings based on mobile compatibility research
     renderer.outputColorSpace = THREE.SRGBColorSpace; // Use standard sRGB, not Linear
@@ -1400,40 +1481,54 @@
     // Create canvas texture for screen content - mobile-optimized sizes
     function createScreenTexture() {
       const canvas = document.createElement('canvas');
-      // Use much smaller textures on mobile to avoid GPU memory issues
-      if (isMobile) {
-        canvas.width = 512;  // Much smaller for mobile
-        canvas.height = 288; // Maintain 16:9 ratio
-      } else {
-        canvas.width = 1920;
-        canvas.height = 1080;
-      }
+      // Use power-of-2 dimensions optimized for each platform
+      const canvasSize = getOptimalCanvasSize(1920, 1080, isMobile);
+      canvas.width = canvasSize.width;
+      canvas.height = canvasSize.height;
+      
+      console.log(`📐 Large screen canvas: ${canvas.width}x${canvas.height} (mobile: ${isMobile})`)
       const ctx = canvas.getContext('2d');
       
-      ctx.fillStyle = '#001122';
+      // Clear with black for letterboxing
+      ctx.fillStyle = '#000000';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#00ff00';
       
-      // Scale font sizes based on canvas size for mobile compatibility
+      // Calculate 16:9 content area within square canvas
+      const contentHeight = canvas.width * 9 / 16;
+      const contentY = (canvas.height - contentHeight) / 2;
+      
+      // Draw content background in 16:9 area
+      ctx.fillStyle = '#001122';
+      ctx.fillRect(0, contentY, canvas.width, contentHeight);
+      
+      // Draw text content centered in 16:9 area
+      ctx.fillStyle = '#00ff00';
       const scale = canvas.width / 1920; // Scale relative to desktop size
       
       ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText('LARGE DISPLAY SCREEN', canvas.width/2, canvas.height/2 - Math.floor(80 * scale));
+      const centerY = canvas.height / 2;
+      ctx.fillText('LARGE DISPLAY SCREEN', canvas.width/2, centerY - Math.floor(80 * scale));
       ctx.font = `bold ${Math.floor(48 * scale)}px Arial`;
-      ctx.fillText('Ready for Screen Sharing or Video', canvas.width/2, canvas.height/2 + Math.floor(10 * scale));
+      ctx.fillText('Ready for Screen Sharing or Video', canvas.width/2, centerY + Math.floor(10 * scale));
       ctx.font = `${Math.floor(32 * scale)}px Arial`;
-      ctx.fillText('Use controls to share desktop or load video', canvas.width/2, canvas.height/2 + Math.floor(80 * scale));
+      ctx.fillText('Use controls to share desktop or load video', canvas.width/2, centerY + Math.floor(80 * scale));
       
       const texture = new THREE.CanvasTexture(canvas);
-      texture.needsUpdate = true;
       
-      // Fix upside down texture orientation
-      texture.flipY = false;
-      
-      // Fix mirrored/reversed texture (flip horizontally)
-      texture.wrapS = THREE.RepeatWrapping;
-      texture.repeat.x = -1;
+      // Configure texture for mobile compatibility
+      if (isMobile || mobileSettings.isIOS || mobileSettings.isAndroid) {
+        configureMobileTexture(texture);
+        // Mobile devices handle flipY differently
+        texture.flipY = true;
+        console.log('📱 Applied mobile texture settings to large screen');
+      } else {
+        // Desktop settings
+        texture.flipY = false;
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.repeat.x = -1;
+        texture.needsUpdate = true;
+      }
       texture.offset.x = 1;
       
       return { texture: texture, canvas: canvas };
@@ -1462,9 +1557,13 @@
             if (child.material && isMobile) {
               // Fix texture loading on mobile - preserve original textures
               if (child.material.map) {
-                // Ensure texture uses correct color space
-                child.material.map.colorSpace = THREE.SRGBColorSpace;
-                child.material.map.needsUpdate = true;
+                // Configure texture for mobile compatibility
+                if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+                  configureMobileTexture(child.material.map);
+                } else {
+                  child.material.map.colorSpace = THREE.SRGBColorSpace;
+                  child.material.map.needsUpdate = true;
+                }
               }
               
               // Only replace material if it's causing issues
@@ -1573,11 +1672,20 @@
       const screenGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
       const screenMaterial = new THREE.MeshBasicMaterial({ 
         map: screenTexture.texture,
-        transparent: false
+        transparent: false,
+        side: THREE.DoubleSide  // Ensure visibility from both sides
       });
       
-      // Ensure texture color space is correct
-      screenTexture.texture.colorSpace = THREE.SRGBColorSpace;
+      // Ensure texture is properly configured for mobile
+      if (isMobile || mobileSettings.isIOS || mobileSettings.isAndroid) {
+        // Mobile devices need specific texture settings
+        screenMaterial.map.minFilter = THREE.LinearFilter;
+        screenMaterial.map.magFilter = THREE.LinearFilter;
+        console.log('📱 Applied mobile-specific screen material settings');
+      } else {
+        // Desktop can use default settings
+        screenTexture.texture.colorSpace = THREE.SRGBColorSpace;
+      }
       
       const displayScreen = new THREE.Mesh(screenGeometry, screenMaterial);
       displayScreen.position.set(0, 4.5, -10);
@@ -2404,7 +2512,16 @@
       function updateScreenFromPeer() {
         if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
-          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          
+          // Clear with black for letterboxing
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          
+          // Draw video in 16:9 aspect ratio within square canvas
+          const contentHeight = largeScreen.canvas.width * 9 / 16;
+          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
+          ctx.drawImage(videoEl, 0, contentY, largeScreen.canvas.width, contentHeight);
+          
           largeScreen.texture.needsUpdate = true;
           // Only log occasionally to avoid spam
           if (Math.random() < 0.01) {
@@ -2559,7 +2676,16 @@
       function updateVideoTexture() {
         if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
-          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          
+          // Clear with black for letterboxing
+          ctx.fillStyle = '#000000';
+          ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+          
+          // Draw video in 16:9 aspect ratio within square canvas
+          const contentHeight = largeScreen.canvas.width * 9 / 16;
+          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
+          ctx.drawImage(videoEl, 0, contentY, largeScreen.canvas.width, contentHeight);
+          
           largeScreen.texture.needsUpdate = true;
         }
         
@@ -2574,16 +2700,25 @@
         // Create MediaStream from video element for WebRTC sharing
         if (socket && socket.connected) {
           try {
-            // Create canvas for video stream
+            // Create canvas for video stream with optimal dimensions
             const canvas = document.createElement('canvas');
-            canvas.width = 1920;
-            canvas.height = 1080;
+            const videoCanvasSize = getOptimalCanvasSize(1920, 1080, isMobileEarly);
+            canvas.width = videoCanvasSize.width;
+            canvas.height = videoCanvasSize.height;
+            console.log(`\ud83c\udfa5 Video canvas: ${canvas.width}x${canvas.height}`);
             const ctx = canvas.getContext('2d');
             
             // Function to draw video to canvas
             function drawVideoToCanvas() {
               if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
-                ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                // Clear with black for letterboxing
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw video in 16:9 aspect ratio within square canvas
+                const contentHeight = canvas.width * 9 / 16;
+                const contentY = (canvas.height - contentHeight) / 2;
+                ctx.drawImage(videoEl, 0, contentY, canvas.width, contentHeight);
               }
               if (currentVideo && !videoEl.paused) {
                 requestAnimationFrame(drawVideoToCanvas);
@@ -2701,20 +2836,31 @@
       }
       
       const ctx = largeScreen.canvas.getContext('2d');
-      ctx.fillStyle = '#001122';
-      ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
-      ctx.fillStyle = '#00ff00';
       
-      // Scale font sizes based on canvas size for mobile compatibility
+      // Clear with black for letterboxing
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
+      
+      // Calculate 16:9 content area within square canvas
+      const contentHeight = largeScreen.canvas.width * 9 / 16;
+      const contentY = (largeScreen.canvas.height - contentHeight) / 2;
+      
+      // Draw content background in 16:9 area
+      ctx.fillStyle = '#001122';
+      ctx.fillRect(0, contentY, largeScreen.canvas.width, contentHeight);
+      
+      // Draw text content centered in 16:9 area
+      ctx.fillStyle = '#00ff00';
       const scale = largeScreen.canvas.width / 1920; // Scale relative to desktop size
       
       ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
       ctx.textAlign = 'center';
-      ctx.fillText('LARGE DISPLAY SCREEN', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - Math.floor(80 * scale));
+      const centerY = largeScreen.canvas.height / 2;
+      ctx.fillText('LARGE DISPLAY SCREEN', largeScreen.canvas.width/2, centerY - Math.floor(80 * scale));
       ctx.font = `bold ${Math.floor(48 * scale)}px Arial`;
-      ctx.fillText('Ready for Screen Sharing or Video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + Math.floor(10 * scale));
+      ctx.fillText('Ready for Screen Sharing or Video', largeScreen.canvas.width/2, centerY + Math.floor(10 * scale));
       ctx.font = `${Math.floor(32 * scale)}px Arial`;
-      ctx.fillText('Use controls to share desktop or load video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + Math.floor(80 * scale));
+      ctx.fillText('Use controls to share desktop or load video', largeScreen.canvas.width/2, centerY + Math.floor(80 * scale));
       
       largeScreen.texture.needsUpdate = true;
     }
@@ -3057,18 +3203,29 @@
       // Add name label
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d');
-      canvas.width = 256;
-      canvas.height = 64;
-      context.font = '24px Arial';
+      canvas.width = 256;  // Square power-of-2
+      canvas.height = 256; // Square power-of-2
+      
+      // Clear canvas
+      context.fillStyle = 'rgba(0,0,0,0)';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Draw text centered in the square canvas
+      context.font = '32px Arial';
       context.fillStyle = 'white';
       context.textAlign = 'center';
-      context.fillText(avatar.username, 128, 40);
+      context.textBaseline = 'middle';
+      context.fillText(avatar.username, 128, 128);
       
       const labelTexture = new THREE.CanvasTexture(canvas);
+      // Configure for mobile if needed
+      if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+        configureMobileTexture(labelTexture);
+      }
       const labelMaterial = new THREE.SpriteMaterial({ map: labelTexture });
       const labelSprite = new THREE.Sprite(labelMaterial);
       labelSprite.position.set(0, 0.8, 0);
-      labelSprite.scale.set(1, 0.25, 1);
+      labelSprite.scale.set(1, 1, 1); // Square aspect ratio
       
       avatarGroup.add(labelSprite);
       scene.add(avatarGroup);
@@ -3119,14 +3276,25 @@
         // Update the canvas texture with new name
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
-        canvas.width = 256;
-        canvas.height = 64;
-        context.font = '24px Arial';
+        canvas.width = 256;  // Square power-of-2
+        canvas.height = 256; // Square power-of-2
+        
+        // Clear canvas
+        context.fillStyle = 'rgba(0,0,0,0)';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw text centered in the square canvas
+        context.font = '32px Arial';
         context.fillStyle = 'white';
         context.textAlign = 'center';
-        context.fillText(newName, 128, 40);
+        context.textBaseline = 'middle';
+        context.fillText(newName, 128, 128);
         
         const labelTexture = new THREE.CanvasTexture(canvas);
+        // Configure for mobile if needed
+        if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+          configureMobileTexture(labelTexture);
+        }
         avatar.label.material.map = labelTexture;
         avatar.label.material.needsUpdate = true;
         
@@ -3145,19 +3313,28 @@
         if (screenObject && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
           
-          // Clear screen and show "Remote Sharing" message
-          ctx.fillStyle = '#001122';
+          // Clear with black for letterboxing
+          ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           
-          // Add sharing indicator text
+          // Calculate 16:9 content area within square canvas
+          const contentHeight = largeScreen.canvas.width * 9 / 16;
+          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
+          
+          // Draw content background in 16:9 area
+          ctx.fillStyle = '#001122';
+          ctx.fillRect(0, contentY, largeScreen.canvas.width, contentHeight);
+          
+          // Add sharing indicator text centered in 16:9 area
           ctx.fillStyle = '#00ff88';
           ctx.font = 'bold 64px Arial';
           ctx.textAlign = 'center';
+          const centerY = largeScreen.canvas.height / 2;
           
           if (data.isVideoFile) {
-            ctx.fillText('📹 VIDEO FILE SHARE', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
+            ctx.fillText('📹 VIDEO FILE SHARE', largeScreen.canvas.width/2, centerY - 50);
           } else {
-            ctx.fillText('🖥️ REMOTE SCREEN SHARE', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
+            ctx.fillText('🖥️ REMOTE SCREEN SHARE', largeScreen.canvas.width/2, centerY - 50);
           }
           
           ctx.fillStyle = '#ffffff';
@@ -3166,18 +3343,18 @@
           // Get username from userAvatars
           const sharingUser = userAvatars.get(data.userId);
           const username = sharingUser ? sharingUser.username : `User${data.userId.substr(0,4)}`;
-          ctx.fillText(`Shared by: ${username}`, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 20);
+          ctx.fillText(`Shared by: ${username}`, largeScreen.canvas.width/2, centerY + 20);
           
           if (data.fileName) {
             ctx.font = '28px Arial';
             ctx.fillStyle = '#ffcc00';
-            ctx.fillText(`File: ${data.fileName}`, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 60);
+            ctx.fillText(`File: ${data.fileName}`, largeScreen.canvas.width/2, centerY + 60);
           }
           
           ctx.font = '24px Arial';
           ctx.fillStyle = '#888888';
           const audioText = data.hasAudio ? '🔊 Audio enabled' : '🔇 No audio';
-          ctx.fillText(audioText, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 100);
+          ctx.fillText(audioText, largeScreen.canvas.width/2, centerY + 100);
           
           largeScreen.texture.needsUpdate = true;
           console.log('📺 Updated screen with remote sharing indicator');
@@ -3190,16 +3367,27 @@
         if (largeScreen && largeScreen.canvas) {
           // Reset screen to default content
           const ctx = largeScreen.canvas.getContext('2d');
+          
+          // Clear with black for letterboxing
           ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           
-          // Add default screen text
+          // Calculate 16:9 content area within square canvas
+          const contentHeight = largeScreen.canvas.width * 9 / 16;
+          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
+          
+          // Draw content background in 16:9 area
+          ctx.fillStyle = '#001122';
+          ctx.fillRect(0, contentY, largeScreen.canvas.width, contentHeight);
+          
+          // Add default screen text centered in 16:9 area
           ctx.fillStyle = '#333333';
           ctx.font = '48px Arial';
           ctx.textAlign = 'center';
-          ctx.fillText('🖥️ LARGE DISPLAY', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 20);
+          const centerY = largeScreen.canvas.height / 2;
+          ctx.fillText('🖥️ LARGE DISPLAY', largeScreen.canvas.width/2, centerY - 20);
           ctx.font = '24px Arial';
-          ctx.fillText('Ready for screen sharing or video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 20);
+          ctx.fillText('Ready for screen sharing or video', largeScreen.canvas.width/2, centerY + 20);
           
           largeScreen.texture.needsUpdate = true;
           console.log('📺 Cleared screen share and reset to default');

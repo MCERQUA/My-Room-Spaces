@@ -1489,30 +1489,21 @@
       console.log(`📐 Large screen canvas: ${canvas.width}x${canvas.height} (mobile: ${isMobile})`)
       const ctx = canvas.getContext('2d');
       
-      // Clear with black for letterboxing
-      ctx.fillStyle = '#000000';
+      // Fill background
+      ctx.fillStyle = '#001122';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       
-      // Calculate 16:9 content area within square canvas
-      const contentHeight = canvas.width * 9 / 16;
-      const contentY = (canvas.height - contentHeight) / 2;
-      
-      // Draw content background in 16:9 area
-      ctx.fillStyle = '#001122';
-      ctx.fillRect(0, contentY, canvas.width, contentHeight);
-      
-      // Draw text content centered in 16:9 area
+      // Draw text content
       ctx.fillStyle = '#00ff00';
       const scale = canvas.width / 1920; // Scale relative to desktop size
       
       ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
       ctx.textAlign = 'center';
-      const centerY = canvas.height / 2;
-      ctx.fillText('LARGE DISPLAY SCREEN', canvas.width/2, centerY - Math.floor(80 * scale));
+      ctx.fillText('LARGE DISPLAY SCREEN', canvas.width/2, canvas.height/2 - Math.floor(80 * scale));
       ctx.font = `bold ${Math.floor(48 * scale)}px Arial`;
-      ctx.fillText('Ready for Screen Sharing or Video', canvas.width/2, centerY + Math.floor(10 * scale));
+      ctx.fillText('Ready for Screen Sharing or Video', canvas.width/2, canvas.height/2 + Math.floor(10 * scale));
       ctx.font = `${Math.floor(32 * scale)}px Arial`;
-      ctx.fillText('Use controls to share desktop or load video', canvas.width/2, centerY + Math.floor(80 * scale));
+      ctx.fillText('Use controls to share desktop or load video', canvas.width/2, canvas.height/2 + Math.floor(80 * scale));
       
       const texture = new THREE.CanvasTexture(canvas);
       
@@ -1611,12 +1602,6 @@
         console.log('SHARESCREEN search complete. Found:', shareScreenObject ? 'YES' : 'NO');
         
         if (shareScreenObject) {
-          // Adjust screen geometry to be square to match our square texture
-          // The GLB model has a 16:9 screen, so we need to scale it to be square
-          const currentScale = shareScreenObject.scale.clone();
-          shareScreenObject.scale.y = currentScale.y * (16/9); // Make height match width aspect
-          console.log('Adjusted SHARESCREEN scale to square aspect ratio');
-          
           // Create screen texture
           const screenTexture = createScreenTexture();
           
@@ -1681,7 +1666,7 @@
     // Fallback screen creation if GLB fails to load
     function createFallbackScreen() {
       const screenWidth = 16;
-      const screenHeight = 16; // Make height same as width for square aspect
+      const screenHeight = 9; // 16:9 aspect ratio
       const screenTexture = createScreenTexture();
       
       const screenGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
@@ -1703,7 +1688,7 @@
       }
       
       const displayScreen = new THREE.Mesh(screenGeometry, screenMaterial);
-      displayScreen.position.set(0, 6, -10); // Adjusted Y position for square screen
+      displayScreen.position.set(0, 4.5, -10); // Original Y position
       displayScreen.rotation.y = 0;
       
       scene.add(displayScreen);
@@ -2527,16 +2512,7 @@
       function updateScreenFromPeer() {
         if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
-          
-          // Clear with black for letterboxing
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
-          
-          // Draw video in 16:9 aspect ratio within square canvas
-          const contentHeight = largeScreen.canvas.width * 9 / 16;
-          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
-          ctx.drawImage(videoEl, 0, contentY, largeScreen.canvas.width, contentHeight);
-          
+          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           largeScreen.texture.needsUpdate = true;
           // Only log occasionally to avoid spam
           if (Math.random() < 0.01) {
@@ -2691,16 +2667,7 @@
       function updateVideoTexture() {
         if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
-          
-          // Clear with black for letterboxing
-          ctx.fillStyle = '#000000';
-          ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
-          
-          // Draw video in 16:9 aspect ratio within square canvas
-          const contentHeight = largeScreen.canvas.width * 9 / 16;
-          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
-          ctx.drawImage(videoEl, 0, contentY, largeScreen.canvas.width, contentHeight);
-          
+          ctx.drawImage(videoEl, 0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           largeScreen.texture.needsUpdate = true;
         }
         
@@ -2726,14 +2693,7 @@
             // Function to draw video to canvas
             function drawVideoToCanvas() {
               if (videoEl.readyState >= videoEl.HAVE_CURRENT_DATA) {
-                // Clear with black for letterboxing
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                
-                // Draw video in 16:9 aspect ratio within square canvas
-                const contentHeight = canvas.width * 9 / 16;
-                const contentY = (canvas.height - contentHeight) / 2;
-                ctx.drawImage(videoEl, 0, contentY, canvas.width, contentHeight);
+                ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
               }
               if (currentVideo && !videoEl.paused) {
                 requestAnimationFrame(drawVideoToCanvas);
@@ -2852,30 +2812,21 @@
       
       const ctx = largeScreen.canvas.getContext('2d');
       
-      // Clear with black for letterboxing
-      ctx.fillStyle = '#000000';
+      // Fill background
+      ctx.fillStyle = '#001122';
       ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
       
-      // Calculate 16:9 content area within square canvas
-      const contentHeight = largeScreen.canvas.width * 9 / 16;
-      const contentY = (largeScreen.canvas.height - contentHeight) / 2;
-      
-      // Draw content background in 16:9 area
-      ctx.fillStyle = '#001122';
-      ctx.fillRect(0, contentY, largeScreen.canvas.width, contentHeight);
-      
-      // Draw text content centered in 16:9 area
+      // Draw text content
       ctx.fillStyle = '#00ff00';
       const scale = largeScreen.canvas.width / 1920; // Scale relative to desktop size
       
       ctx.font = `bold ${Math.floor(72 * scale)}px Arial`;
       ctx.textAlign = 'center';
-      const centerY = largeScreen.canvas.height / 2;
-      ctx.fillText('LARGE DISPLAY SCREEN', largeScreen.canvas.width/2, centerY - Math.floor(80 * scale));
+      ctx.fillText('LARGE DISPLAY SCREEN', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - Math.floor(80 * scale));
       ctx.font = `bold ${Math.floor(48 * scale)}px Arial`;
-      ctx.fillText('Ready for Screen Sharing or Video', largeScreen.canvas.width/2, centerY + Math.floor(10 * scale));
+      ctx.fillText('Ready for Screen Sharing or Video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + Math.floor(10 * scale));
       ctx.font = `${Math.floor(32 * scale)}px Arial`;
-      ctx.fillText('Use controls to share desktop or load video', largeScreen.canvas.width/2, centerY + Math.floor(80 * scale));
+      ctx.fillText('Use controls to share desktop or load video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + Math.floor(80 * scale));
       
       largeScreen.texture.needsUpdate = true;
     }
@@ -3328,28 +3279,19 @@
         if (screenObject && largeScreen && largeScreen.canvas) {
           const ctx = largeScreen.canvas.getContext('2d');
           
-          // Clear with black for letterboxing
-          ctx.fillStyle = '#000000';
+          // Clear screen and show "Remote Sharing" message
+          ctx.fillStyle = '#001122';
           ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           
-          // Calculate 16:9 content area within square canvas
-          const contentHeight = largeScreen.canvas.width * 9 / 16;
-          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
-          
-          // Draw content background in 16:9 area
-          ctx.fillStyle = '#001122';
-          ctx.fillRect(0, contentY, largeScreen.canvas.width, contentHeight);
-          
-          // Add sharing indicator text centered in 16:9 area
+          // Add sharing indicator text
           ctx.fillStyle = '#00ff88';
           ctx.font = 'bold 64px Arial';
           ctx.textAlign = 'center';
-          const centerY = largeScreen.canvas.height / 2;
           
           if (data.isVideoFile) {
-            ctx.fillText('📹 VIDEO FILE SHARE', largeScreen.canvas.width/2, centerY - 50);
+            ctx.fillText('📹 VIDEO FILE SHARE', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
           } else {
-            ctx.fillText('🖥️ REMOTE SCREEN SHARE', largeScreen.canvas.width/2, centerY - 50);
+            ctx.fillText('🖥️ REMOTE SCREEN SHARE', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 50);
           }
           
           ctx.fillStyle = '#ffffff';
@@ -3358,18 +3300,18 @@
           // Get username from userAvatars
           const sharingUser = userAvatars.get(data.userId);
           const username = sharingUser ? sharingUser.username : `User${data.userId.substr(0,4)}`;
-          ctx.fillText(`Shared by: ${username}`, largeScreen.canvas.width/2, centerY + 20);
+          ctx.fillText(`Shared by: ${username}`, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 20);
           
           if (data.fileName) {
             ctx.font = '28px Arial';
             ctx.fillStyle = '#ffcc00';
-            ctx.fillText(`File: ${data.fileName}`, largeScreen.canvas.width/2, centerY + 60);
+            ctx.fillText(`File: ${data.fileName}`, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 60);
           }
           
           ctx.font = '24px Arial';
           ctx.fillStyle = '#888888';
           const audioText = data.hasAudio ? '🔊 Audio enabled' : '🔇 No audio';
-          ctx.fillText(audioText, largeScreen.canvas.width/2, centerY + 100);
+          ctx.fillText(audioText, largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 100);
           
           largeScreen.texture.needsUpdate = true;
           console.log('📺 Updated screen with remote sharing indicator');
@@ -3382,27 +3324,16 @@
         if (largeScreen && largeScreen.canvas) {
           // Reset screen to default content
           const ctx = largeScreen.canvas.getContext('2d');
-          
-          // Clear with black for letterboxing
           ctx.fillStyle = '#000000';
           ctx.fillRect(0, 0, largeScreen.canvas.width, largeScreen.canvas.height);
           
-          // Calculate 16:9 content area within square canvas
-          const contentHeight = largeScreen.canvas.width * 9 / 16;
-          const contentY = (largeScreen.canvas.height - contentHeight) / 2;
-          
-          // Draw content background in 16:9 area
-          ctx.fillStyle = '#001122';
-          ctx.fillRect(0, contentY, largeScreen.canvas.width, contentHeight);
-          
-          // Add default screen text centered in 16:9 area
+          // Add default screen text
           ctx.fillStyle = '#333333';
           ctx.font = '48px Arial';
           ctx.textAlign = 'center';
-          const centerY = largeScreen.canvas.height / 2;
-          ctx.fillText('🖥️ LARGE DISPLAY', largeScreen.canvas.width/2, centerY - 20);
+          ctx.fillText('🖥️ LARGE DISPLAY', largeScreen.canvas.width/2, largeScreen.canvas.height/2 - 20);
           ctx.font = '24px Arial';
-          ctx.fillText('Ready for screen sharing or video', largeScreen.canvas.width/2, centerY + 20);
+          ctx.fillText('Ready for screen sharing or video', largeScreen.canvas.width/2, largeScreen.canvas.height/2 + 20);
           
           largeScreen.texture.needsUpdate = true;
           console.log('📺 Cleared screen share and reset to default');

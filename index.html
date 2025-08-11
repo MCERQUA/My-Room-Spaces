@@ -1602,6 +1602,12 @@
         console.log('SHARESCREEN search complete. Found:', shareScreenObject ? 'YES' : 'NO');
         
         if (shareScreenObject) {
+          // Adjust screen geometry to be square to match our square texture
+          // The GLB model has a 16:9 screen, so we need to scale it to be square
+          const currentScale = shareScreenObject.scale.clone();
+          shareScreenObject.scale.y = currentScale.y * (16/9); // Make height match width aspect
+          console.log('Adjusted SHARESCREEN scale to square aspect ratio');
+          
           // Create screen texture
           const screenTexture = createScreenTexture();
           
@@ -1638,7 +1644,7 @@
             name: 'Large Display Screen',
             type: 'display',
             originalPosition: shareScreenObject.position.clone(),
-            originalScale: shareScreenObject.scale.clone(),
+            originalScale: shareScreenObject.scale.clone(), // This now includes the square aspect adjustment
             originalRotation: shareScreenObject.rotation.clone(),
             objectId: 'SHARESCREEN-HERE',  // Fixed ID for server reference
             isSelectable: false  // Mark screen as non-selectable
@@ -1666,7 +1672,7 @@
     // Fallback screen creation if GLB fails to load
     function createFallbackScreen() {
       const screenWidth = 16;
-      const screenHeight = 9;
+      const screenHeight = 16; // Make height same as width for square aspect
       const screenTexture = createScreenTexture();
       
       const screenGeometry = new THREE.PlaneGeometry(screenWidth, screenHeight);
@@ -1688,7 +1694,7 @@
       }
       
       const displayScreen = new THREE.Mesh(screenGeometry, screenMaterial);
-      displayScreen.position.set(0, 4.5, -10);
+      displayScreen.position.set(0, 6, -10); // Adjusted Y position for square screen
       displayScreen.rotation.y = 0;
       
       scene.add(displayScreen);

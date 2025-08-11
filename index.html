@@ -1554,32 +1554,41 @@
               child.receiveShadow = true;
             }
             // Ensure materials are compatible with mobile
-            if (child.material && isMobile) {
-              // Fix texture loading on mobile - preserve original textures
-              if (child.material.map) {
-                // Configure texture for mobile compatibility
-                if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
-                  configureMobileTexture(child.material.map);
-                } else {
-                  child.material.map.colorSpace = THREE.SRGBColorSpace;
-                  child.material.map.needsUpdate = true;
-                }
-              }
+            if (child.material) {
+              // Handle different material types
+              const materials = Array.isArray(child.material) ? child.material : [child.material];
               
-              // Only replace material if it's causing issues
-              if (child.material.type === 'MeshStandardMaterial' || child.material.type === 'MeshPhysicalMaterial') {
-                const basicMaterial = new THREE.MeshBasicMaterial({
-                  map: child.material.map, // CRITICAL: Preserve the texture map
-                  color: child.material.map ? 0xffffff : (child.material.color || 0xffffff), // White if textured
-                  transparent: child.material.transparent || false,
-                  opacity: child.material.opacity || 1.0,
-                  side: child.material.side || THREE.FrontSide
+              materials.forEach(material => {
+                // Configure all texture maps for mobile
+                const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'lightMap', 'bumpMap', 'displacementMap'];
+                
+                textureProps.forEach(prop => {
+                  if (material[prop]) {
+                    if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+                      configureMobileTexture(material[prop]);
+                      console.log(`✅ Configured room ${prop} for mobile on ${child.name || 'mesh'}`);
+                    } else {
+                      material[prop].colorSpace = THREE.SRGBColorSpace;
+                      material[prop].needsUpdate = true;
+                    }
+                  }
                 });
-                child.material = basicMaterial;
-                console.log('Replaced material with MeshBasicMaterial, preserved texture:', !!child.material.map);
-              }
-              
-              child.material.needsUpdate = true;
+                
+                // Only replace material if it's causing issues on mobile
+                if (isMobile && (material.type === 'MeshStandardMaterial' || material.type === 'MeshPhysicalMaterial')) {
+                  const basicMaterial = new THREE.MeshBasicMaterial({
+                    map: material.map, // CRITICAL: Preserve the texture map
+                    color: material.map ? 0xffffff : (material.color || 0xffffff), // White if textured
+                    transparent: material.transparent || false,
+                    opacity: material.opacity || 1.0,
+                    side: material.side || THREE.FrontSide
+                  });
+                  child.material = basicMaterial;
+                  console.log('Replaced material with MeshBasicMaterial, preserved texture:', !!child.material.map);
+                }
+                
+                material.needsUpdate = true;
+              });
             }
           }
         });
@@ -3745,6 +3754,26 @@
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
+            
+            // Configure textures for mobile compatibility
+            if (child.material) {
+              // Handle different material types
+              const materials = Array.isArray(child.material) ? child.material : [child.material];
+              
+              materials.forEach(material => {
+                // Check all texture maps that might exist
+                const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'];
+                
+                textureProps.forEach(prop => {
+                  if (material[prop]) {
+                    if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+                      configureMobileTexture(material[prop]);
+                      console.log(`✅ Configured ${prop} for mobile on ${child.name || 'mesh'}`);
+                    }
+                  }
+                });
+              });
+            }
           }
         });
         

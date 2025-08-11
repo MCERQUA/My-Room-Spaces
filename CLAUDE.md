@@ -146,6 +146,40 @@ object.userData = {
 - `object-delete`: Objects removed from server and all connected clients
 - `world-state`: Complete world sync sent to new users on connection
 
+## ⚠️ CRITICAL: Screen Share Implementation Notes
+
+### **DO NOT MODIFY SCREEN SHARE ASPECT RATIOS OR GEOMETRY**
+
+The screen sharing system is **EXTREMELY SENSITIVE** to changes in:
+
+1. **Screen Geometry Dimensions**: 
+   - Large screen is **16:9 aspect ratio** (16 width × 9 height)
+   - GLB model SHARESCREEN object must remain at original scale
+   - Fallback screen PlaneGeometry must be (16, 9)
+
+2. **Canvas Texture Dimensions**:
+   - Can use square power-of-2 textures (512×512, 1024×1024, 2048×2048)
+   - Texture will stretch to fit 16:9 screen geometry (this is correct behavior)
+   - **DO NOT** add letterboxing or aspect ratio compensation
+
+3. **Critical Functions That Must Not Be Changed**:
+   - `updateScreenTexture()` in `startScreenShare()`
+   - `displaySharedStream()` for P2P video
+   - Canvas drawing: `ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height)`
+
+### **What Breaks Screen Share**:
+- Changing screen geometry from 16:9 to square
+- Adding letterboxing to canvas drawing operations  
+- Modifying GLB SHARESCREEN object scale
+- Changing canvas drawing coordinates (must use full canvas dimensions)
+- Altering texture wrap modes on screen materials
+
+### **Mobile Texture Fixes Applied**:
+- Square power-of-2 canvas textures for mobile compatibility
+- Mobile texture parameters: ClampToEdgeWrapping, LinearFilter, no mipmaps
+- GLB model textures configured for mobile WebGL compatibility
+- Screen functionality preserved during mobile optimization
+
 ### Hybrid Screen Sharing Architecture (v2.0)
 **Two-Layer System for Optimal Performance:**
 

@@ -497,12 +497,11 @@
       right: 20px;
     }
     
-    /* Mobile grid layout for menu */
+    /* Mobile layout for menu - keep vertical */
     @media (max-width: 768px) {
       .glass-menu {
-        flex-direction: row;
-        flex-wrap: wrap;
-        width: fit-content;  /* Fit exactly to content */
+        flex-direction: column;  /* Keep vertical on mobile too */
+        width: auto;  /* Auto-size to content */
         gap: 8px;
         padding: 6px;
       }

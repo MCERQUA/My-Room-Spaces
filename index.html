@@ -1713,108 +1713,32 @@
       const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
       console.log(`Loading ${isMobile ? 'mobile-optimized (JPG textures)' : 'desktop (WebP textures)'} room model...`);
       
-      loader.load(modelPath, function(gltf) {
-        console.log('Loading room model from:', modelPath);
-        const roomModel = gltf.scene;
-        
-        // CRITICAL: Ensure all textures are properly loaded on mobile
-        if (isMobile) {
-          console.log('Mobile: Processing textures after GLB load...');
+      // BEST PRACTICE: Let GLTFLoader handle everything automatically
+      // GLB files embed textures directly, and GLTFLoader handles them properly
+      loader.load(
+        modelPath,
+        function (gltf) {
+          console.log('GLB model loaded successfully from:', modelPath);
+          const roomModel = gltf.scene;
           
-          // Wait a frame to ensure textures are ready
-          setTimeout(() => {
-            roomModel.traverse((child) => {
-              if (child.isMesh && child.material) {
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                materials.forEach(material => {
-                  // Force all textures to update and set correct encoding
-                  if (material.map) {
-                    // Set correct color space for textures
-                    material.map.colorSpace = THREE.SRGBColorSpace;
-                    material.map.needsUpdate = true;
-                    console.log(`Forced texture update for: ${child.name}`);
-                  }
-                  if (material.normalMap) material.normalMap.needsUpdate = true;
-                  if (material.roughnessMap) material.roughnessMap.needsUpdate = true;
-                  if (material.metalnessMap) material.metalnessMap.needsUpdate = true;
-                  if (material.aoMap) material.aoMap.needsUpdate = true;
-                  
-                  material.needsUpdate = true;
-                });
+          // Just add the model to the scene - GLTFLoader handles textures automatically
+          roomModel.position.set(0, 0, 0);
+          roomModel.scale.set(1, 1, 1);
+          
+          // Only set shadows on desktop for performance
+          roomModel.traverse((child) => {
+            if (child.isMesh) {
+              if (!isMobile) {
+                child.castShadow = true;
+                child.receiveShadow = true;
               }
-            });
-            console.log('Mobile: Texture updates complete');
-          }, 100);
-        }
-        
-        // Add the entire room to the scene
-        roomModel.position.set(0, 0, 0);
-        roomModel.scale.set(1, 1, 1);
-        
-        // Process all meshes in the model
-        roomModel.traverse((child) => {
-          if (child.isMesh) {
-            // Enable shadows only on desktop
-            if (!isMobile) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-            }
-            
-            // Debug texture loading on mobile
-            if (child.material) {
-              const materials = Array.isArray(child.material) ? child.material : [child.material];
               
-              materials.forEach((material, index) => {
-                if (isMobile) {
-                  // Detailed logging for mobile debugging
-                  console.log(`=== Mobile Material Debug: ${child.name} ===`);
-                  console.log('Material type:', material.type);
-                  console.log('Has map (texture):', !!material.map);
-                  
-                  if (material.map) {
-                    console.log('Texture details:');
-                    console.log('- Image:', material.map.image);
-                    console.log('- Image width:', material.map.image?.width);
-                    console.log('- Image height:', material.map.image?.height);
-                    console.log('- Image src:', material.map.image?.src || 'embedded');
-                    console.log('- Image ready:', material.map.image?.complete);
-                    console.log('- Texture UUID:', material.map.uuid);
-                    console.log('- ColorSpace:', material.map.colorSpace);
-                    console.log('- needsUpdate:', material.map.needsUpdate);
-                    
-                    // Check if texture has actual data
-                    if (material.map.image && material.map.image.width === 0) {
-                      console.error('❌ Texture has no data! Width is 0');
-                    }
-                    
-                    // Force texture update
-                    material.map.needsUpdate = true;
-                    
-                    // Check if image is loaded
-                    if (material.map.image && !material.map.image.complete) {
-                      console.warn('⚠️ Texture image not loaded yet!');
-                      
-                      // Try to force load
-                      material.map.image.onload = () => {
-                        console.log('✅ Texture loaded for:', child.name);
-                        material.map.needsUpdate = true;
-                        material.needsUpdate = true;
-                      };
-                    }
-                  }
-                  
-                  // Log material color
-                  if (material.color) {
-                    console.log('Material color:', material.color.getHexString());
-                  }
-                  
-                  // Ensure material updates
-                  material.needsUpdate = true;
-                }
-              });
+              // Simple logging for debugging (don't modify anything)
+              if (isMobile && child.material) {
+                console.log(`Mobile mesh: ${child.name}, Has texture: ${!!child.material.map}`);
+              }
             }
-          }
-        });
+          });
         
         scene.add(roomModel);
         
@@ -1884,15 +1808,17 @@
         }
         
         console.log('Room model loaded successfully');
-      }, 
-      function(progress) {
-        console.log('Room loading progress:', (progress.loaded / progress.total * 100) + '%');
-      },
-      function(error) {
-        console.error('Error loading room model:', error);
-        console.log('Creating fallback screen instead');
-        createFallbackScreen();
-      });
+        },
+        function(progress) {
+          // Progress callback (optional)
+          console.log('Room loading progress:', (progress.loaded / progress.total * 100) + '%');
+        },
+        function(error) {
+          console.error('An error occurred loading the GLB model:', error);
+          console.log('Creating fallback screen instead');
+          createFallbackScreen();
+        }
+      );
     }
     
     // Fallback screen creation if GLB fails to load

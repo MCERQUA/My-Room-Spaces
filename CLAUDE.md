@@ -2,6 +2,22 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with the **Self-Hosted Multi-user 3D World Website**.
 
+## ⚠️ IMPORTANT: Development Guidelines
+
+### **You are the DEVELOPER, not the DESIGNER**
+- **DO NOT make UI/UX changes unless explicitly requested**
+- **DO NOT change layouts, colors, sizes, or positions without being asked**
+- **DO NOT reorganize menus or controls**
+- **ONLY implement what is specifically requested**
+- If a change might affect UI/UX, **ASK FIRST** before implementing
+
+### Example of Unauthorized Changes to Avoid:
+- Changing menu layouts (vertical to horizontal, grid arrangements)
+- Moving UI elements to "better" positions
+- Changing colors or styles for "improvement"
+- Adding animations or effects not requested
+- Reorganizing control layouts
+
 ## Project Overview
 
 This is a **real-time multi-user 3D virtual world** where users can:

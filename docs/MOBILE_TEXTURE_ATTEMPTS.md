@@ -1,7 +1,10 @@
 # Mobile Texture Rendering Attempts Documentation
 
 ## 🔴 CURRENT STATUS: UNRESOLVED
-**As of August 12, 2025 - Mobile textures are STILL WHITE despite 16+ different approaches**
+**As of August 12, 2025 - Mobile textures are STILL WHITE despite 17+ different approaches**
+
+### Latest Attempt: WebGL 2 - FAILED ❌
+Even with WebGL 2's improved texture support, mobile textures remain white.
 
 ## Overview
 This document tracks all the different approaches we've tried to fix mobile texture rendering issues in the 3D Three.js site. The main problem has been textures appearing white or not rendering correctly on mobile devices, while working fine on desktop.
@@ -19,7 +22,7 @@ This document tracks all the different approaches we've tried to fix mobile text
 
 ## Latest Attempts (August 12, 2025) - STILL NOT WORKING
 
-### ⚠️ CURRENT STATUS: Mobile textures still showing white despite all attempts
+### ⚠️ CURRENT STATUS: Mobile textures still showing white despite 17+ attempts including WebGL 2
 
 ### 14. Simplified GLB Loading (Following Best Practices)
 **Commit**: `12da505` - Let GLTFLoader handle textures automatically
@@ -47,6 +50,15 @@ This document tracks all the different approaches we've tried to fix mobile text
 - But textures don't render (all surfaces white except base colors)
 - Issue affects: iOS Safari, Chrome on iOS, Android Chrome
 
+### 17. WebGL 2 Implementation
+**Commit**: `9ed4a5b` - Enable WebGL 2 for better texture support
+**Changes**:
+- Added WebGL 2 detection and automatic usage when available
+- WebGL 2 has better texture handling, especially for non-power-of-2 textures
+- iOS 15+ supports WebGL 2.0 via Metal
+- Android has supported WebGL 2 since 2016
+- **Result**: ❌ Still white textures even with WebGL 2
+
 ## Latest Fixes (August 12, 2025)
 
 ### 11. WebP to JPG Texture Conversion
@@ -68,6 +80,28 @@ This document tracks all the different approaches we've tried to fix mobile text
 - Set `renderer.outputColorSpace = THREE.SRGBColorSpace` for both mobile and desktop
 - GLB textures require sRGB to display correctly
 - **Result**: Consistent texture rendering across devices
+
+## Complete List of Failed Attempts
+
+### Summary: 17 Different Approaches - ALL FAILED ❌
+
+1. Mobile detection and fallback rendering
+2. Lighting and shadow adjustments  
+3. Comprehensive mobile white texture fix
+4. Ultimate mobile WebGL compatibility fix
+5. Research-backed mobile fixes
+6. Power-of-2 square textures (512x512, 1024x1024, 2048x2048)
+7. GLB model texture configuration (configureMobileTexture on all maps)
+8. Screen proportion adjustments
+9. Revert to 16:9 aspect ratio
+10. Complete removal of mobile-specific handling
+11. WebP to JPG texture conversion (separate mobile GLB)
+12. Removed material simplification
+13. Unified color space settings (sRGB for all)
+14. Simplified GLB loading (let GLTFLoader handle everything)
+15. Force render updates on mobile
+16. Debug findings (textures load but don't render)
+17. **WebGL 2 implementation** (latest attempt - still doesn't work)
 
 ## Attempts Made (Chronological)
 
@@ -305,9 +339,14 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 // ❌ Forcing texture updates
 material.map.needsUpdate = true;
 
+// ❌ WebGL 2 (Even with better texture support)
+const renderer = new THREE.WebGLRenderer({ /* params */ });
+// WebGL 2 is used automatically if available
+
 // ❌ Material simplification
-// ❌ Texture manipulation
+// ❌ Texture manipulation  
 // ❌ Power-of-2 enforcement
+// ❌ configureMobileTexture() function
 // ❌ All of the above
 ```
 

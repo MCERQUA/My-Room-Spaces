@@ -497,15 +497,8 @@
       right: 20px;
     }
     
-    /* Mobile layout for menu - keep vertical */
+    /* Mobile layout for menu buttons only */
     @media (max-width: 768px) {
-      .glass-menu {
-        flex-direction: column;  /* Keep vertical on mobile too */
-        width: auto;  /* Auto-size to content */
-        gap: 8px;
-        padding: 6px;
-      }
-      
       .glass-menu .glass-button {
         width: 38px;
         height: 38px;
@@ -561,10 +554,10 @@
 
     /* User List Styles */
     .user-list {
-      position: absolute;
-      top: 75px;  /* Moved down to avoid toggle button */
+      position: fixed;
+      top: 20px;  /* Same position as toggle button */
       right: 20px;
-      z-index: 300;
+      z-index: 402;  /* Higher than toggle button */
       background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
@@ -649,30 +642,6 @@
     .user-item.self {
       background: rgba(74, 144, 226, 0.2);
       font-weight: 600;
-    }
-    
-    .avatar-upload-button {
-      background: rgba(74, 144, 226, 0.2);
-      border: 1px solid rgba(74, 144, 226, 0.3);
-      color: #4a90e2;
-      padding: 6px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-size: 12px;
-      margin-top: 10px;
-      width: calc(100% - 20px);
-      margin-left: 10px;
-      margin-right: 10px;
-      transition: all 0.3s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
-    
-    .avatar-upload-button:hover {
-      background: rgba(74, 144, 226, 0.3);
-      transform: translateY(-1px);
     }
 
     .user-count {
@@ -1313,9 +1282,6 @@
       <div id="user-list-content">
         <div class="user-item self" id="current-user">Loading...</div>
       </div>
-      <button class="avatar-upload-button" id="upload-avatar">
-        🎭 Upload Custom Avatar
-      </button>
     </div>
   </div>
 
@@ -4237,49 +4203,7 @@
       document.getElementById('objects-list-dialog').classList.remove('visible');
     });
     
-    // Custom avatar upload
-    document.getElementById('upload-avatar').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.glb,.gltf';
-      input.onchange = async (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          try {
-            // Check file size (limit to 2MB for data URLs)
-            if (file.size > 2 * 1024 * 1024) {
-              alert('Avatar file too large. Please use a file smaller than 2MB.');
-              return;
-            }
-            
-            // Convert file to data URL for sharing
-            const reader = new FileReader();
-            reader.onload = (e) => {
-              myCustomAvatarUrl = e.target.result;
-              
-              // Notify server of custom avatar update
-              if (socket && socket.connected) {
-                socket.emit('user-avatar-update', {
-                  customAvatarUrl: myCustomAvatarUrl
-                });
-                console.log('🎭 Custom avatar uploaded (size: ' + (file.size / 1024).toFixed(2) + 'KB)');
-              }
-              
-              // Update local user data
-              if (userAvatars.has(myUserId)) {
-                userAvatars.get(myUserId).customAvatarUrl = myCustomAvatarUrl;
-              }
-            };
-            reader.readAsDataURL(file);
-          } catch (error) {
-            console.error('Error uploading avatar:', error);
-            alert('Failed to upload avatar');
-          }
-        }
-      };
-      input.click();
-    });
+    // Custom avatar upload removed
     
     // Screen control event listeners
     document.getElementById('share-screen').addEventListener('click', (e) => {
@@ -4363,19 +4287,15 @@
       toggleChat();
     });
 
-    // User list toggle functionality
+    // User list close functionality
     document.getElementById('user-list-close').addEventListener('click', (e) => {
       e.stopPropagation();
       const userList = document.getElementById('user-list');
-      userList.classList.toggle('collapsed');
+      const toggleButton = document.getElementById('users-toggle');
       
-      // Change button text based on state
-      const closeButton = document.getElementById('user-list-close');
-      if (userList.classList.contains('collapsed')) {
-        closeButton.textContent = '+';
-      } else {
-        closeButton.textContent = '×';
-      }
+      // Hide user list and show toggle button
+      userList.classList.add('collapsed');
+      toggleButton.style.display = 'flex';
     });
     
     // Corner toggle buttons functionality
@@ -4388,7 +4308,11 @@
     document.getElementById('users-toggle').addEventListener('click', (e) => {
       e.stopPropagation();
       const userList = document.getElementById('user-list');
-      userList.classList.toggle('collapsed');
+      const toggleButton = document.getElementById('users-toggle');
+      
+      // Show user list and hide toggle button
+      userList.classList.remove('collapsed');
+      toggleButton.style.display = 'none';
     });
     
     // Add touch event support for mobile

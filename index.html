@@ -1711,13 +1711,11 @@
     let largeScreen = null;
     
     function loadRoomModel() {
-      // On mobile, warn about potential WebP issues
-      if (isMobile) {
-        console.warn('⚠️ Mobile detected - WebP textures in GLB may not render correctly');
-        console.log('Consider using a GLB with JPG/PNG textures for better mobile compatibility');
-      }
+      // Use mobile-optimized GLB with JPG textures for mobile devices
+      const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
+      console.log(`Loading ${isMobile ? 'mobile-optimized (JPG textures)' : 'desktop (WebP textures)'} room model...`);
       
-      loader.load('./models/BAKE-WEBROOM1.glb', function(gltf) {
+      loader.load(modelPath, function(gltf) {
         console.log('Loading room model...');
         const roomModel = gltf.scene;
         
@@ -1734,48 +1732,32 @@
               child.receiveShadow = true;
             }
             
-            // WEBP TEXTURE FIX for mobile
-            // WebP textures embedded in GLB files can fail on mobile
-            // Create fallback materials if textures fail to load
+            // Mobile material optimization
+            // The mobile GLB now has JPG textures which should work properly
             
-            if (child.material) {
+            if (child.material && isMobile) {
               const materials = Array.isArray(child.material) ? child.material : [child.material];
               
               materials.forEach((material, index) => {
-                // On mobile, check if texture exists and handle WebP issues
-                if (isMobile) {
-                  // If the texture failed to load (WebP issue), create a colored fallback
-                  if (material.map && material.map.image) {
-                    // Check if the texture actually loaded
-                    const textureLoaded = material.map.image.width > 0 && material.map.image.height > 0;
-                    
-                    if (!textureLoaded) {
-                      console.warn(`Texture failed to load for ${child.name}, using color fallback`);
-                      // Use the material's base color or a default
-                      material.map = null;
-                      material.color = material.color || new THREE.Color(0x808080);
-                    }
+                // Simplify to MeshBasicMaterial for better mobile performance
+                // JPG textures in mobile GLB should load correctly
+                if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
+                  const basicMaterial = new THREE.MeshBasicMaterial({
+                    map: material.map, // JPG textures should work on mobile now
+                    color: material.map ? 0xffffff : (material.color || 0x808080),
+                    transparent: material.transparent || false,
+                    opacity: material.opacity || 1.0,
+                    side: material.side || THREE.FrontSide
+                  });
+                  
+                  // Replace the material
+                  if (Array.isArray(child.material)) {
+                    child.material[index] = basicMaterial;
+                  } else {
+                    child.material = basicMaterial;
                   }
                   
-                  // Simplify to MeshBasicMaterial for better mobile performance
-                  if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
-                    const basicMaterial = new THREE.MeshBasicMaterial({
-                      map: material.map, // Will be null if WebP failed
-                      color: material.map ? 0xffffff : (material.color || 0x808080),
-                      transparent: material.transparent || false,
-                      opacity: material.opacity || 1.0,
-                      side: material.side || THREE.FrontSide
-                    });
-                    
-                    // Replace the material
-                    if (Array.isArray(child.material)) {
-                      child.material[index] = basicMaterial;
-                    } else {
-                      child.material = basicMaterial;
-                    }
-                    
-                    console.log(`Mobile: ${child.name} - texture: ${!!basicMaterial.map}, color: ${basicMaterial.color.getHexString()}`);
-                  }
+                  console.log(`Mobile optimized: ${child.name} - texture loaded: ${!!basicMaterial.map}`);
                 }
               });
             }

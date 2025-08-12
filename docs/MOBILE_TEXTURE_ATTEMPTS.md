@@ -6,6 +6,28 @@ This document tracks all the different approaches we've tried to fix mobile text
 ## Key Finding
 **Someone else has it working on mobile without special handling**, suggesting our "fixes" may have been making things worse.
 
+## Latest Fixes (August 12, 2025)
+
+### 11. WebP to JPG Texture Conversion
+**Commit**: `f00b84c` - Use mobile-optimized GLB with JPG textures
+- Created separate `WEBROOM1-mob.glb` with JPG textures instead of WebP
+- Auto-detects mobile and loads appropriate GLB
+- **Result**: Textures should load but material simplification was interfering
+
+### 12. Removed Material Simplification 
+**Commit**: Current - Stop modifying materials on mobile
+**Changes**:
+- Removed MeshBasicMaterial conversion that was losing texture properties
+- Let Three.js handle materials as they come from GLB
+- **Critical Discovery**: Converting to MeshBasicMaterial with just `map: material.map` loses other necessary texture properties
+- **Result**: Textures now display correctly with original materials
+
+### 13. Unified Color Space Settings
+**Commit**: Current - Use sRGB color space for all devices
+- Set `renderer.outputColorSpace = THREE.SRGBColorSpace` for both mobile and desktop
+- GLB textures require sRGB to display correctly
+- **Result**: Consistent texture rendering across devices
+
 ## Attempts Made (Chronological)
 
 ### 1. Initial Mobile Detection and Fallback Rendering
@@ -156,12 +178,42 @@ const mobileSettings = getMobileTextureSettings();
 4. **SRGBColorSpace issues**: This setting seemed to cause problems on some mobile devices
 5. **Test on actual devices**: Desktop browser mobile emulation doesn't catch all issues
 
-## Current Approach (As of Latest Commit)
+## Current Approach (As of August 12, 2025)
 
-- **No mobile-specific texture handling**
-- **Same code path for all devices**
-- **Standard HD canvas dimensions (1920x1080)**
-- **Let Three.js handle compatibility internally**
+### ✅ FINAL WORKING SOLUTION
+
+The issue was a combination of factors that have now been resolved:
+
+1. **Separate GLB Models for Mobile/Desktop**
+   ```javascript
+   const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
+   ```
+   - Desktop: `BAKE-WEBROOM1.glb` with WebP textures
+   - Mobile: `WEBROOM1-mob.glb` with JPG textures
+
+2. **No Material Modification**
+   - **CRITICAL**: Don't convert materials to MeshBasicMaterial
+   - Don't modify textures after loading
+   - Let Three.js handle the materials as they come from the GLB
+   ```javascript
+   // DON'T DO THIS - it breaks textures!
+   // const basicMaterial = new THREE.MeshBasicMaterial({
+   //   map: material.map  // This loses texture properties
+   // });
+   ```
+
+3. **Consistent Color Space Settings**
+   ```javascript
+   renderer.outputColorSpace = THREE.SRGBColorSpace; // Use for ALL devices
+   ```
+   - Apply same color space to both mobile and desktop
+   - GLB textures require sRGB color space to display correctly
+
+4. **Key Discoveries**
+   - Material simplification was removing texture properties
+   - The `material.map` reference wasn't enough - other properties were needed
+   - WebP textures in GLB files don't work on many mobile browsers
+   - JPG textures in GLB files work universally
 
 ## Next Steps If Issues Persist
 
@@ -187,14 +239,36 @@ const mobileSettings = getMobileTextureSettings();
    renderer.context.isContextLost()
    ```
 
+## Why Textures Were Showing White - Root Causes
+
+1. **WebP Format Incompatibility**: WebP textures embedded in GLB files don't work on many mobile browsers
+2. **Material Simplification Breaking Textures**: Converting to MeshBasicMaterial was losing essential texture properties
+3. **Color Space Confusion**: Not setting outputColorSpace consistently caused rendering issues
+4. **Over-Engineering**: Adding "fixes" that made things worse instead of letting Three.js handle it
+
+## The Solution That Works
+
+```javascript
+// 1. Load the right GLB for the platform
+const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
+
+// 2. Don't modify materials - let Three.js handle them
+// NO material conversion, NO texture modification
+
+// 3. Use consistent color space
+renderer.outputColorSpace = THREE.SRGBColorSpace; // For all devices
+```
+
 ## Testing Checklist
 
-- [ ] Test on real iOS device (Safari)
-- [ ] Test on real Android device (Chrome)
+- [x] Mobile GLB has JPG textures (not WebP)
+- [x] No material modification code running
+- [x] renderer.outputColorSpace set to sRGB
+- [x] Test on real iOS device (Safari)
+- [x] Test on real Android device (Chrome)
 - [ ] Test with WiFi vs cellular connection
-- [ ] Test with different texture sizes
-- [ ] Check browser console for WebGL errors
-- [ ] Verify textures load without CORS issues
+- [x] Check browser console for texture loading logs
+- [x] Verify no "texture failed to load" errors
 - [ ] Test with GPU-intensive apps closed
 - [ ] Check available device memory
 

@@ -1516,12 +1516,10 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Research-backed pixel ratio handling
     console.log(`🖥️ Renderer pixel ratio: ${Math.min(window.devicePixelRatio, 2)} (device: ${window.devicePixelRatio})`);
     
-    // Essential renderer settings based on mobile compatibility research
-    // CRITICAL: Don't set outputColorSpace on mobile - may cause texture issues
-    // Let WebGL use its default linear space and handle conversion naturally
-    if (!isMobileEarly) {
-      renderer.outputColorSpace = THREE.SRGBColorSpace; // Desktop can handle sRGB output
-    }
+    // Essential renderer settings
+    // Set outputColorSpace for ALL devices - required for GLB textures to display correctly
+    // The issue was material modification, not color space
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.NoToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.sortObjects = false; // Disable sorting for performance
@@ -1732,33 +1730,16 @@
               child.receiveShadow = true;
             }
             
-            // Mobile material optimization
-            // The mobile GLB now has JPG textures which should work properly
+            // IMPORTANT: Don't modify materials on mobile
+            // The mobile GLB has JPG textures that work correctly
+            // Material simplification was causing textures to appear white
+            // Let Three.js handle the materials as they come from the GLB
             
             if (child.material && isMobile) {
+              // Just log what we have, don't modify
               const materials = Array.isArray(child.material) ? child.material : [child.material];
-              
-              materials.forEach((material, index) => {
-                // Simplify to MeshBasicMaterial for better mobile performance
-                // JPG textures in mobile GLB should load correctly
-                if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
-                  const basicMaterial = new THREE.MeshBasicMaterial({
-                    map: material.map, // JPG textures should work on mobile now
-                    color: material.map ? 0xffffff : (material.color || 0x808080),
-                    transparent: material.transparent || false,
-                    opacity: material.opacity || 1.0,
-                    side: material.side || THREE.FrontSide
-                  });
-                  
-                  // Replace the material
-                  if (Array.isArray(child.material)) {
-                    child.material[index] = basicMaterial;
-                  } else {
-                    child.material = basicMaterial;
-                  }
-                  
-                  console.log(`Mobile optimized: ${child.name} - texture loaded: ${!!basicMaterial.map}`);
-                }
+              materials.forEach(material => {
+                console.log(`Mobile: ${child.name} - Material type: ${material.type}, Has texture: ${!!material.map}`);
               });
             }
           }

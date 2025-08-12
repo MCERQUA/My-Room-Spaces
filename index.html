@@ -1715,10 +1715,17 @@
       console.log('isMobileEarly:', isMobileEarly);
       console.log('User Agent:', navigator.userAgent);
       
-      // TEMPORARY: Force desktop GLB on mobile to test if it's a file issue
-      // const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
-      const modelPath = './models/BAKE-WEBROOM1.glb'; // TEST: Use desktop GLB for all
-      console.log(`TESTING: Loading DESKTOP GLB on all devices from: ${modelPath}`);
+      // Check for real iOS even if Chrome masks it
+      const isRealIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+                        /iPhone|iPad|iPod/.test(navigator.platform) ||
+                        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      
+      console.log('Is Real iOS device:', isRealIOS);
+      
+      // Use mobile GLB for any mobile device OR iOS
+      const shouldUseMobileGLB = isMobile || isRealIOS;
+      const modelPath = shouldUseMobileGLB ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
+      console.log(`Loading ${shouldUseMobileGLB ? 'mobile-optimized (JPG textures)' : 'desktop (WebP textures)'} room model...`);
       
       // BEST PRACTICE: Let GLTFLoader handle everything automatically
       // GLB files embed textures directly, and GLTFLoader handles them properly
@@ -1783,6 +1790,33 @@
           console.log(`Summary: ${meshCount} meshes, ${textureCount} textures found`);
         
         scene.add(roomModel);
+        
+        // Force a render update on ALL mobile devices
+        const isAnyMobile = isMobile || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        
+        if (isAnyMobile) {
+          console.log('Mobile device detected: Forcing render update...');
+          
+          // Force renderer to update
+          renderer.render(scene, camera);
+          
+          // Also try forcing material updates after a delay
+          setTimeout(() => {
+            roomModel.traverse((child) => {
+              if (child.isMesh && child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                materials.forEach(material => {
+                  if (material.map) {
+                    material.map.needsUpdate = true;
+                  }
+                  material.needsUpdate = true;
+                });
+              }
+            });
+            console.log('Mobile: Forced material updates');
+            renderer.render(scene, camera);
+          }, 500);
+        }
         
         // Find the SHARESCREEN object
         let shareScreenObject = null;

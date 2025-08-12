@@ -352,14 +352,14 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       transition: all 0.3s ease;
       transform-origin: top left;
-      width: 60px;  /* Fixed width for single column */
+      width: fit-content;  /* Let it size to the button width */
     }
     
     /* Popup panels for menu items */
     .menu-popup {
       position: absolute;
       top: 0;
-      left: 70px;  /* Fixed position next to 60px menu + 10px gap */
+      left: calc(100% + 10px);  /* Position 10px to the right of menu */
       min-width: 200px;
       background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);

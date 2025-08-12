@@ -1463,20 +1463,34 @@
     userObject.add(localAvatar);
     const isIOSNew = /iPhone|iPad/.test(navigator.userAgent) && parseFloat(navigator.userAgent.match(/OS (\d+)/)?.[1] || '0') >= 17;
     
-    // Test WebGL context creation first
+    // Test WebGL 2 support first, then fall back to WebGL 1
     let webglTestCanvas = document.createElement('canvas');
     let testGL = null;
     let webglSupported = false;
+    let webgl2Supported = false;
     let highpSupported = false;
     
     try {
-      testGL = webglTestCanvas.getContext('webgl') || webglTestCanvas.getContext('experimental-webgl');
+      // Try WebGL 2 first
+      testGL = webglTestCanvas.getContext('webgl2');
       if (testGL) {
+        webgl2Supported = true;
         webglSupported = true;
+        console.log('✅ WebGL 2 supported!');
+      } else {
+        // Fall back to WebGL 1
+        testGL = webglTestCanvas.getContext('webgl') || webglTestCanvas.getContext('experimental-webgl');
+        if (testGL) {
+          webglSupported = true;
+          console.log('⚠️ WebGL 1 supported (WebGL 2 not available)');
+        }
+      }
+      
+      if (testGL) {
         // Test shader precision support
         const fragmentShaderPrecision = testGL.getShaderPrecisionFormat(testGL.FRAGMENT_SHADER, testGL.HIGH_FLOAT);
         highpSupported = fragmentShaderPrecision && fragmentShaderPrecision.precision > 0;
-        console.log('WebGL supported:', webglSupported, 'Highp supported:', highpSupported);
+        console.log('WebGL version:', webgl2Supported ? '2.0' : '1.0', 'Highp supported:', highpSupported);
       }
     } catch (e) {
       console.error('WebGL context creation failed:', e);
@@ -1495,8 +1509,8 @@
       throw new Error('WebGL not supported');
     }
     
-    // Create renderer with mobile-optimized settings based on research
-    const renderer = new THREE.WebGLRenderer({ 
+    // Create renderer with WebGL 2 if available (better texture support)
+    const rendererParams = {
       antialias: false, // Disable on all devices to avoid mobile issues
       alpha: false, // CRITICAL: Research shows alpha: true causes mobile white screens
       powerPreference: "high-performance", // Research shows this helps with multiple GPUs
@@ -1505,7 +1519,15 @@
       stencil: false, // Disable stencil buffer to save memory
       depth: true,
       logarithmicDepthBuffer: false // Can cause issues on some mobile GPUs
-    });
+    };
+    
+    // Create the renderer (WebGL 2 will be used automatically if available)
+    const renderer = new THREE.WebGLRenderer(rendererParams);
+    
+    // Log which WebGL version is being used
+    const glContext = renderer.getContext();
+    const isWebGL2 = glContext instanceof WebGL2RenderingContext;
+    console.log(`🎮 Using WebGL ${isWebGL2 ? '2' : '1'} for rendering`);
     
     // Conservative sizing for mobile
     const maxSize = isMobileEarly ? 1024 : 2048;

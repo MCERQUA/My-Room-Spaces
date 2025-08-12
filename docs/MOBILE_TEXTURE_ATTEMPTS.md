@@ -1,13 +1,22 @@
 # Mobile Texture Rendering Attempts Documentation
 
-## 🟡 CURRENT STATUS: NEW APPROACH IMPLEMENTED
-**As of December 17, 2024 - Implementing texture reprocessing similar to Sketchfab/Spatial.io**
+## 🟡 CURRENT STATUS: TESTING PLATFORM-STYLE PROCESSING
+**As of December 17, 2024 - Attempt #18 implemented, awaiting test results**
 
-### Latest Attempt #18: Platform-Style Texture Processing
-Reprocessing textures on-the-fly for mobile, similar to how platforms like Sketchfab and Spatial.io handle GLB files.
+### Critical Context Discovery
+**The GLB files WORK on Sketchfab and Spatial.io on mobile**, which means:
+- The GLB files themselves are valid
+- These platforms process/convert textures on-the-fly for mobile compatibility
+- We need to replicate their texture processing approach
 
 ## Overview
-This document tracks all the different approaches we've tried to fix mobile texture rendering issues in the 3D Three.js site. The main problem has been textures appearing white or not rendering correctly on mobile devices, while working fine on desktop.
+This document comprehensively tracks ALL approaches attempted to fix mobile texture rendering issues. The core problem: textures appear white on mobile (iPhone 14 Max tested) while working perfectly on desktop.
+
+### Test Environment
+- **Device**: iPhone 14 Max (high-end device, rules out performance issues)
+- **Browsers Affected**: Safari, Chrome on iOS, Android Chrome
+- **GLB Files**: Web-optimized with online GLB optimizer (reduced texture resolution, optimized geometry)
+- **Known Working**: Same GLBs work on Sketchfab and Spatial.io mobile
 
 ### Quick Summary of What We Know:
 - ✅ Mobile GLB file exists with JPG textures (WEBROOM1-mob.glb)
@@ -83,17 +92,57 @@ This document tracks all the different approaches we've tried to fix mobile text
 
 ## Complete List of Failed Attempts
 
-### 18. Platform-Style Texture Reprocessing (Current Attempt)
-**Commit**: Current - Reprocess textures like Sketchfab/Spatial.io
-**Changes**:
-- Canvas-based texture reprocessing for mobile
-- Convert all textures to power-of-2 dimensions
-- Resize to max 1024x1024 for mobile devices
-- Create new CanvasTexture from reprocessed image data
-- Apply to all texture maps (diffuse, normal, roughness, etc.)
-- Mobile debug panel for real-time diagnostics
-- WebGL capability detection and logging
-- **Result**: Testing in progress...
+### 18. Platform-Style Texture Reprocessing (CURRENT - December 17, 2024)
+**Commit**: `e518544` - Implement platform-style texture reprocessing
+**Rationale**: Since Sketchfab/Spatial.io make the same GLBs work on mobile, they must be processing textures
+**Implementation Details**:
+```javascript
+// Core approach - reprocess every texture through Canvas
+1. Detect mobile device on load
+2. For each material.map in the GLB:
+   - Create HTML5 Canvas with 2D context
+   - Calculate power-of-2 dimensions (max 1024x1024)
+   - Draw original texture to canvas with high-quality resampling
+   - Create new THREE.CanvasTexture from processed canvas
+   - Copy UV transforms from original
+   - Apply mobile-optimized settings:
+     * LinearMipmapLinearFilter for minification
+     * LinearFilter for magnification
+     * Generate mipmaps = true
+     * Anisotropy = 4 (or device max)
+     * ColorSpace = SRGBColorSpace
+   - Dispose original texture
+   - Replace with processed texture
+3. Apply same process to normalMap, roughnessMap, metalnessMap, etc.
+```
+
+**Debug Features Added**:
+- Mobile debug panel (🐛 button bottom-right on mobile)
+- Shows WebGL capabilities (max texture size, units, etc.)
+- Real-time texture processing status
+- Error tracking and performance metrics
+- Platform detection (iOS/Android, Safari/Chrome)
+
+**Technical Implementation**:
+```javascript
+// Canvas processing with optimal settings
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d', { 
+  alpha: true,
+  desynchronized: true,
+  willReadFrequently: false 
+});
+
+// Power-of-2 sizing
+targetWidth = Math.pow(2, Math.round(Math.log2(targetWidth)));
+targetHeight = Math.pow(2, Math.round(Math.log2(targetHeight)));
+
+// High-quality resampling
+ctx.imageSmoothingEnabled = true;
+ctx.imageSmoothingQuality = 'high';
+```
+
+**Result**: ⏳ Awaiting test results on iPhone 14 Max...
 
 ### Summary: 18 Different Approaches Attempted
 
@@ -302,29 +351,164 @@ The issue was a combination of factors that have now been resolved:
    - WebP textures in GLB files don't work on many mobile browsers
    - JPG textures in GLB files work universally
 
-## Next Steps If Issues Persist
+## 🚀 NEXT APPROACHES TO TRY (If #18 Fails)
 
-1. **Check WebGL capabilities directly**:
+### 19. Basis/KTX2 Compressed Texture Format
+**Rationale**: Industry-standard compressed format that platforms likely use
+**Implementation**:
+```javascript
+// Use KTX2Loader with Basis transcoder
+const ktx2Loader = new THREE.KTX2Loader();
+ktx2Loader.setTranscoderPath('path/to/basis/');
+ktx2Loader.detectSupport(renderer);
+
+// Convert textures to KTX2 format server-side or on-the-fly
+// Load compressed textures that work universally
+```
+**Why it might work**: Basis/KTX2 is specifically designed for cross-platform WebGL compatibility
+
+### 20. Extract and Load Textures Separately
+**Rationale**: Bypass GLTFLoader texture handling entirely
+**Implementation**:
+1. Extract all textures from GLB using gltf-transform
+2. Load textures separately with THREE.TextureLoader
+3. Manually apply to materials after GLB loads
+4. Process each texture individually for mobile
+**Why it might work**: Complete control over texture loading pipeline
+
+### 21. WebGL 1 Fallback with Basic Materials
+**Rationale**: Force simplest possible rendering path
+**Implementation**:
+```javascript
+// Force WebGL 1 context
+const renderer = new THREE.WebGLRenderer({
+  context: canvas.getContext('webgl', { // not 'webgl2'
+    powerPreference: 'high-performance'
+  })
+});
+
+// Convert all materials to MeshBasicMaterial
+// But preserve texture with proper processing
+```
+**Why it might work**: Eliminates WebGL 2 compatibility issues
+
+### 22. Progressive Texture Loading
+**Rationale**: Load low-res first, then upgrade
+**Implementation**:
+1. Create 64x64 thumbnail textures initially
+2. Display immediately (should work on any device)
+3. Progressively load higher resolutions
+4. Replace textures as they load
+**Why it might work**: Ensures something displays, helps identify loading vs rendering issues
+
+### 23. Server-Side Texture Processing API
+**Rationale**: Replicate exactly what Sketchfab/Spatial.io do
+**Implementation**:
+1. Send GLB to server endpoint
+2. Process with Sharp/ImageMagick to exact mobile specs
+3. Return processed textures or modified GLB
+4. Cache processed versions
+**Why it might work**: Server has full image processing capabilities
+
+### 24. WASM-Based Texture Processing
+**Rationale**: Use compiled image processing for consistency
+**Implementation**:
+```javascript
+// Use WASM module for texture processing
+import { processTextureForMobile } from './texture-processor.wasm';
+const processedData = processTextureForMobile(textureData);
+```
+**Why it might work**: Consistent processing across all platforms
+
+### 25. Three.js Legacy Version Test
+**Rationale**: Older version might have better mobile compatibility
+**Implementation**:
+- Test with Three.js r140 or earlier
+- Some versions had different mobile handling
+**Why it might work**: Regression in newer versions
+
+### 26. Direct WebGL Texture Upload
+**Rationale**: Bypass Three.js texture creation
+**Implementation**:
+```javascript
+const gl = renderer.getContext();
+const texture = gl.createTexture();
+gl.bindTexture(gl.TEXTURE_2D, texture);
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+// Manual WebGL texture configuration
+```
+**Why it might work**: Complete control over WebGL calls
+
+## 🔍 DIAGNOSTIC INFORMATION NEEDED
+
+### From Debug Panel (Attempt #18)
+When testing, please provide:
+1. **WebGL Capabilities Section**:
+   - Max Texture Size value
+   - Texture Units count
+   - WebGL Version string
+   - Renderer string
+
+2. **Texture Processing Section**:
+   - Which textures show as "processed"
+   - Any that show as "failed"
+   - Resolution each was processed to
+
+3. **Console Errors**:
+   - Any WebGL errors
+   - Any texture loading errors
+   - Any "out of memory" messages
+
+### Additional Tests to Run
+1. **Test with a single textured cube GLB**:
+   - Create simplest possible test case
+   - Single texture, single material
+   - Verify if ANY GLB textures work
+
+2. **Test texture formats directly**:
    ```javascript
-   const gl = renderer.getContext();
-   const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+   // Try loading a plain JPG/PNG as texture
+   const loader = new THREE.TextureLoader();
+   loader.load('test.jpg', (texture) => {
+     // Apply to a simple plane
+   });
    ```
 
-2. **Add error handling for texture loading**:
-   ```javascript
-   texture.onError = (error) => console.error('Texture error:', error);
-   ```
+3. **Memory test**:
+   - Close all other apps
+   - Clear browser cache
+   - Test immediately after device restart
 
-3. **Test with basic colored materials first**:
-   - Verify geometry is rendering
-   - Then add textures incrementally
+## 🎯 CRITICAL INSIGHTS
 
-4. **Check for CORS issues**: Mobile browsers may have stricter CORS policies
+### What We Know For Certain:
+1. **GLB files are valid** (work on Sketchfab/Spatial.io mobile)
+2. **It's not a performance issue** (iPhone 14 Max is high-end)
+3. **Textures ARE loading** (debug shows dimensions)
+4. **Materials ARE present** (objects have colors)
+5. **But textures DON'T render** (white surfaces)
 
-5. **Verify WebGL context isn't lost**:
-   ```javascript
-   renderer.context.isContextLost()
-   ```
+### Platform Processing Hypothesis:
+Sketchfab and Spatial.io likely:
+1. **Decode textures server-side** or with WASM
+2. **Convert to specific format** (likely Basis/KTX2)
+3. **Serve different assets to mobile** (detected via User-Agent)
+4. **Use texture streaming** (progressive loading)
+5. **Have fallback rendering paths** (multiple techniques)
+
+### The Core Mystery:
+- Textures load (have dimensions)
+- Materials exist (have colors)
+- But textures don't display (white)
+- **This suggests**: The texture data exists but isn't being bound to the GPU correctly
+
+### Possible Root Causes:
+1. **Texture format incompatibility** in the GPU pipeline
+2. **Memory layout issues** with how textures are stored
+3. **Shader compilation differences** on mobile
+4. **UV coordinate precision** issues
+5. **Color space conversion** problems
+6. **Texture binding state** bugs in Three.js on iOS
 
 ## Why Textures Are STILL Showing White - Unresolved Issues
 
@@ -407,9 +591,38 @@ const renderer = new THREE.WebGLRenderer({ /* params */ });
    - Try different WebGL context parameters
    - Check for WebGL extensions support
 
+## 📊 COMPLETE ATTEMPT SUMMARY
+
+### Total Attempts: 18 (+ 8 planned approaches)
+
+**Approach Categories Tried**:
+1. **Texture Configuration** (Attempts 1-10): Power-of-2, wrapping modes, filters
+2. **Material Modifications** (Attempts 11-13): Material simplification, color space
+3. **GLB File Changes** (Attempts 11, 14-15): WebP to JPG conversion, separate mobile GLB
+4. **WebGL Context** (Attempt 17): WebGL 2 implementation
+5. **Platform Emulation** (Attempt 18): Canvas reprocessing like Sketchfab/Spatial.io
+
+**Current Status**: 
+- ⏳ Attempt #18 implemented and deployed
+- 🐛 Debug panel added for mobile diagnostics
+- 📱 Awaiting test results on iPhone 14 Max
+
+**If #18 Succeeds**: Document the solution and optimize performance
+**If #18 Fails**: Proceed with approaches #19-26 in order of likelihood
+
+## 🔑 KEY TAKEAWAYS
+
+1. **The GLB files are NOT the problem** - they work on other platforms
+2. **It's a texture GPU binding issue** - textures load but don't render
+3. **Platform processing is the key** - Sketchfab/Spatial.io do something special
+4. **Canvas reprocessing might work** - It's what platforms likely do
+5. **Debug visibility is crucial** - Mobile debug panel will reveal the issue
+
 ## References
 
 - Three.js mobile compatibility: https://threejs.org/docs/#manual/en/introduction/WebGL-compatibility-check
 - WebGL mobile limitations: https://webgl2fundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
 - Canvas texture best practices: https://threejs.org/docs/#api/en/textures/CanvasTexture
 - GLTFLoader documentation: https://threejs.org/docs/#examples/en/loaders/GLTFLoader
+- Basis Universal: https://github.com/BinomialLLC/basis_universal
+- KTX2 Specification: https://www.khronos.org/ktx/

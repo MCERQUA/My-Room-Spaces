@@ -352,13 +352,16 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       transition: all 0.3s ease;
       transform-origin: top left;
-      width: 60px;  /* Explicit width: 10px + 40px + 10px */
+      width: 60px !important;  /* FORCE IT */
+      max-width: 60px !important;  /* REALLY FORCE IT */
+      min-width: 60px !important;  /* ABSOLUTELY FORCE IT */
       box-sizing: border-box;  /* Include padding in width */
+      overflow: hidden;  /* Hide any overflow */
     }
     
     /* Popup panels for menu items */
     .menu-popup {
-      position: absolute;
+      position: fixed;  /* Use fixed positioning instead */
       top: 75px;  /* Same top as menu */
       left: 90px;  /* 20px (menu left) + 60px (menu width) + 10px (gap) */
       min-width: 200px;
@@ -502,7 +505,9 @@
       .glass-menu {
         flex-direction: row;
         flex-wrap: wrap;
-        width: 100px;
+        width: 100px !important;
+        max-width: 100px !important;
+        min-width: 100px !important;
         gap: 8px;
         padding: 8px;
       }
@@ -1162,7 +1167,7 @@
   </button>
   
   <!-- Glass Menu -->
-  <div class="glass-menu collapsed" id="glass-menu">
+  <div class="glass-menu" id="glass-menu">
     <button class="glass-button" id="menu-home" data-popup="home-popup">
       🏠
       <span class="tooltip">Home</span>

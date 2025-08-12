@@ -1447,10 +1447,11 @@
   </div>
   
   <!-- Mobile Debug Panel -->
-  <button id="debug-toggle-btn">🐛</button>
+  <button id="debug-toggle-btn" onclick="event.stopPropagation(); window.toggleDebugPanel && window.toggleDebugPanel();">🐛</button>
   <div id="mobile-debug-panel">
     <h3>Mobile Debug Info</h3>
     <div id="debug-content"></div>
+    <button onclick="this.parentElement.classList.remove('visible');" style="margin-top: 10px; padding: 5px 10px; background: #4a90e2; color: white; border: none; border-radius: 4px;">Close</button>
   </div>
   
   <script src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.js"></script>
@@ -1549,36 +1550,32 @@
       }
     }
     
-    // Show debug button on mobile and set up click handler
+    // Make toggleDebugPanel globally accessible
+    window.toggleDebugPanel = toggleDebugPanel;
+    
+    // Show debug button on mobile
     if (isMobileEarly) {
-      window.addEventListener('DOMContentLoaded', () => {
+      // Show button immediately, don't wait for DOMContentLoaded
+      setTimeout(() => {
         const debugBtn = document.getElementById('debug-toggle-btn');
         if (debugBtn) {
           debugBtn.style.display = 'block';
-          
-          // Add click handler with event stopping
-          debugBtn.addEventListener('click', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleDebugPanel();
-          }, true); // Use capture phase
-          
-          // Prevent touch events from propagating
-          debugBtn.addEventListener('touchstart', (e) => {
-            e.stopPropagation();
-          }, true);
-          debugBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleDebugPanel();
-          }, true);
+          console.log('📱 Debug button shown');
         }
         document.body.classList.add('is-mobile');
         
         // Add console logging for debugging
         console.log('📱 Mobile Debug Initialized');
-        console.log('Platform:', mobileSettings);
-      });
+        console.log('Platform:', typeof mobileSettings !== 'undefined' ? mobileSettings : 'Settings not ready');
+        
+        // Also show the debug panel immediately for testing
+        const panel = document.getElementById('mobile-debug-panel');
+        if (panel) {
+          panel.classList.add('visible');
+          updateDebugPanel();
+          console.log('📱 Debug panel shown automatically');
+        }
+      }, 100);
     }
     
     // Comprehensive WebGL capability detection
@@ -2057,51 +2054,29 @@
                   console.log('  Type:', material.type);
                   console.log('  Has map:', !!material.map);
                   
-                  // Simpler mobile texture fix - just ensure correct settings
+                  // ON MOBILE: DO NOTHING - Let Three.js handle textures naturally
                   if (isMobile && material.map) {
                     textureCount++;
-                    console.log('  📱 Mobile texture fix...');
+                    console.log('  📱 Mobile: Texture found, NOT modifying');
+                    console.log('    Material type:', material.type);
                     
-                    // Log current texture state
                     if (material.map.image) {
                       console.log('    Image dimensions:', material.map.image.width, 'x', material.map.image.height);
-                      console.log('    Image type:', material.map.image.constructor.name);
-                    }
-                    
-                    // Try simpler approach - just ensure texture settings are correct
-                    material.map.colorSpace = THREE.SRGBColorSpace;
-                    material.map.flipY = false; // GLB textures should not be flipped
-                    material.map.generateMipmaps = true;
-                    material.map.minFilter = THREE.LinearMipmapLinearFilter;
-                    material.map.magFilter = THREE.LinearFilter;
-                    material.map.needsUpdate = true;
-                    
-                    // Force material to use unlit shading to test if textures show at all
-                    if (material.type === 'MeshStandardMaterial' || material.type === 'MeshPhysicalMaterial') {
-                      // Convert to basic material to eliminate lighting issues
-                      const basicMat = new THREE.MeshBasicMaterial({
-                        map: material.map,
-                        color: material.color || new THREE.Color(1, 1, 1),
-                        transparent: material.transparent || false,
-                        opacity: material.opacity || 1,
-                        side: material.side || THREE.FrontSide
-                      });
+                      console.log('    Image ready:', material.map.image.complete !== false);
                       
-                      // Replace the material
-                      child.material = basicMat;
-                      material.dispose();
-                      material = basicMat;
-                      
-                      console.log('    ✅ Converted to MeshBasicMaterial for testing');
+                      // Just log the current state, don't modify anything
+                      console.log('    Current settings:');
+                      console.log('      - colorSpace:', material.map.colorSpace);
+                      console.log('      - minFilter:', material.map.minFilter);
+                      console.log('      - magFilter:', material.map.magFilter);
+                      console.log('      - generateMipmaps:', material.map.generateMipmaps);
                     }
-                    
-                    material.needsUpdate = true;
                     
                     // Update debug panel
                     if (isMobileEarly) {
                       debugInfo.textures.push({
                         name: child.name || 'unnamed',
-                        success: true,
+                        success: material.map.image ? true : false,
                         status: material.map.image ? `${material.map.image.width}x${material.map.image.height}` : 'no image'
                       });
                       updateDebugPanel();
@@ -2220,49 +2195,89 @@
         
         console.log('Room model loaded successfully');
         
-        // Test if regular texture loading works on mobile
+        // Test if ANY textures work on mobile with multiple approaches
         if (isMobile) {
-          console.log('📱 Testing if TextureLoader works on mobile...');
-          const textureLoader = new THREE.TextureLoader();
+          console.log('📱 === MOBILE TEXTURE TESTING ===');
           
-          // Create a simple test texture with Canvas
+          // TEST 1: Simple colored plane (no texture)
+          const colorGeometry = new THREE.PlaneGeometry(5, 5);
+          const colorMaterial = new THREE.MeshBasicMaterial({ 
+            color: 0x00FF00,  // Green
+            side: THREE.DoubleSide 
+          });
+          const colorPlane = new THREE.Mesh(colorGeometry, colorMaterial);
+          colorPlane.position.set(-5, 2, -5);
+          scene.add(colorPlane);
+          console.log('✅ Added GREEN plane (no texture) at left');
+          
+          // TEST 2: Canvas texture
           const testCanvas = document.createElement('canvas');
           testCanvas.width = 256;
           testCanvas.height = 256;
           const testCtx = testCanvas.getContext('2d');
           
-          // Draw a test pattern
+          // Draw a more visible test pattern
           testCtx.fillStyle = '#FF0000';
           testCtx.fillRect(0, 0, 256, 256);
-          testCtx.fillStyle = '#FFFFFF';
-          testCtx.font = '30px Arial';
-          testCtx.fillText('TEST', 80, 130);
+          testCtx.fillStyle = '#FFFF00';
+          testCtx.fillRect(64, 64, 128, 128);
+          testCtx.fillStyle = '#000000';
+          testCtx.font = 'bold 40px Arial';
+          testCtx.fillText('MOBILE', 50, 140);
           
-          // Create texture from canvas
           const testTexture = new THREE.CanvasTexture(testCanvas);
           testTexture.needsUpdate = true;
           
-          // Create a test plane to verify textures work at all
-          const testGeometry = new THREE.PlaneGeometry(3, 3);
+          const testGeometry = new THREE.PlaneGeometry(5, 5);
           const testMaterial = new THREE.MeshBasicMaterial({ 
             map: testTexture,
             side: THREE.DoubleSide 
           });
           const testPlane = new THREE.Mesh(testGeometry, testMaterial);
-          testPlane.position.set(0, 3, -5);
-          testPlane.name = 'TEST_TEXTURE_PLANE';
+          testPlane.position.set(0, 2, -5);
           scene.add(testPlane);
+          console.log('✅ Added RED/YELLOW texture plane at center');
           
-          console.log('✅ Test texture plane added to scene');
-          console.log('If you see a red square with "TEST" text, textures CAN work');
-          console.log('If not, there is a fundamental WebGL issue');
+          // TEST 3: Data texture (programmatic)
+          const width = 128;
+          const height = 128;
+          const size = width * height;
+          const data = new Uint8Array(4 * size);
+          
+          for (let i = 0; i < size; i++) {
+            const stride = i * 4;
+            data[stride] = (i % width) * 2;      // R
+            data[stride + 1] = (i / width) * 2;  // G
+            data[stride + 2] = 128;              // B
+            data[stride + 3] = 255;              // A
+          }
+          
+          const dataTexture = new THREE.DataTexture(data, width, height);
+          dataTexture.needsUpdate = true;
+          
+          const dataGeometry = new THREE.PlaneGeometry(5, 5);
+          const dataMaterial = new THREE.MeshBasicMaterial({
+            map: dataTexture,
+            side: THREE.DoubleSide
+          });
+          const dataPlane = new THREE.Mesh(dataGeometry, dataMaterial);
+          dataPlane.position.set(5, 2, -5);
+          scene.add(dataPlane);
+          console.log('✅ Added DATA texture plane at right');
+          
+          console.log('===================================');
+          console.log('YOU SHOULD SEE:');
+          console.log('LEFT: Green square (no texture)');
+          console.log('CENTER: Red/Yellow square with "MOBILE" text');
+          console.log('RIGHT: Gradient pattern');
+          console.log('===================================');
           
           // Update debug info
-          debugInfo.textures.push({
-            name: 'Canvas Test Texture',
-            success: true,
-            status: 'Created and displayed'
-          });
+          debugInfo.textures.push(
+            { name: 'Color Plane', success: true, status: 'Green - No texture' },
+            { name: 'Canvas Texture', success: true, status: 'Red/Yellow pattern' },
+            { name: 'Data Texture', success: true, status: 'Gradient pattern' }
+          );
           updateDebugPanel();
         }
         },

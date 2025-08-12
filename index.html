@@ -341,6 +341,7 @@
       z-index: 400;
       display: flex;
       flex-direction: column;  /* Single column layout */
+      align-items: center;  /* Center icons */
       gap: 10px;
       background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
@@ -351,14 +352,14 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       transition: all 0.3s ease;
       transform-origin: top left;
-      width: fit-content;  /* Fit to content width */
+      width: 60px;  /* Fixed width for single column */
     }
     
     /* Popup panels for menu items */
     .menu-popup {
       position: absolute;
       top: 0;
-      left: calc(100% + 15px);  /* Position to the right with gap */
+      left: 70px;  /* Fixed position next to 60px menu + 10px gap */
       min-width: 200px;
       background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
@@ -372,6 +373,65 @@
       pointer-events: none;
       transition: all 0.3s ease;
       z-index: 399;
+    }
+    
+    /* Style buttons in popups */
+    .menu-popup button {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.9);
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .menu-popup button:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    
+    .menu-popup button:active {
+      transform: translateY(0);
+      background: rgba(255, 255, 255, 0.1);
+    }
+    
+    /* Style file input wrappers in popups */
+    .menu-popup .file-input-wrapper {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: rgba(255, 255, 255, 0.9);
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      width: 100%;
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    
+    .menu-popup .file-input-wrapper:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.25);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     }
     
     .menu-popup.active {
@@ -1126,22 +1186,22 @@
     
     <div class="menu-popup" id="screen-popup">
       <h3>🖥️ Screen Share</h3>
-      <button id="share-screen" style="width: 100%; margin: 4px 0;">Share Desktop</button>
-      <button id="stop-sharing" style="display: none; width: 100%; margin: 4px 0;">Stop Sharing</button>
-      <label class="file-input-wrapper" style="width: 100%; margin: 4px 0; display: block;">
+      <button id="share-screen">🖥️ Share Desktop</button>
+      <button id="stop-sharing" style="display: none;">⏹️ Stop Sharing</button>
+      <label class="file-input-wrapper">
         📁 Load Video File
         <input type="file" id="video-upload" accept="video/*" style="display: none;" />
       </label>
-      <button id="clear-screen" style="width: 100%; margin: 4px 0;">Clear Screen</button>
+      <button id="clear-screen">🧹 Clear Screen</button>
     </div>
     
     <div class="menu-popup" id="objects-popup">
       <h3>📦 3D Objects</h3>
-      <label class="file-input-wrapper" style="width: 100%; margin: 4px 0; display: block;">
+      <label class="file-input-wrapper">
         📦 Load GLB Model
         <input type="file" id="glb-upload" accept=".glb,.gltf" style="display: none;" />
       </label>
-      <div id="object-controls" style="display: none;">
+      <div id="object-controls" style="display: none; margin-top: 12px;">
         <div style="display: flex; gap: 8px; margin: 8px 0;">
           <button id="move-up" style="flex: 1;">↑</button>
           <button id="move-down" style="flex: 1;">↓</button>
@@ -1150,7 +1210,7 @@
           <button id="move-left" style="flex: 1;">←</button>
           <button id="move-right" style="flex: 1;">→</button>
         </div>
-        <button id="delete-object" style="width: 100%; margin: 8px 0; background: rgba(255,77,77,0.2);">Delete</button>
+        <button id="delete-object" style="width: 100%; margin: 8px 0; background: rgba(255,77,77,0.15); border-color: rgba(255,77,77,0.3);">🗑️ Delete</button>
       </div>
     </div>
     

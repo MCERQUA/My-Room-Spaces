@@ -1709,9 +1709,16 @@
     let largeScreen = null;
     
     function loadRoomModel() {
-      // Use mobile-optimized GLB with JPG textures for mobile devices
-      const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
-      console.log(`Loading ${isMobile ? 'mobile-optimized (JPG textures)' : 'desktop (WebP textures)'} room model...`);
+      // Debug mobile detection
+      console.log('=== MOBILE DETECTION DEBUG ===');
+      console.log('isMobile:', isMobile);
+      console.log('isMobileEarly:', isMobileEarly);
+      console.log('User Agent:', navigator.userAgent);
+      
+      // TEMPORARY: Force desktop GLB on mobile to test if it's a file issue
+      // const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
+      const modelPath = './models/BAKE-WEBROOM1.glb'; // TEST: Use desktop GLB for all
+      console.log(`TESTING: Loading DESKTOP GLB on all devices from: ${modelPath}`);
       
       // BEST PRACTICE: Let GLTFLoader handle everything automatically
       // GLB files embed textures directly, and GLTFLoader handles them properly
@@ -1725,20 +1732,55 @@
           roomModel.position.set(0, 0, 0);
           roomModel.scale.set(1, 1, 1);
           
-          // Only set shadows on desktop for performance
+          // Debug all materials and textures
+          console.log('=== MATERIAL/TEXTURE DEBUG ===');
+          let meshCount = 0;
+          let textureCount = 0;
+          
           roomModel.traverse((child) => {
             if (child.isMesh) {
+              meshCount++;
+              
               if (!isMobile) {
                 child.castShadow = true;
                 child.receiveShadow = true;
               }
               
-              // Simple logging for debugging (don't modify anything)
-              if (isMobile && child.material) {
-                console.log(`Mobile mesh: ${child.name}, Has texture: ${!!child.material.map}`);
+              // Detailed material debugging
+              if (child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                
+                materials.forEach((material, idx) => {
+                  console.log(`Mesh: ${child.name || 'unnamed'} [Material ${idx}]`);
+                  console.log('  Type:', material.type);
+                  console.log('  Has map:', !!material.map);
+                  
+                  if (material.map) {
+                    textureCount++;
+                    console.log('  Texture info:');
+                    console.log('    - UUID:', material.map.uuid);
+                    console.log('    - Image:', material.map.image);
+                    console.log('    - Image type:', material.map.image?.constructor.name);
+                    console.log('    - Width x Height:', material.map.image?.width, 'x', material.map.image?.height);
+                    console.log('    - Source:', material.map.source);
+                    
+                    // Check if it's actually rendering
+                    if (material.map.image && material.map.image.width > 0) {
+                      console.log('    ✅ Texture has valid dimensions');
+                    } else {
+                      console.log('    ❌ Texture has no valid dimensions!');
+                    }
+                  } else {
+                    console.log('  No texture map');
+                  }
+                  
+                  console.log('  Color:', material.color?.getHexString());
+                });
               }
             }
           });
+          
+          console.log(`Summary: ${meshCount} meshes, ${textureCount} textures found`);
         
         scene.add(roomModel);
         

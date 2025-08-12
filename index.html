@@ -339,7 +339,7 @@
       top: 75px;  /* Moved down to avoid toggle button */
       left: 20px;
       z-index: 400;
-      display: flex;
+      display: inline-flex;  /* Use inline-flex to shrink wrap content */
       flex-direction: column;  /* Single column layout */
       align-items: center;  /* Center icons */
       gap: 10px;
@@ -352,7 +352,7 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       transition: all 0.3s ease;
       transform-origin: top left;
-      width: fit-content;  /* Let it size to the button width */
+      /* No width property - let inline-flex handle it */
     }
     
     /* Popup panels for menu items */
@@ -527,6 +527,8 @@
       color: #ffffff;
       transition: all 0.3s ease;
       position: relative;
+      margin: 0;  /* Ensure no default margins */
+      flex-shrink: 0;  /* Prevent button from shrinking */
     }
 
     .glass-button:hover {

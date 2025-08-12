@@ -1341,8 +1341,8 @@
   </div>
 
   <!-- Welcome Dialog -->
-  <div class="welcome-overlay" id="welcome-overlay"></div>
-  <div class="welcome-dialog" id="welcome-dialog">
+  <div class="welcome-overlay" id="welcome-overlay" style="display: none;"></div>
+  <div class="welcome-dialog" id="welcome-dialog" style="display: none;">
     <h2>Welcome</h2>
     <p>Enter your name to join</p>
     <input type="text" class="welcome-input" id="welcome-input" placeholder="Your name" maxlength="20" autocomplete="off">
@@ -1519,7 +1519,7 @@
     // Essential renderer settings based on mobile compatibility research
     // CRITICAL: Don't set outputColorSpace on mobile - may cause texture issues
     // Let WebGL use its default linear space and handle conversion naturally
-    if (!isMobile) {
+    if (!isMobileEarly) {
       renderer.outputColorSpace = THREE.SRGBColorSpace; // Desktop can handle sRGB output
     }
     renderer.toneMapping = THREE.NoToneMapping;
@@ -2173,22 +2173,37 @@
     let userChosenName = '';
     
     function showWelcomeDialog() {
-      const welcomeDialog = document.getElementById('welcome-dialog');
-      const welcomeOverlay = document.getElementById('welcome-overlay');
-      const welcomeInput = document.getElementById('welcome-input');
-      const welcomeButton = document.getElementById('welcome-button');
-      
-      // Show the dialog and overlay
-      welcomeDialog.style.display = 'block';
-      welcomeOverlay.style.display = 'block';
-      
-      // Focus input (with delay for mobile)
-      setTimeout(() => {
-        // Only focus on non-touch devices to prevent keyboard popup issues
-        if (!('ontouchstart' in window)) {
-          welcomeInput.focus();
+      try {
+        const welcomeDialog = document.getElementById('welcome-dialog');
+        const welcomeOverlay = document.getElementById('welcome-overlay');
+        const welcomeInput = document.getElementById('welcome-input');
+        const welcomeButton = document.getElementById('welcome-button');
+        
+        if (!welcomeDialog || !welcomeOverlay) {
+          console.error('Welcome dialog elements not found!');
+          // Fallback: initialize with generated name
+          initializeRoomSystem();
+          return;
         }
-      }, 100);
+        
+        // Show the dialog and overlay
+        welcomeDialog.style.display = 'block';
+        welcomeOverlay.style.display = 'block';
+        console.log('Welcome dialog shown');
+        
+        // Focus input (with delay for mobile)
+        setTimeout(() => {
+          // Only focus on non-touch devices to prevent keyboard popup issues
+          if (!('ontouchstart' in window) && welcomeInput) {
+            welcomeInput.focus();
+          }
+        }, 100);
+      } catch (error) {
+        console.error('Error showing welcome dialog:', error);
+        // Fallback: initialize with generated name
+        initializeRoomSystem();
+        return;
+      }
       
       // Add explicit touch handling for input field
       welcomeInput.addEventListener('touchstart', (e) => {

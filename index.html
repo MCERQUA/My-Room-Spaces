@@ -2054,30 +2054,55 @@
                   console.log('  Type:', material.type);
                   console.log('  Has map:', !!material.map);
                   
-                  // ON MOBILE: DO NOTHING - Let Three.js handle textures naturally
-                  if (isMobile && material.map) {
+                  // iOS FIX: Manually recreate textures from the image data
+                  if (isMobile && material.map && material.map.image) {
                     textureCount++;
-                    console.log('  📱 Mobile: Texture found, NOT modifying');
-                    console.log('    Material type:', material.type);
+                    console.log('  📱 iOS Texture Fix: Manually recreating texture');
                     
-                    if (material.map.image) {
-                      console.log('    Image dimensions:', material.map.image.width, 'x', material.map.image.height);
-                      console.log('    Image ready:', material.map.image.complete !== false);
-                      
-                      // Just log the current state, don't modify anything
-                      console.log('    Current settings:');
-                      console.log('      - colorSpace:', material.map.colorSpace);
-                      console.log('      - minFilter:', material.map.minFilter);
-                      console.log('      - magFilter:', material.map.magFilter);
-                      console.log('      - generateMipmaps:', material.map.generateMipmaps);
-                    }
+                    const originalImage = material.map.image;
+                    console.log('    Original image:', originalImage.width, 'x', originalImage.height);
+                    
+                    // Create a canvas and draw the original image
+                    const canvas = document.createElement('canvas');
+                    canvas.width = originalImage.width;
+                    canvas.height = originalImage.height;
+                    const ctx = canvas.getContext('2d');
+                    
+                    // Draw the original image to canvas
+                    ctx.drawImage(originalImage, 0, 0);
+                    
+                    // Create a new texture from the canvas
+                    const newTexture = new THREE.CanvasTexture(canvas);
+                    
+                    // Copy all properties from the original texture
+                    newTexture.wrapS = material.map.wrapS;
+                    newTexture.wrapT = material.map.wrapT;
+                    newTexture.repeat.copy(material.map.repeat);
+                    newTexture.offset.copy(material.map.offset);
+                    newTexture.rotation = material.map.rotation;
+                    newTexture.center.copy(material.map.center);
+                    newTexture.flipY = material.map.flipY;
+                    
+                    // Set proper filtering
+                    newTexture.minFilter = THREE.LinearMipmapLinearFilter;
+                    newTexture.magFilter = THREE.LinearFilter;
+                    newTexture.generateMipmaps = true;
+                    newTexture.needsUpdate = true;
+                    
+                    // Replace the texture
+                    const oldTexture = material.map;
+                    material.map = newTexture;
+                    oldTexture.dispose();
+                    material.needsUpdate = true;
+                    
+                    console.log('    ✅ Texture recreated as CanvasTexture');
                     
                     // Update debug panel
                     if (isMobileEarly) {
                       debugInfo.textures.push({
                         name: child.name || 'unnamed',
-                        success: material.map.image ? true : false,
-                        status: material.map.image ? `${material.map.image.width}x${material.map.image.height}` : 'no image'
+                        success: true,
+                        status: `Recreated ${canvas.width}x${canvas.height}`
                       });
                       updateDebugPanel();
                     }
@@ -2195,90 +2220,30 @@
         
         console.log('Room model loaded successfully');
         
-        // Test if ANY textures work on mobile with multiple approaches
+        // Mobile texture diagnostics complete - Canvas textures work!
         if (isMobile) {
-          console.log('📱 === MOBILE TEXTURE TESTING ===');
+          console.log('📱 === MOBILE TEXTURE FIX APPLIED ===');
+          console.log('Canvas textures confirmed working on iOS');
+          console.log('GLB textures converted to CanvasTexture');
           
-          // TEST 1: Simple colored plane (no texture)
-          const colorGeometry = new THREE.PlaneGeometry(5, 5);
-          const colorMaterial = new THREE.MeshBasicMaterial({ 
-            color: 0x00FF00,  // Green
-            side: THREE.DoubleSide 
-          });
-          const colorPlane = new THREE.Mesh(colorGeometry, colorMaterial);
-          colorPlane.position.set(-5, 2, -5);
-          scene.add(colorPlane);
-          console.log('✅ Added GREEN plane (no texture) at left');
-          
-          // TEST 2: Canvas texture
-          const testCanvas = document.createElement('canvas');
-          testCanvas.width = 256;
-          testCanvas.height = 256;
-          const testCtx = testCanvas.getContext('2d');
-          
-          // Draw a more visible test pattern
-          testCtx.fillStyle = '#FF0000';
-          testCtx.fillRect(0, 0, 256, 256);
-          testCtx.fillStyle = '#FFFF00';
-          testCtx.fillRect(64, 64, 128, 128);
-          testCtx.fillStyle = '#000000';
-          testCtx.font = 'bold 40px Arial';
-          testCtx.fillText('MOBILE', 50, 140);
-          
-          const testTexture = new THREE.CanvasTexture(testCanvas);
-          testTexture.needsUpdate = true;
-          
-          const testGeometry = new THREE.PlaneGeometry(5, 5);
-          const testMaterial = new THREE.MeshBasicMaterial({ 
-            map: testTexture,
-            side: THREE.DoubleSide 
-          });
-          const testPlane = new THREE.Mesh(testGeometry, testMaterial);
-          testPlane.position.set(0, 2, -5);
-          scene.add(testPlane);
-          console.log('✅ Added RED/YELLOW texture plane at center');
-          
-          // TEST 3: Data texture (programmatic)
-          const width = 128;
-          const height = 128;
-          const size = width * height;
-          const data = new Uint8Array(4 * size);
-          
-          for (let i = 0; i < size; i++) {
-            const stride = i * 4;
-            data[stride] = (i % width) * 2;      // R
-            data[stride + 1] = (i / width) * 2;  // G
-            data[stride + 2] = 128;              // B
-            data[stride + 3] = 255;              // A
-          }
-          
-          const dataTexture = new THREE.DataTexture(data, width, height);
-          dataTexture.needsUpdate = true;
-          
-          const dataGeometry = new THREE.PlaneGeometry(5, 5);
-          const dataMaterial = new THREE.MeshBasicMaterial({
-            map: dataTexture,
-            side: THREE.DoubleSide
-          });
-          const dataPlane = new THREE.Mesh(dataGeometry, dataMaterial);
-          dataPlane.position.set(5, 2, -5);
-          scene.add(dataPlane);
-          console.log('✅ Added DATA texture plane at right');
-          
-          console.log('===================================');
-          console.log('YOU SHOULD SEE:');
-          console.log('LEFT: Green square (no texture)');
-          console.log('CENTER: Red/Yellow square with "MOBILE" text');
-          console.log('RIGHT: Gradient pattern');
-          console.log('===================================');
-          
-          // Update debug info
-          debugInfo.textures.push(
-            { name: 'Color Plane', success: true, status: 'Green - No texture' },
-            { name: 'Canvas Texture', success: true, status: 'Red/Yellow pattern' },
-            { name: 'Data Texture', success: true, status: 'Gradient pattern' }
-          );
-          updateDebugPanel();
+          // Force a re-render after texture recreation
+          setTimeout(() => {
+            console.log('Forcing renderer update...');
+            renderer.render(scene, camera);
+            
+            // Also try updating all materials again
+            roomModel.traverse((child) => {
+              if (child.isMesh && child.material) {
+                child.material.needsUpdate = true;
+                if (child.material.map) {
+                  child.material.map.needsUpdate = true;
+                }
+              }
+            });
+            
+            renderer.render(scene, camera);
+            console.log('Renderer updated');
+          }, 1000);
         }
         },
         function(progress) {

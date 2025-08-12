@@ -1,10 +1,51 @@
 # Mobile Texture Rendering Attempts Documentation
 
+## 🔴 CURRENT STATUS: UNRESOLVED
+**As of August 12, 2025 - Mobile textures are STILL WHITE despite 16+ different approaches**
+
 ## Overview
 This document tracks all the different approaches we've tried to fix mobile texture rendering issues in the 3D Three.js site. The main problem has been textures appearing white or not rendering correctly on mobile devices, while working fine on desktop.
 
+### Quick Summary of What We Know:
+- ✅ Mobile GLB file exists with JPG textures (WEBROOM1-mob.glb)
+- ✅ Textures load successfully (console shows valid dimensions)
+- ✅ Materials are present (objects have base colors)
+- ❌ Textures don't render (all surfaces appear white)
+- ❌ Affects ALL mobile browsers (iOS Safari, Chrome, Android)
+- ❌ Following Three.js best practices doesn't fix it
+
 ## Key Finding
 **Someone else has it working on mobile without special handling**, suggesting our "fixes" may have been making things worse.
+
+## Latest Attempts (August 12, 2025) - STILL NOT WORKING
+
+### ⚠️ CURRENT STATUS: Mobile textures still showing white despite all attempts
+
+### 14. Simplified GLB Loading (Following Best Practices)
+**Commit**: `12da505` - Let GLTFLoader handle textures automatically
+**Changes**:
+- Removed ALL texture manipulation code
+- Removed material modifications
+- Let GLTFLoader handle everything automatically as per Three.js best practices
+- Used standard loader.load() pattern without interference
+- **Result**: ❌ Textures still white on mobile
+
+### 15. Force Render Updates on Mobile
+**Commit**: `5c2547e` - Force texture updates after load
+**Changes**:
+- Added forced renderer.render() calls after model load
+- Added delayed material.needsUpdate = true for all materials
+- Fixed mobile detection to include iOS Chrome
+- **Result**: ❌ Still white textures on all mobile browsers
+
+### 16. Debug Findings
+**What we know**:
+- Mobile GLB (WEBROOM1-mob.glb) has JPG textures instead of WebP
+- Desktop GLB works fine on desktop
+- Textures appear to load (have valid dimensions in console)
+- Materials are present (couch is black, not white - indicating material loads)
+- But textures don't render (all surfaces white except base colors)
+- Issue affects: iOS Safari, Chrome on iOS, Android Chrome
 
 ## Latest Fixes (August 12, 2025)
 
@@ -239,25 +280,43 @@ The issue was a combination of factors that have now been resolved:
    renderer.context.isContextLost()
    ```
 
-## Why Textures Were Showing White - Root Causes
+## Why Textures Are STILL Showing White - Unresolved Issues
 
-1. **WebP Format Incompatibility**: WebP textures embedded in GLB files don't work on many mobile browsers
-2. **Material Simplification Breaking Textures**: Converting to MeshBasicMaterial was losing essential texture properties
-3. **Color Space Confusion**: Not setting outputColorSpace consistently caused rendering issues
-4. **Over-Engineering**: Adding "fixes" that made things worse instead of letting Three.js handle it
+### ❌ THE PROBLEM PERSISTS
+Despite following Three.js best practices, mobile textures remain white.
 
-## The Solution That Works
+### Current Understanding:
+1. **Textures ARE loading**: Console shows valid dimensions
+2. **Materials ARE present**: Objects have colors (couch is black, not white)
+3. **But textures DON'T render**: The texture data exists but isn't displayed
+4. **Platform-agnostic issue**: Affects iOS Safari, Chrome on iOS, and Android
 
+### What We've Tried That DOESN'T Work:
 ```javascript
-// 1. Load the right GLB for the platform
+// ❌ Separate GLB files with JPG textures
 const modelPath = isMobile ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
 
-// 2. Don't modify materials - let Three.js handle them
-// NO material conversion, NO texture modification
+// ❌ Letting GLTFLoader handle everything
+loader.load(modelPath, (gltf) => scene.add(gltf.scene));
 
-// 3. Use consistent color space
-renderer.outputColorSpace = THREE.SRGBColorSpace; // For all devices
+// ❌ Setting color space
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+
+// ❌ Forcing texture updates
+material.map.needsUpdate = true;
+
+// ❌ Material simplification
+// ❌ Texture manipulation
+// ❌ Power-of-2 enforcement
+// ❌ All of the above
 ```
+
+### Possible Remaining Issues:
+1. **GLB Export Problem**: The mobile GLB might be incorrectly exported
+2. **WebGL Mobile Limitation**: Some fundamental WebGL limitation we haven't identified
+3. **Three.js Mobile Bug**: Possible bug in Three.js GLTFLoader on mobile
+4. **Texture Format Issue**: Even JPG textures might have encoding problems in GLB
+5. **Memory Constraints**: Mobile devices might be hitting memory limits
 
 ## Testing Checklist
 
@@ -272,8 +331,34 @@ renderer.outputColorSpace = THREE.SRGBColorSpace; // For all devices
 - [ ] Test with GPU-intensive apps closed
 - [ ] Check available device memory
 
+## Next Steps to Try
+
+### Potential Solutions Not Yet Attempted:
+1. **Re-export GLB with different settings**:
+   - Try different compression settings
+   - Ensure textures are embedded correctly
+   - Use Blender or other 3D software to verify
+
+2. **Try loading textures separately**:
+   - Extract textures from GLB
+   - Load them with TextureLoader
+   - Apply manually to materials
+
+3. **Test with a simpler GLB**:
+   - Create a basic cube with texture
+   - Test if ANY GLB textures work on mobile
+
+4. **Check Three.js version compatibility**:
+   - Update to latest Three.js
+   - Or try older version that's known to work
+
+5. **WebGL context settings**:
+   - Try different WebGL context parameters
+   - Check for WebGL extensions support
+
 ## References
 
 - Three.js mobile compatibility: https://threejs.org/docs/#manual/en/introduction/WebGL-compatibility-check
 - WebGL mobile limitations: https://webgl2fundamentals.org/webgl/lessons/webgl-resizing-the-canvas.html
 - Canvas texture best practices: https://threejs.org/docs/#api/en/textures/CanvasTexture
+- GLTFLoader documentation: https://threejs.org/docs/#examples/en/loaders/GLTFLoader

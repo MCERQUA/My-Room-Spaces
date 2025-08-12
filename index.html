@@ -2136,6 +2136,10 @@
       const welcomeInput = document.getElementById('welcome-input');
       const welcomeButton = document.getElementById('welcome-button');
       
+      // Show the dialog and overlay
+      welcomeDialog.style.display = 'block';
+      welcomeOverlay.style.display = 'block';
+      
       // Focus input (with delay for mobile)
       setTimeout(() => {
         welcomeInput.focus();
@@ -4052,21 +4056,23 @@
       document.getElementById('help-dialog').classList.remove('visible');
     });
     
-    // GLB Upload from dropdown
-    document.getElementById('glb-upload').addEventListener('change', (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        loadModelFromFile(file);
-        document.getElementById('objects-controls').style.display = 'none';
-      }
-    });
+    // GLB Upload from popup
+    const glbUpload = document.getElementById('glb-upload');
+    if (glbUpload) {
+      glbUpload.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          loadModelFromFile(file);
+          // Close the popup after loading
+          if (activePopup) {
+            document.getElementById(activePopup).classList.remove('active');
+            activePopup = null;
+          }
+        }
+      });
+    }
     
-    // View Objects button
-    document.getElementById('view-objects').addEventListener('click', (e) => {
-      e.stopPropagation();
-      showObjectsList();
-      document.getElementById('objects-controls').style.display = 'none';
-    });
+    // View Objects button removed - no longer in new popup system
     
     // Close objects list
     document.getElementById('objects-list-close').addEventListener('click', (e) => {

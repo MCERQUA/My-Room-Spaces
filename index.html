@@ -994,6 +994,9 @@
       text-align: center;
       margin-bottom: 20px;
       transition: all 0.3s ease;
+      -webkit-appearance: none; /* Remove iOS default styling */
+      -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+      touch-action: manipulation; /* Better touch handling */
     }
 
     .welcome-input:focus {
@@ -1017,6 +1020,8 @@
       font-weight: 600;
       transition: all 0.3s ease;
       min-width: 120px;
+      -webkit-tap-highlight-color: transparent; /* Remove tap highlight on iOS */
+      touch-action: manipulation; /* Prevent double-tap zoom */
     }
 
     .welcome-button:hover {
@@ -2205,8 +2210,16 @@
       
       // Focus input (with delay for mobile)
       setTimeout(() => {
-        welcomeInput.focus();
+        // Only focus on non-touch devices to prevent keyboard popup issues
+        if (!('ontouchstart' in window)) {
+          welcomeInput.focus();
+        }
       }, 100);
+      
+      // Add explicit touch handling for input field
+      welcomeInput.addEventListener('touchstart', (e) => {
+        e.stopPropagation(); // Ensure touch events reach the input
+      });
       
       // Handle name submission
       function submitName() {
@@ -2223,13 +2236,27 @@
         initializeRoomSystem();
       }
       
-      // Submit on button click (works on mobile)
-      welcomeButton.addEventListener('click', submitName);
+      // Submit on button click - handle both touch and mouse
+      let touchHandled = false;
       
-      // Add touch event for mobile
+      welcomeButton.addEventListener('touchstart', (e) => {
+        touchHandled = true;
+        e.preventDefault(); // Prevent mouse events from firing
+      });
+      
       welcomeButton.addEventListener('touchend', (e) => {
         e.preventDefault();
-        submitName();
+        if (touchHandled) {
+          submitName();
+          touchHandled = false;
+        }
+      });
+      
+      welcomeButton.addEventListener('click', (e) => {
+        // Only handle click if it wasn't a touch event
+        if (!touchHandled) {
+          submitName();
+        }
       });
       
       // Submit on Enter key

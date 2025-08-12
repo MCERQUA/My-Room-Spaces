@@ -146,6 +146,21 @@ object.userData = {
 - `object-delete`: Objects removed from server and all connected clients
 - `world-state`: Complete world sync sent to new users on connection
 
+## ⚠️ CRITICAL: Mobile Texture Rendering
+
+### **IMPORTANT: Mobile Texture Issues Documentation**
+Before attempting ANY mobile texture fixes, **ALWAYS review `docs/MOBILE_TEXTURE_ATTEMPTS.md`** which documents:
+- 10+ different approaches already tried that don't work
+- Power-of-2 enforcement, SRGBColorSpace, canvas sizing variations
+- Current approach: NO special mobile handling (someone else has it working without)
+- Testing checklist and debugging steps
+
+**DO NOT RE-IMPLEMENT**:
+- `configureMobileTexture()` function with ClampToEdge/LinearFilter
+- Power-of-2 canvas size enforcement
+- Mobile-specific texture settings
+- SRGBColorSpace modifications
+
 ## ⚠️ CRITICAL: Screen Share Implementation Notes
 
 ### **DO NOT MODIFY SCREEN SHARE ASPECT RATIOS OR GEOMETRY**

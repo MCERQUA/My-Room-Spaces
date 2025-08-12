@@ -1684,13 +1684,12 @@
 
 
 
-    // Create canvas texture for screen content - mobile-optimized sizes
+    // Create canvas texture for screen content
     function createScreenTexture() {
       const canvas = document.createElement('canvas');
-      // Use power-of-2 dimensions optimized for each platform
-      const canvasSize = getOptimalCanvasSize(1920, 1080, isMobile);
-      canvas.width = canvasSize.width;
-      canvas.height = canvasSize.height;
+      // Use standard HD dimensions for all devices
+      canvas.width = 1920;
+      canvas.height = 1080;
       
       console.log(`📐 Large screen canvas: ${canvas.width}x${canvas.height} (mobile: ${isMobile})`)
       const ctx = canvas.getContext('2d');
@@ -1713,19 +1712,11 @@
       
       const texture = new THREE.CanvasTexture(canvas);
       
-      // Configure texture for mobile compatibility
-      if (isMobile || mobileSettings.isIOS || mobileSettings.isAndroid) {
-        configureMobileTexture(texture);
-        // Mobile devices handle flipY differently
-        texture.flipY = true;
-        console.log('📱 Applied mobile texture settings to large screen');
-      } else {
-        // Desktop settings
-        texture.flipY = false;
-        texture.wrapS = THREE.RepeatWrapping;
-        texture.repeat.x = -1;
-        texture.needsUpdate = true;
-      }
+      // Use same settings for all devices - no special mobile handling
+      texture.flipY = false;
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.repeat.x = -1;
+      texture.needsUpdate = true;
       texture.offset.x = 1;
       
       return { texture: texture, canvas: canvas };
@@ -3424,10 +3415,6 @@
       context.fillText(avatar.username, 128, 128);
       
       const labelTexture = new THREE.CanvasTexture(canvas);
-      // Configure for mobile if needed
-      if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
-        configureMobileTexture(labelTexture);
-      }
       const labelMaterial = new THREE.SpriteMaterial({ map: labelTexture });
       const labelSprite = new THREE.Sprite(labelMaterial);
       labelSprite.position.set(0, 0.8, 0);

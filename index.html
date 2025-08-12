@@ -85,10 +85,7 @@
     }
 
     .model-controls {
-      position: absolute;
-      top: 280px;  /* Moved down to avoid menu */
-      left: 20px;
-      z-index: 350;
+      display: none;  /* Hidden by default, shown as popup */
       background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
@@ -196,19 +193,7 @@
     }
 
     .screen-controls {
-      position: absolute;
-      top: 280px;  /* Moved down to avoid menu */
-      left: 20px;
-      z-index: 350;
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
-      width: 240px;
-      display: none;
+      display: none;  /* Hidden by default, shown as popup */
     }
 
     .screen-controls h3 {
@@ -366,6 +351,40 @@
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       transition: all 0.3s ease;
       transform-origin: top left;
+      width: fit-content;  /* Fit to content width */
+    }
+    
+    /* Popup panels for menu items */
+    .menu-popup {
+      position: absolute;
+      top: 0;
+      left: calc(100% + 15px);  /* Position to the right with gap */
+      min-width: 200px;
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 15px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      opacity: 0;
+      transform: translateX(-10px);
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 399;
+    }
+    
+    .menu-popup.active {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+    
+    .menu-popup h3 {
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 600;
+      margin: 0 0 12px 0;
     }
     
     .glass-menu.collapsed {
@@ -1081,22 +1100,70 @@
   
   <!-- Glass Menu -->
   <div class="glass-menu collapsed" id="glass-menu">
-    <button class="glass-button" id="menu-home">
+    <button class="glass-button" id="menu-home" data-popup="home-popup">
       🏠
       <span class="tooltip">Home</span>
     </button>
-    <button class="glass-button" id="menu-screen">
+    <button class="glass-button" id="menu-screen" data-popup="screen-popup">
       🖥️
       <span class="tooltip">Screen Share</span>
     </button>
-    <button class="glass-button" id="menu-objects">
+    <button class="glass-button" id="menu-objects" data-popup="objects-popup">
       📦
       <span class="tooltip">Load GLB Model</span>
     </button>
-    <button class="glass-button" id="menu-help">
+    <button class="glass-button" id="menu-help" data-popup="help-popup">
       ❓
       <span class="tooltip">Help</span>
     </button>
+    
+    <!-- Popup Panels -->
+    <div class="menu-popup" id="home-popup">
+      <h3>🏠 Home</h3>
+      <p style="color: #fff; font-size: 12px;">Welcome to the 3D Multi-User World!</p>
+      <p style="color: rgba(255,255,255,0.7); font-size: 11px;">Click anywhere to close</p>
+    </div>
+    
+    <div class="menu-popup" id="screen-popup">
+      <h3>🖥️ Screen Share</h3>
+      <button id="share-screen" style="width: 100%; margin: 4px 0;">Share Desktop</button>
+      <button id="stop-sharing" style="display: none; width: 100%; margin: 4px 0;">Stop Sharing</button>
+      <label class="file-input-wrapper" style="width: 100%; margin: 4px 0; display: block;">
+        📁 Load Video File
+        <input type="file" id="video-upload" accept="video/*" style="display: none;" />
+      </label>
+      <button id="clear-screen" style="width: 100%; margin: 4px 0;">Clear Screen</button>
+    </div>
+    
+    <div class="menu-popup" id="objects-popup">
+      <h3>📦 3D Objects</h3>
+      <label class="file-input-wrapper" style="width: 100%; margin: 4px 0; display: block;">
+        📦 Load GLB Model
+        <input type="file" id="glb-upload" accept=".glb,.gltf" style="display: none;" />
+      </label>
+      <div id="object-controls" style="display: none;">
+        <div style="display: flex; gap: 8px; margin: 8px 0;">
+          <button id="move-up" style="flex: 1;">↑</button>
+          <button id="move-down" style="flex: 1;">↓</button>
+        </div>
+        <div style="display: flex; gap: 8px; margin: 8px 0;">
+          <button id="move-left" style="flex: 1;">←</button>
+          <button id="move-right" style="flex: 1;">→</button>
+        </div>
+        <button id="delete-object" style="width: 100%; margin: 8px 0; background: rgba(255,77,77,0.2);">Delete</button>
+      </div>
+    </div>
+    
+    <div class="menu-popup" id="help-popup">
+      <h3>❓ Help</h3>
+      <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 8px 0;">
+        <strong>Controls:</strong><br>
+        • WASD - Move<br>
+        • Mouse - Look<br>
+        • Click - Select object<br>
+        • ESC - Exit fullscreen
+      </p>
+    </div>
   </div>
   
   <!-- Visitor Counter (Disabled) -->
@@ -1107,29 +1174,7 @@
     </div>
   </div> -->
   
-  <div class="screen-controls" id="screen-controls" style="display: none;">
-    <h3>🖥️ Screen Controls</h3>
-    <button id="share-screen">🖥️ Share Desktop</button>
-    <button id="stop-sharing" style="display: none;">⏹️ Stop Sharing</button>
-    <label class="file-input-wrapper">
-      📁 Load Video File
-      <input type="file" id="video-upload" accept="video/*" />
-    </label>
-    <button id="clear-screen">🧹 Clear Screen</button>
-    <div class="volume-control">
-      <button id="toggle-audio" style="min-width: auto; padding: 6px 10px;">🔊</button>
-      <input type="range" id="volume-slider" min="0" max="100" value="100">
-    </div>
-  </div>
-  
-  <div class="screen-controls" id="objects-controls" style="display: none;">
-    <h3>📦 Objects Menu</h3>
-    <label class="file-input-wrapper">
-      📤 Upload GLB Model
-      <input type="file" id="glb-upload" accept=".glb,.gltf" />
-    </label>
-    <button id="view-objects">📋 View All Objects</button>
-  </div>
+  <!-- Old controls removed - now using popup system -->
 
   
   <video id="video-element" autoplay controls muted="false" volume="1.0" style="display: none;"></video>
@@ -3951,38 +3996,55 @@
       deselectObject();
     });
 
-    // Glass menu event handlers
+    // Popup menu system
+    let activePopup = null;
+    
+    function showPopup(popupId) {
+      // Close any active popup
+      if (activePopup && activePopup !== popupId) {
+        document.getElementById(activePopup).classList.remove('active');
+      }
+      
+      // Toggle the requested popup
+      const popup = document.getElementById(popupId);
+      if (popup) {
+        if (popup.classList.contains('active')) {
+          popup.classList.remove('active');
+          activePopup = null;
+        } else {
+          popup.classList.add('active');
+          activePopup = popupId;
+        }
+      }
+    }
+    
+    // Close popup when clicking outside
+    document.addEventListener('click', (e) => {
+      if (activePopup && !e.target.closest('.glass-menu') && !e.target.closest('.menu-popup')) {
+        document.getElementById(activePopup).classList.remove('active');
+        activePopup = null;
+      }
+    });
+    
+    // Glass menu event handlers with popup
     document.getElementById('menu-home').addEventListener('click', (e) => {
       e.stopPropagation();
-      console.log('Home button clicked - future navigation');
-      // Future: Navigate to global directory
+      showPopup('home-popup');
     });
     
     document.getElementById('menu-screen').addEventListener('click', (e) => {
       e.stopPropagation();
-      const screenControls = document.getElementById('screen-controls');
-      if (screenControls.style.display === 'none') {
-        screenControls.style.display = 'block';
-      } else {
-        screenControls.style.display = 'none';
-      }
+      showPopup('screen-popup');
     });
     
     document.getElementById('menu-objects').addEventListener('click', (e) => {
       e.stopPropagation();
-      const objectsControls = document.getElementById('objects-controls');
-      if (objectsControls.style.display === 'none') {
-        // Hide other dropdowns
-        document.getElementById('screen-controls').style.display = 'none';
-        objectsControls.style.display = 'block';
-      } else {
-        objectsControls.style.display = 'none';
-      }
+      showPopup('objects-popup');
     });
     
     document.getElementById('menu-help').addEventListener('click', (e) => {
       e.stopPropagation();
-      document.getElementById('help-dialog').classList.add('visible');
+      showPopup('help-popup');
     });
     
     document.getElementById('help-close').addEventListener('click', (e) => {

@@ -4149,37 +4149,43 @@
       clearScreen();
     });
 
-    // Audio control event listeners
+    // Audio control event listeners - add null checks since elements were removed
     let isAudioMuted = false;
-    document.getElementById('toggle-audio').addEventListener('click', (e) => {
-      e.stopPropagation();
-      const videoEl = document.getElementById('video-element');
-      const button = document.getElementById('toggle-audio');
-      
-      isAudioMuted = !isAudioMuted;
-      videoEl.muted = isAudioMuted;
-      
-      // Also update all peer video elements
-      document.querySelectorAll('video').forEach(video => {
-        video.muted = isAudioMuted;
+    const toggleAudioBtn = document.getElementById('toggle-audio');
+    if (toggleAudioBtn) {
+      toggleAudioBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const videoEl = document.getElementById('video-element');
+        const button = document.getElementById('toggle-audio');
+        
+        isAudioMuted = !isAudioMuted;
+        videoEl.muted = isAudioMuted;
+        
+        // Also update all peer video elements
+        document.querySelectorAll('video').forEach(video => {
+          video.muted = isAudioMuted;
+        });
+        
+        button.textContent = isAudioMuted ? '🔇 Audio OFF' : '🔊 Audio ON';
+        console.log('Audio ' + (isAudioMuted ? 'muted' : 'unmuted'));
       });
-      
-      button.textContent = isAudioMuted ? '🔇 Audio OFF' : '🔊 Audio ON';
-      console.log('Audio ' + (isAudioMuted ? 'muted' : 'unmuted'));
-    });
+    }
     
-    document.getElementById('volume-slider').addEventListener('input', (e) => {
-      const volume = e.target.value / 100;
-      const videoEl = document.getElementById('video-element');
-      videoEl.volume = volume;
-      
-      // Also update all peer video elements
-      document.querySelectorAll('video').forEach(video => {
-        video.volume = volume;
+    const volumeSlider = document.getElementById('volume-slider');
+    if (volumeSlider) {
+      volumeSlider.addEventListener('input', (e) => {
+        const volume = e.target.value / 100;
+        const videoEl = document.getElementById('video-element');
+        videoEl.volume = volume;
+        
+        // Also update all peer video elements
+        document.querySelectorAll('video').forEach(video => {
+          video.volume = volume;
+        });
+        
+        console.log('Volume set to:', Math.round(volume * 100) + '%');
       });
-      
-      console.log('Volume set to:', Math.round(volume * 100) + '%');
-    });
+    }
 
     // Chat interface event listeners
     document.getElementById('chat-send').addEventListener('click', (e) => {

@@ -1427,28 +1427,9 @@
       return { width: size, height: size };
     }
     
-    // Helper to configure texture for mobile compatibility
-    function configureMobileTexture(texture) {
-      // Critical for non-power-of-2 textures on mobile
-      texture.wrapS = THREE.ClampToEdgeWrapping;
-      texture.wrapT = THREE.ClampToEdgeWrapping;
-      texture.minFilter = THREE.LinearFilter;
-      texture.magFilter = THREE.LinearFilter;
-      texture.generateMipmaps = false;
-      
-      // Ensure proper color space
-      texture.colorSpace = THREE.SRGBColorSpace;
-      
-      // Additional mobile-specific settings
-      texture.anisotropy = 1;  // Disable anisotropic filtering on mobile
-      texture.format = THREE.RGBAFormat;  // Ensure RGBA format
-      texture.type = THREE.UnsignedByteType;  // Standard type for mobile
-      
-      texture.needsUpdate = true;
-      
-      console.log('✅ Configured texture for mobile compatibility');
-      return texture;
-    }
+    // REMOVED: configureMobileTexture function
+    // Documentation shows someone got it working without any special texture handling
+    // The issue was likely caused by double color space conversion or over-configuration
     
     // Create texture loader with CORS support for future use
     const textureLoader = new THREE.TextureLoader();
@@ -1536,7 +1517,11 @@
     console.log(`🖥️ Renderer pixel ratio: ${Math.min(window.devicePixelRatio, 2)} (device: ${window.devicePixelRatio})`);
     
     // Essential renderer settings based on mobile compatibility research
-    renderer.outputColorSpace = THREE.SRGBColorSpace; // Use standard sRGB, not Linear
+    // CRITICAL: Don't set outputColorSpace on mobile - may cause texture issues
+    // Let WebGL use its default linear space and handle conversion naturally
+    if (!isMobile) {
+      renderer.outputColorSpace = THREE.SRGBColorSpace; // Desktop can handle sRGB output
+    }
     renderer.toneMapping = THREE.NoToneMapping;
     renderer.toneMappingExposure = 1.0;
     renderer.sortObjects = false; // Disable sorting for performance
@@ -1726,6 +1711,12 @@
     let largeScreen = null;
     
     function loadRoomModel() {
+      // On mobile, warn about potential WebP issues
+      if (isMobile) {
+        console.warn('⚠️ Mobile detected - WebP textures in GLB may not render correctly');
+        console.log('Consider using a GLB with JPG/PNG textures for better mobile compatibility');
+      }
+      
       loader.load('./models/BAKE-WEBROOM1.glb', function(gltf) {
         console.log('Loading room model...');
         const roomModel = gltf.scene;
@@ -1734,48 +1725,58 @@
         roomModel.position.set(0, 0, 0);
         roomModel.scale.set(1, 1, 1);
         
-        // Enable shadows for all meshes (desktop only)
+        // Process all meshes in the model
         roomModel.traverse((child) => {
           if (child.isMesh) {
+            // Enable shadows only on desktop
             if (!isMobile) {
               child.castShadow = true;
               child.receiveShadow = true;
             }
-            // Ensure materials are compatible with mobile
+            
+            // WEBP TEXTURE FIX for mobile
+            // WebP textures embedded in GLB files can fail on mobile
+            // Create fallback materials if textures fail to load
+            
             if (child.material) {
-              // Handle different material types
               const materials = Array.isArray(child.material) ? child.material : [child.material];
               
-              materials.forEach(material => {
-                // Configure all texture maps for mobile
-                const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'lightMap', 'bumpMap', 'displacementMap'];
-                
-                textureProps.forEach(prop => {
-                  if (material[prop]) {
-                    if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
-                      configureMobileTexture(material[prop]);
-                      console.log(`✅ Configured room ${prop} for mobile on ${child.name || 'mesh'}`);
-                    } else {
-                      material[prop].colorSpace = THREE.SRGBColorSpace;
-                      material[prop].needsUpdate = true;
+              materials.forEach((material, index) => {
+                // On mobile, check if texture exists and handle WebP issues
+                if (isMobile) {
+                  // If the texture failed to load (WebP issue), create a colored fallback
+                  if (material.map && material.map.image) {
+                    // Check if the texture actually loaded
+                    const textureLoaded = material.map.image.width > 0 && material.map.image.height > 0;
+                    
+                    if (!textureLoaded) {
+                      console.warn(`Texture failed to load for ${child.name}, using color fallback`);
+                      // Use the material's base color or a default
+                      material.map = null;
+                      material.color = material.color || new THREE.Color(0x808080);
                     }
                   }
-                });
-                
-                // Only replace material if it's causing issues on mobile
-                if (isMobile && (material.type === 'MeshStandardMaterial' || material.type === 'MeshPhysicalMaterial')) {
-                  const basicMaterial = new THREE.MeshBasicMaterial({
-                    map: material.map, // CRITICAL: Preserve the texture map
-                    color: material.map ? 0xffffff : (material.color || 0xffffff), // White if textured
-                    transparent: material.transparent || false,
-                    opacity: material.opacity || 1.0,
-                    side: material.side || THREE.FrontSide
-                  });
-                  child.material = basicMaterial;
-                  console.log('Replaced material with MeshBasicMaterial, preserved texture:', !!child.material.map);
+                  
+                  // Simplify to MeshBasicMaterial for better mobile performance
+                  if (material.isMeshStandardMaterial || material.isMeshPhysicalMaterial) {
+                    const basicMaterial = new THREE.MeshBasicMaterial({
+                      map: material.map, // Will be null if WebP failed
+                      color: material.map ? 0xffffff : (material.color || 0x808080),
+                      transparent: material.transparent || false,
+                      opacity: material.opacity || 1.0,
+                      side: material.side || THREE.FrontSide
+                    });
+                    
+                    // Replace the material
+                    if (Array.isArray(child.material)) {
+                      child.material[index] = basicMaterial;
+                    } else {
+                      child.material = basicMaterial;
+                    }
+                    
+                    console.log(`Mobile: ${child.name} - texture: ${!!basicMaterial.map}, color: ${basicMaterial.color.getHexString()}`);
+                  }
                 }
-                
-                material.needsUpdate = true;
               });
             }
           }

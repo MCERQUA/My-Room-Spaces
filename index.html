@@ -348,15 +348,12 @@
       -webkit-backdrop-filter: blur(10px);
       border: 1px solid rgba(255, 255, 255, 0.2);
       border-radius: 16px;
-      padding: 10px;
+      padding: 6px;  /* Minimal padding */
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       transition: all 0.3s ease;
       transform-origin: top left;
-      width: 60px !important;  /* FORCE IT */
-      max-width: 60px !important;  /* REALLY FORCE IT */
-      min-width: 60px !important;  /* ABSOLUTELY FORCE IT */
-      box-sizing: border-box;  /* Include padding in width */
-      overflow: hidden;  /* Hide any overflow */
+      width: auto;  /* Auto-size to content */
+      box-sizing: border-box;
     }
     
     /* Popup panels for menu items */
@@ -505,11 +502,10 @@
       .glass-menu {
         flex-direction: row;
         flex-wrap: wrap;
-        width: 100px !important;
-        max-width: 100px !important;
-        min-width: 100px !important;
+        width: auto;  /* Auto-size to content */
+        max-width: 92px;  /* 2 buttons (38px each) + gap (8px) + padding (8px*2) */
         gap: 8px;
-        padding: 8px;
+        padding: 6px;
       }
       
       .glass-menu .glass-button {

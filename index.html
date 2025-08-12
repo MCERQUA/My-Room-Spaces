@@ -780,8 +780,12 @@
       color: #ffffff;
       padding: 8px 12px;
       border-radius: 12px;
-      font-size: 13px;
+      font-size: 16px;  /* 16px prevents zoom on iOS */
       transition: all 0.3s ease;
+      -webkit-appearance: none;  /* Remove iOS styling */
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      min-width: 0;  /* Allow input to shrink properly */
     }
 
     .chat-input:focus {
@@ -794,12 +798,15 @@
       background: transparent;
       border: 1px solid rgba(255, 255, 255, 0.3);
       color: #ffffff;
-      padding: 8px 16px;
+      padding: 8px 12px;
       border-radius: 12px;
       cursor: pointer;
       font-size: 13px;
       font-weight: 600;
       transition: all 0.3s ease;
+      flex-shrink: 0;  /* Prevent button from shrinking */
+      -webkit-tap-highlight-color: transparent;  /* Remove tap highlight */
+      touch-action: manipulation;  /* Better touch handling */
     }
 
     .chat-send:hover {
@@ -810,27 +817,41 @@
     .chat-toggle {
       position: absolute;
       bottom: 20px;
-      right: 380px;
+      right: 280px;  /* Position next to narrower chat (250px + 30px gap) */
       z-index: 301;
-      width: 40px;
-      height: 40px;
+      width: 28px;
+      height: 28px;
       background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
       -webkit-backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;  /* Make it circular */
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 16px;
       transition: all 0.3s ease;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      padding: 0;
+      line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
 
     .chat-toggle:hover {
       background: rgba(255, 255, 255, 0.2);
-      transform: translateY(-2px);
+      border-color: rgba(255, 255, 255, 0.5);
+      transform: scale(1.1);
+    }
+    
+    .chat-toggle.show-chat {
+      /* When chat is hidden, show chat icon */
+    }
+    
+    .chat-toggle.hide-chat {
+      /* When chat is shown, show X icon */
+      font-size: 20px;
     }
 
     .chat-container.hidden {
@@ -1121,10 +1142,22 @@
         bottom: 10px;
         right: 10px;
       }
+      
+      .chat-input-container {
+        gap: 6px;  /* Smaller gap on mobile */
+      }
+      
+      .chat-send {
+        padding: 8px 10px;  /* Smaller padding on mobile */
+        font-size: 12px;
+      }
 
       .chat-toggle {
-        right: calc(100vw - 50px);
+        right: 270px;  /* Next to narrower mobile chat */
         bottom: 10px;
+        width: 24px;
+        height: 24px;
+        font-size: 14px;
       }
 
       .help-dialog {
@@ -1286,7 +1319,7 @@
   </div>
 
   <!-- Chat Interface -->
-  <div class="chat-container" id="chat-container">
+  <div class="chat-container hidden" id="chat-container">
     <div class="chat-messages" id="chat-messages">
       <!-- Messages will be added here -->
     </div>
@@ -1297,7 +1330,7 @@
   </div>
 
   <!-- Chat Toggle Button -->
-  <button class="chat-toggle" id="chat-toggle">💬</button>
+  <button class="chat-toggle show-chat" id="chat-toggle">💬</button>
 
   <!-- Help Dialog -->
   <div class="help-dialog" id="help-dialog">
@@ -3626,10 +3659,14 @@
       
       if (chatContainer.classList.contains('hidden')) {
         chatContainer.classList.remove('hidden');
-        chatToggle.textContent = '❌';
+        chatToggle.textContent = '×';  // Show X when chat is visible
+        chatToggle.classList.add('hide-chat');
+        chatToggle.classList.remove('show-chat');
       } else {
         chatContainer.classList.add('hidden');
-        chatToggle.textContent = '💬';
+        chatToggle.textContent = '💬';  // Show chat icon when chat is hidden
+        chatToggle.classList.add('show-chat');
+        chatToggle.classList.remove('hide-chat');
       }
     }
     

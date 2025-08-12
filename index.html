@@ -988,6 +988,7 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
       z-index: 600;
       text-align: center;
+      pointer-events: auto; /* Ensure dialog is interactive */
     }
 
     .welcome-dialog h2 {
@@ -1058,6 +1059,7 @@
       height: 100%;
       background: rgba(0, 0, 0, 0.7);
       z-index: 599;
+      pointer-events: auto; /* Ensure overlay is interactive */
     }
 
     /* Visitor Counter Styles */
@@ -3776,6 +3778,20 @@
 
     // Touch controls for mobile
     document.addEventListener('touchstart', (event) => {
+      // Don't interfere with UI elements
+      if (event.target.closest('.welcome-dialog') || 
+          event.target.closest('.welcome-overlay') ||
+          event.target.closest('.chat-container') ||
+          event.target.closest('.chat-toggle') ||
+          event.target.closest('.glass-menu') ||
+          event.target.closest('.user-list') ||
+          event.target.closest('.model-controls') ||
+          event.target.closest('.screen-controls') ||
+          event.target.closest('.help-dialog') ||
+          event.target.closest('.objects-list-dialog')) {
+        return; // Let UI elements handle their own touch events
+      }
+      
       if (event.touches.length === 1) {
         const currentTime = new Date().getTime();
         const tapLength = currentTime - lastTap;
@@ -3796,6 +3812,20 @@
     });
 
     document.addEventListener('touchmove', (event) => {
+      // Don't interfere with UI elements
+      if (event.target.closest('.welcome-dialog') || 
+          event.target.closest('.welcome-overlay') ||
+          event.target.closest('.chat-container') ||
+          event.target.closest('.chat-toggle') ||
+          event.target.closest('.glass-menu') ||
+          event.target.closest('.user-list') ||
+          event.target.closest('.model-controls') ||
+          event.target.closest('.screen-controls') ||
+          event.target.closest('.help-dialog') ||
+          event.target.closest('.objects-list-dialog')) {
+        return; // Let UI elements handle their own touch events
+      }
+      
       if (isDragging && event.touches.length === 1) {
         const deltaMove = {
           x: event.touches[0].clientX - previousMousePosition.x,
@@ -3815,6 +3845,20 @@
     });
 
     document.addEventListener('touchend', (event) => {
+      // Don't interfere with UI elements
+      if (event.target.closest('.welcome-dialog') || 
+          event.target.closest('.welcome-overlay') ||
+          event.target.closest('.chat-container') ||
+          event.target.closest('.chat-toggle') ||
+          event.target.closest('.glass-menu') ||
+          event.target.closest('.user-list') ||
+          event.target.closest('.model-controls') ||
+          event.target.closest('.screen-controls') ||
+          event.target.closest('.help-dialog') ||
+          event.target.closest('.objects-list-dialog')) {
+        return; // Let UI elements handle their own touch events
+      }
+      
       isMoving = false;
       isDragging = false;
       event.preventDefault();

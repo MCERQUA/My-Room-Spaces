@@ -363,6 +363,73 @@
       border-radius: 16px;
       padding: 10px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      transition: all 0.3s ease;
+      transform-origin: top left;
+    }
+    
+    .glass-menu.collapsed {
+      opacity: 0;
+      transform: scale(0);
+      pointer-events: none;
+    }
+    
+    /* Toggle buttons for corners */
+    .corner-toggle {
+      position: fixed;
+      width: 44px;
+      height: 44px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 401;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+    
+    .corner-toggle:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+    
+    .corner-toggle svg {
+      width: 20px;
+      height: 20px;
+      stroke: rgba(255, 255, 255, 0.8);
+      stroke-width: 2;
+      fill: none;
+    }
+    
+    #menu-toggle {
+      top: 20px;
+      left: 20px;
+    }
+    
+    #users-toggle {
+      top: 20px;
+      right: 20px;
+    }
+    
+    /* Mobile grid layout for menu */
+    @media (max-width: 768px) {
+      .glass-menu {
+        flex-wrap: wrap;
+        width: 100px;
+        gap: 8px;
+        padding: 8px;
+      }
+      
+      .glass-menu .glass-button {
+        width: 38px;
+        height: 38px;
+        font-size: 16px;
+      }
     }
 
     .glass-button {
@@ -423,6 +490,14 @@
       padding: 15px 20px;
       box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
       min-width: 150px;
+      transition: all 0.3s ease;
+      transform-origin: top right;
+    }
+    
+    .user-list.collapsed {
+      opacity: 0;
+      transform: scale(0);
+      pointer-events: none;
     }
 
     .user-list-header {
@@ -986,8 +1061,24 @@
     </div>
   </div>
   
+  <!-- Corner Toggle Buttons -->
+  <button class="corner-toggle" id="menu-toggle" aria-label="Toggle Menu">
+    <svg viewBox="0 0 24 24">
+      <rect x="4" y="5" width="16" height="2" rx="1"/>
+      <rect x="4" y="11" width="16" height="2" rx="1"/>
+      <rect x="4" y="17" width="16" height="2" rx="1"/>
+    </svg>
+  </button>
+  
+  <button class="corner-toggle" id="users-toggle" aria-label="Toggle Users">
+    <svg viewBox="0 0 24 24">
+      <circle cx="12" cy="8" r="3"/>
+      <path d="M12 14c-4 0-7 2-7 4v2h14v-2c0-2-3-4-7-4z"/>
+    </svg>
+  </button>
+  
   <!-- Glass Menu -->
-  <div class="glass-menu" id="glass-menu">
+  <div class="glass-menu collapsed" id="glass-menu">
     <button class="glass-button" id="menu-home">
       🏠
       <span class="tooltip">Home</span>
@@ -1064,7 +1155,7 @@
   </div>
 
   <!-- User List in Top Right -->
-  <div class="user-list" id="user-list">
+  <div class="user-list collapsed" id="user-list">
     <div class="user-list-header">
       <h3>👥 Users Online <span class="user-count" id="user-count-badge">(1)</span></h3>
       <button class="user-list-close" id="user-list-close">×</button>
@@ -1998,8 +2089,10 @@
       const welcomeInput = document.getElementById('welcome-input');
       const welcomeButton = document.getElementById('welcome-button');
       
-      // Focus input
-      welcomeInput.focus();
+      // Focus input (with delay for mobile)
+      setTimeout(() => {
+        welcomeInput.focus();
+      }, 100);
       
       // Handle name submission
       function submitName() {
@@ -2016,8 +2109,14 @@
         initializeRoomSystem();
       }
       
-      // Submit on button click
+      // Submit on button click (works on mobile)
       welcomeButton.addEventListener('click', submitName);
+      
+      // Add touch event for mobile
+      welcomeButton.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        submitName();
+      });
       
       // Submit on Enter key
       welcomeInput.addEventListener('keypress', (e) => {
@@ -4044,6 +4143,29 @@
       } else {
         closeButton.textContent = '×';
       }
+    });
+    
+    // Corner toggle buttons functionality
+    document.getElementById('menu-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const menu = document.getElementById('glass-menu');
+      menu.classList.toggle('collapsed');
+    });
+    
+    document.getElementById('users-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      const userList = document.getElementById('user-list');
+      userList.classList.toggle('collapsed');
+    });
+    
+    // Add touch event support for mobile
+    ['menu-toggle', 'users-toggle'].forEach(id => {
+      const button = document.getElementById(id);
+      button.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        button.click();
+      });
     });
 
 

@@ -203,9 +203,13 @@ socket.on('user-moved', (data) => {
 **Approach**: Add quality-of-life features without touching core systems.
 
 #### 4.1 Advanced UI Features
+- **Per-User Audio Controls**:
+  - Local mute button for each user (only affects your browser)
+  - Volume slider per user (0-150% with boost capability)
+  - Preferences saved to localStorage
+  - Small icons next to usernames in user list
 - Push-to-talk mode toggle
 - Audio quality indicators
-- Volume controls per user
 - Speaking animation on avatars
 
 #### 4.2 Performance Optimizations

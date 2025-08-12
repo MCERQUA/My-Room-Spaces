@@ -340,6 +340,50 @@ function detectVoiceActivity() {
 - Distance-based nameplate visibility
 - Color-coded mute status indicators
 
+### Per-User Audio Controls
+
+**Local Audio Preferences:**
+```javascript
+// Store user-specific audio settings
+const audioPreferences = {
+  mutedUsers: new Set(),    // Users muted locally
+  userVolumes: new Map(),   // Volume levels (0-150%)
+  
+  save() {
+    localStorage.setItem('audioMutedUsers', JSON.stringify([...this.mutedUsers]));
+    localStorage.setItem('audioVolumes', JSON.stringify([...this.userVolumes]));
+  },
+  
+  load() {
+    const muted = localStorage.getItem('audioMutedUsers');
+    const volumes = localStorage.getItem('audioVolumes');
+    if (muted) this.mutedUsers = new Set(JSON.parse(muted));
+    if (volumes) this.userVolumes = new Map(JSON.parse(volumes));
+  }
+};
+```
+
+**Volume Boost Implementation:**
+```javascript
+// Apply volume with boost capability (up to 150%)
+function applyUserVolume(userId, audioElement, stream) {
+  const volume = audioPreferences.userVolumes.get(userId) || 100;
+  
+  if (volume <= 100) {
+    // Standard volume control
+    audioElement.volume = volume / 100;
+  } else {
+    // Use Web Audio API for boost
+    const audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(stream);
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = volume / 100; // 1.5 = 150%
+    source.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+  }
+}
+```
+
 ## 5. Implementation Architecture for 3D Room
 
 ### Hybrid Audio System Design

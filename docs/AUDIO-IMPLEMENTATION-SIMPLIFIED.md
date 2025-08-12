@@ -144,17 +144,331 @@ socket.on('audio-mute-status', (data) => {
 });
 ```
 
-## Visual Indicators (Simple)
+## Per-User Audio Controls (Enhanced)
 
-### Add to Avatar Labels:
+### Local User Preferences Storage
 ```javascript
-// When spawning or updating avatars
-function updateAvatarAudioStatus(userId, isMuted) {
+// Store per-user audio preferences locally
+const audioPreferences = {
+  mutedUsers: new Set(),        // Set of userIds that are locally muted
+  userVolumes: new Map(),       // Map of userId -> volume (0-150)
+  
+  // Save to localStorage
+  save() {
+    localStorage.setItem('audioMutedUsers', JSON.stringify([...this.mutedUsers]));
+    localStorage.setItem('audioVolumes', JSON.stringify([...this.userVolumes]));
+  },
+  
+  // Load from localStorage
+  load() {
+    const muted = localStorage.getItem('audioMutedUsers');
+    const volumes = localStorage.getItem('audioVolumes');
+    
+    if (muted) this.mutedUsers = new Set(JSON.parse(muted));
+    if (volumes) this.userVolumes = new Map(JSON.parse(volumes));
+  }
+};
+
+// Load preferences on startup
+audioPreferences.load();
+```
+
+### Enhanced Audio Playback with Volume Control
+```javascript
+// Map to store audio elements and gain nodes for each user
+const userAudioElements = new Map();
+
+function playUserAudio(userId, stream) {
+  // Remove any existing audio element for this user
+  const existing = userAudioElements.get(userId);
+  if (existing) {
+    existing.audio.remove();
+    if (existing.gainNode) existing.gainNode.disconnect();
+  }
+  
+  // Create audio element
+  const audio = document.createElement('audio');
+  audio.id = `audio-${userId}`;
+  audio.srcObject = stream;
+  audio.autoplay = true;
+  audio.style.display = 'none';
+  
+  // Check if user is locally muted
+  if (audioPreferences.mutedUsers.has(userId)) {
+    audio.muted = true;
+  }
+  
+  // Apply saved volume or default to 100%
+  const savedVolume = audioPreferences.userVolumes.get(userId) || 100;
+  audio.volume = Math.min(savedVolume / 100, 1); // Cap at 100% for basic audio element
+  
+  // For boost over 100%, we'll need Web Audio API
+  let gainNode = null;
+  if (savedVolume > 100) {
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createMediaStreamSource(stream);
+    gainNode = audioContext.createGain();
+    gainNode.gain.value = savedVolume / 100; // 1.5 = 150% volume
+    source.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+  }
+  
+  document.body.appendChild(audio);
+  
+  // Store reference for later control
+  userAudioElements.set(userId, { audio, gainNode, stream });
+}
+
+// Toggle local mute for a specific user
+function toggleUserMute(userId) {
+  const element = userAudioElements.get(userId);
+  if (!element) return;
+  
+  const isMuted = audioPreferences.mutedUsers.has(userId);
+  
+  if (isMuted) {
+    // Unmute
+    audioPreferences.mutedUsers.delete(userId);
+    element.audio.muted = false;
+  } else {
+    // Mute
+    audioPreferences.mutedUsers.add(userId);
+    element.audio.muted = true;
+  }
+  
+  audioPreferences.save();
+  updateUserListAudioControls(userId);
+  
+  return !isMuted; // Return new mute state
+}
+
+// Set volume for a specific user (0-150%)
+function setUserVolume(userId, volume) {
+  const element = userAudioElements.get(userId);
+  if (!element) return;
+  
+  // Clamp volume between 0 and 150
+  volume = Math.max(0, Math.min(150, volume));
+  
+  // Save preference
+  audioPreferences.userVolumes.set(userId, volume);
+  audioPreferences.save();
+  
+  if (volume <= 100) {
+    // Use normal audio element volume
+    element.audio.volume = volume / 100;
+    
+    // Disconnect gain node if exists
+    if (element.gainNode) {
+      element.gainNode.disconnect();
+      element.gainNode = null;
+    }
+  } else {
+    // Need Web Audio API for boost
+    if (!element.gainNode) {
+      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(element.stream);
+      element.gainNode = audioContext.createGain();
+      source.connect(element.gainNode);
+      element.gainNode.connect(audioContext.destination);
+    }
+    
+    element.gainNode.gain.value = volume / 100;
+    element.audio.volume = 1; // Max out audio element
+  }
+}
+```
+
+### User List UI with Audio Controls
+```javascript
+// Update user list to include audio controls
+function createUserListItem(userId, username) {
+  const userItem = document.createElement('div');
+  userItem.className = 'user-item';
+  userItem.id = `user-item-${userId}`;
+  userItem.style.cssText = `
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    color: white;
+  `;
+  
+  // Username
+  const nameSpan = document.createElement('span');
+  nameSpan.textContent = username;
+  nameSpan.style.flex = '1';
+  
+  // Mute button (speaker icon)
+  const muteBtn = document.createElement('button');
+  const isMuted = audioPreferences.mutedUsers.has(userId);
+  muteBtn.innerHTML = isMuted ? '🔇' : '🔊';
+  muteBtn.className = 'audio-control-btn';
+  muteBtn.title = isMuted ? 'Unmute user (local only)' : 'Mute user (local only)';
+  muteBtn.style.cssText = `
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  `;
+  
+  muteBtn.onclick = () => {
+    const newMuteState = toggleUserMute(userId);
+    muteBtn.innerHTML = newMuteState ? '🔇' : '🔊';
+    muteBtn.title = newMuteState ? 'Unmute user (local only)' : 'Mute user (local only)';
+  };
+  
+  // Volume button (opens slider)
+  const volumeBtn = document.createElement('button');
+  volumeBtn.innerHTML = '🎚️';
+  volumeBtn.className = 'audio-control-btn';
+  volumeBtn.title = 'Adjust volume';
+  volumeBtn.style.cssText = `
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+  `;
+  
+  volumeBtn.onclick = (e) => {
+    e.stopPropagation();
+    showVolumeSlider(userId, volumeBtn);
+  };
+  
+  // Hover effects
+  muteBtn.onmouseenter = volumeBtn.onmouseenter = (e) => {
+    e.target.style.opacity = '1';
+  };
+  
+  muteBtn.onmouseleave = volumeBtn.onmouseleave = (e) => {
+    e.target.style.opacity = '0.7';
+  };
+  
+  userItem.appendChild(nameSpan);
+  userItem.appendChild(muteBtn);
+  userItem.appendChild(volumeBtn);
+  
+  return userItem;
+}
+
+// Volume slider popup
+function showVolumeSlider(userId, anchorElement) {
+  // Remove any existing slider
+  const existingSlider = document.getElementById('volume-slider-popup');
+  if (existingSlider) existingSlider.remove();
+  
+  // Create slider popup
+  const popup = document.createElement('div');
+  popup.id = 'volume-slider-popup';
+  popup.style.cssText = `
+    position: absolute;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 200px;
+  `;
+  
+  // Position near button
+  const rect = anchorElement.getBoundingClientRect();
+  popup.style.top = `${rect.bottom + 5}px`;
+  popup.style.left = `${rect.left - 100}px`;
+  
+  // Volume label
+  const label = document.createElement('div');
+  const currentVolume = audioPreferences.userVolumes.get(userId) || 100;
+  label.textContent = `Volume: ${currentVolume}%`;
+  label.style.cssText = 'color: white; font-size: 12px; text-align: center;';
+  
+  // Volume slider
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = '0';
+  slider.max = '150';
+  slider.value = currentVolume;
+  slider.style.cssText = `
+    width: 100%;
+    cursor: pointer;
+  `;
+  
+  // Markers for 0%, 100%, 150%
+  const markers = document.createElement('div');
+  markers.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    margin-top: 4px;
+  `;
+  markers.innerHTML = '<span>0%</span><span>100%</span><span>150%</span>';
+  
+  // Update volume in real-time
+  slider.oninput = () => {
+    const volume = parseInt(slider.value);
+    label.textContent = `Volume: ${volume}%`;
+    setUserVolume(userId, volume);
+    
+    // Visual feedback for boost range
+    if (volume > 100) {
+      label.style.color = '#ff9500'; // Orange for boost
+      label.textContent = `Volume: ${volume}% (Boosted)`;
+    } else {
+      label.style.color = 'white';
+    }
+  };
+  
+  // Close when clicking outside
+  const closePopup = (e) => {
+    if (!popup.contains(e.target) && e.target !== anchorElement) {
+      popup.remove();
+      document.removeEventListener('click', closePopup);
+    }
+  };
+  
+  setTimeout(() => {
+    document.addEventListener('click', closePopup);
+  }, 0);
+  
+  popup.appendChild(label);
+  popup.appendChild(slider);
+  popup.appendChild(markers);
+  document.body.appendChild(popup);
+}
+```
+
+### Visual Indicators (Simple)
+
+Update avatar labels to show audio status:
+```javascript
+function updateAvatarAudioStatus(userId, isMuted, isSpeaking) {
   const avatar = userAvatars.get(userId);
   if (!avatar) return;
   
-  // Simple emoji indicator
-  const indicator = isMuted ? '🔇' : '🔊';
+  // Check local mute status
+  const isLocallyMuted = audioPreferences.mutedUsers.has(userId);
+  
+  // Determine indicator
+  let indicator = '';
+  if (isLocallyMuted) {
+    indicator = '🚫'; // Locally muted by you
+  } else if (isMuted) {
+    indicator = '🔇'; // Muted by themselves
+  } else if (isSpeaking) {
+    indicator = '🔊'; // Speaking
+  } else {
+    indicator = '🔈'; // Has audio, not speaking
+  }
   
   // Update the existing label
   if (avatar.label) {

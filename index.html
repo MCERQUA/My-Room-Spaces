@@ -1447,7 +1447,7 @@
   </div>
   
   <!-- Mobile Debug Panel -->
-  <button id="debug-toggle-btn" onclick="toggleDebugPanel()">🐛</button>
+  <button id="debug-toggle-btn">🐛</button>
   <div id="mobile-debug-panel">
     <h3>Mobile Debug Info</h3>
     <div id="debug-content"></div>
@@ -1549,14 +1549,35 @@
       }
     }
     
-    // Show debug button on mobile
+    // Show debug button on mobile and set up click handler
     if (isMobileEarly) {
       window.addEventListener('DOMContentLoaded', () => {
         const debugBtn = document.getElementById('debug-toggle-btn');
         if (debugBtn) {
           debugBtn.style.display = 'block';
+          
+          // Add click handler with event stopping
+          debugBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleDebugPanel();
+          }, true); // Use capture phase
+          
+          // Prevent touch events from propagating
+          debugBtn.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+          }, true);
+          debugBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleDebugPanel();
+          }, true);
         }
         document.body.classList.add('is-mobile');
+        
+        // Add console logging for debugging
+        console.log('📱 Mobile Debug Initialized');
+        console.log('Platform:', mobileSettings);
       });
     }
     
@@ -1992,6 +2013,21 @@
         modelPath,
         function (gltf) {
           console.log('GLB model loaded successfully from:', modelPath);
+          
+          // Add extensive logging for mobile debugging
+          if (isMobile) {
+            console.log('📱 === MOBILE TEXTURE DEBUGGING ===');
+            console.log('Model path:', modelPath);
+            console.log('GLTF object:', gltf);
+            console.log('Renderer capabilities:', renderer.capabilities);
+            console.log('WebGL context:', renderer.getContext());
+            
+            // Check if textures are even in the GLTF
+            if (gltf.parser && gltf.parser.json && gltf.parser.json.textures) {
+              console.log('GLTF textures array:', gltf.parser.json.textures);
+            }
+          }
+          
           const roomModel = gltf.scene;
           
           // Just add the model to the scene - GLTFLoader handles textures automatically
@@ -2021,100 +2057,55 @@
                   console.log('  Type:', material.type);
                   console.log('  Has map:', !!material.map);
                   
-                  // Mobile texture reprocessing - similar to platform processing
-                  if (isMobile && material.map && material.map.image) {
+                  // Simpler mobile texture fix - just ensure correct settings
+                  if (isMobile && material.map) {
                     textureCount++;
-                    const originalImage = material.map.image;
+                    console.log('  📱 Mobile texture fix...');
                     
-                    console.log('  📱 Mobile texture reprocessing...');
-                    console.log('    Original size:', originalImage.width, 'x', originalImage.height);
+                    // Log current texture state
+                    if (material.map.image) {
+                      console.log('    Image dimensions:', material.map.image.width, 'x', material.map.image.height);
+                      console.log('    Image type:', material.map.image.constructor.name);
+                    }
                     
-                    // Create canvas for reprocessing
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d', { 
-                      alpha: true,
-                      desynchronized: true,
-                      willReadFrequently: false 
-                    });
+                    // Try simpler approach - just ensure texture settings are correct
+                    material.map.colorSpace = THREE.SRGBColorSpace;
+                    material.map.flipY = false; // GLB textures should not be flipped
+                    material.map.generateMipmaps = true;
+                    material.map.minFilter = THREE.LinearMipmapLinearFilter;
+                    material.map.magFilter = THREE.LinearFilter;
+                    material.map.needsUpdate = true;
                     
-                    // Calculate optimal mobile size (power-of-2)
-                    const maxMobileSize = 1024;
-                    let targetWidth = Math.min(originalImage.width, maxMobileSize);
-                    let targetHeight = Math.min(originalImage.height, maxMobileSize);
+                    // Force material to use unlit shading to test if textures show at all
+                    if (material.type === 'MeshStandardMaterial' || material.type === 'MeshPhysicalMaterial') {
+                      // Convert to basic material to eliminate lighting issues
+                      const basicMat = new THREE.MeshBasicMaterial({
+                        map: material.map,
+                        color: material.color || new THREE.Color(1, 1, 1),
+                        transparent: material.transparent || false,
+                        opacity: material.opacity || 1,
+                        side: material.side || THREE.FrontSide
+                      });
+                      
+                      // Replace the material
+                      child.material = basicMat;
+                      material.dispose();
+                      material = basicMat;
+                      
+                      console.log('    ✅ Converted to MeshBasicMaterial for testing');
+                    }
                     
-                    // Round to nearest power of 2
-                    targetWidth = Math.pow(2, Math.round(Math.log2(targetWidth)));
-                    targetHeight = Math.pow(2, Math.round(Math.log2(targetHeight)));
-                    
-                    canvas.width = targetWidth;
-                    canvas.height = targetHeight;
-                    
-                    // High-quality image resampling
-                    ctx.imageSmoothingEnabled = true;
-                    ctx.imageSmoothingQuality = 'high';
-                    
-                    // Draw the original image to canvas
-                    ctx.drawImage(originalImage, 0, 0, targetWidth, targetHeight);
-                    
-                    // Create new texture from reprocessed canvas
-                    const processedTexture = new THREE.CanvasTexture(canvas);
-                    
-                    // Copy original texture properties
-                    processedTexture.wrapS = material.map.wrapS || THREE.RepeatWrapping;
-                    processedTexture.wrapT = material.map.wrapT || THREE.RepeatWrapping;
-                    processedTexture.repeat.copy(material.map.repeat || new THREE.Vector2(1, 1));
-                    processedTexture.offset.copy(material.map.offset || new THREE.Vector2(0, 0));
-                    processedTexture.rotation = material.map.rotation || 0;
-                    processedTexture.center.copy(material.map.center || new THREE.Vector2(0.5, 0.5));
-                    
-                    // Mobile-optimized settings
-                    processedTexture.minFilter = THREE.LinearMipmapLinearFilter;
-                    processedTexture.magFilter = THREE.LinearFilter;
-                    processedTexture.generateMipmaps = true;
-                    processedTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
-                    
-                    // Set correct color space
-                    processedTexture.colorSpace = THREE.SRGBColorSpace;
-                    processedTexture.needsUpdate = true;
-                    
-                    // Replace original texture
-                    material.map.dispose();
-                    material.map = processedTexture;
                     material.needsUpdate = true;
-                    
-                    console.log(`    ✅ Reprocessed to: ${targetWidth}x${targetHeight}`);
                     
                     // Update debug panel
                     if (isMobileEarly) {
                       debugInfo.textures.push({
                         name: child.name || 'unnamed',
                         success: true,
-                        status: `${targetWidth}x${targetHeight}`
+                        status: material.map.image ? `${material.map.image.width}x${material.map.image.height}` : 'no image'
                       });
                       updateDebugPanel();
                     }
-                    
-                    // Process other texture maps if they exist
-                    const otherMaps = ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'];
-                    otherMaps.forEach(mapName => {
-                      if (material[mapName] && material[mapName].image) {
-                        const mapCanvas = document.createElement('canvas');
-                        const mapCtx = mapCanvas.getContext('2d');
-                        mapCanvas.width = targetWidth;
-                        mapCanvas.height = targetHeight;
-                        mapCtx.drawImage(material[mapName].image, 0, 0, targetWidth, targetHeight);
-                        
-                        const newMap = new THREE.CanvasTexture(mapCanvas);
-                        newMap.wrapS = material[mapName].wrapS || THREE.RepeatWrapping;
-                        newMap.wrapT = material[mapName].wrapT || THREE.RepeatWrapping;
-                        newMap.generateMipmaps = true;
-                        newMap.needsUpdate = true;
-                        
-                        material[mapName].dispose();
-                        material[mapName] = newMap;
-                        console.log(`    ✅ Reprocessed ${mapName}`);
-                      }
-                    });
                   } else if (material.map) {
                     textureCount++;
                     console.log('  Desktop texture (no processing)');
@@ -2228,6 +2219,52 @@
         }
         
         console.log('Room model loaded successfully');
+        
+        // Test if regular texture loading works on mobile
+        if (isMobile) {
+          console.log('📱 Testing if TextureLoader works on mobile...');
+          const textureLoader = new THREE.TextureLoader();
+          
+          // Create a simple test texture with Canvas
+          const testCanvas = document.createElement('canvas');
+          testCanvas.width = 256;
+          testCanvas.height = 256;
+          const testCtx = testCanvas.getContext('2d');
+          
+          // Draw a test pattern
+          testCtx.fillStyle = '#FF0000';
+          testCtx.fillRect(0, 0, 256, 256);
+          testCtx.fillStyle = '#FFFFFF';
+          testCtx.font = '30px Arial';
+          testCtx.fillText('TEST', 80, 130);
+          
+          // Create texture from canvas
+          const testTexture = new THREE.CanvasTexture(testCanvas);
+          testTexture.needsUpdate = true;
+          
+          // Create a test plane to verify textures work at all
+          const testGeometry = new THREE.PlaneGeometry(3, 3);
+          const testMaterial = new THREE.MeshBasicMaterial({ 
+            map: testTexture,
+            side: THREE.DoubleSide 
+          });
+          const testPlane = new THREE.Mesh(testGeometry, testMaterial);
+          testPlane.position.set(0, 3, -5);
+          testPlane.name = 'TEST_TEXTURE_PLANE';
+          scene.add(testPlane);
+          
+          console.log('✅ Test texture plane added to scene');
+          console.log('If you see a red square with "TEST" text, textures CAN work');
+          console.log('If not, there is a fundamental WebGL issue');
+          
+          // Update debug info
+          debugInfo.textures.push({
+            name: 'Canvas Test Texture',
+            success: true,
+            status: 'Created and displayed'
+          });
+          updateDebugPanel();
+        }
         },
         function(progress) {
           // Progress callback (optional)

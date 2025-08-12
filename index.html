@@ -359,8 +359,8 @@
     /* Popup panels for menu items */
     .menu-popup {
       position: absolute;
-      top: 0;
-      left: calc(100% + 10px);  /* Position 10px to the right of menu */
+      top: 75px;  /* Same top as menu */
+      left: 90px;  /* 20px (menu left) + 60px (menu width) + 10px (gap) */
       min-width: 200px;
       background: rgba(255, 255, 255, 0.1);
       backdrop-filter: blur(10px);
@@ -1179,9 +1179,10 @@
       ❓
       <span class="tooltip">Help</span>
     </button>
-    
-    <!-- Popup Panels -->
-    <div class="menu-popup" id="home-popup">
+  </div>
+  
+  <!-- Popup Panels (moved outside menu container) -->
+  <div class="menu-popup" id="home-popup">
       <h3>🏠 Home</h3>
       <p style="color: #fff; font-size: 12px;">Welcome to the 3D Multi-User World!</p>
       <p style="color: rgba(255,255,255,0.7); font-size: 11px;">Click anywhere to close</p>
@@ -1217,16 +1218,15 @@
       </div>
     </div>
     
-    <div class="menu-popup" id="help-popup">
-      <h3>❓ Help</h3>
-      <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 8px 0;">
-        <strong>Controls:</strong><br>
-        • WASD - Move<br>
-        • Mouse - Look<br>
-        • Click - Select object<br>
-        • ESC - Exit fullscreen
-      </p>
-    </div>
+  <div class="menu-popup" id="help-popup">
+    <h3>❓ Help</h3>
+    <p style="color: rgba(255,255,255,0.8); font-size: 12px; margin: 8px 0;">
+      <strong>Controls:</strong><br>
+      • WASD - Move<br>
+      • Mouse - Look<br>
+      • Click - Select object<br>
+      • ESC - Exit fullscreen
+    </p>
   </div>
   
   <!-- Visitor Counter (Disabled) -->

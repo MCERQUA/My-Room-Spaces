@@ -2173,37 +2173,22 @@
     let userChosenName = '';
     
     function showWelcomeDialog() {
-      try {
-        const welcomeDialog = document.getElementById('welcome-dialog');
-        const welcomeOverlay = document.getElementById('welcome-overlay');
-        const welcomeInput = document.getElementById('welcome-input');
-        const welcomeButton = document.getElementById('welcome-button');
-        
-        if (!welcomeDialog || !welcomeOverlay) {
-          console.error('Welcome dialog elements not found!');
-          // Fallback: initialize with generated name
-          initializeRoomSystem();
-          return;
+      const welcomeDialog = document.getElementById('welcome-dialog');
+      const welcomeOverlay = document.getElementById('welcome-overlay');
+      const welcomeInput = document.getElementById('welcome-input');
+      const welcomeButton = document.getElementById('welcome-button');
+      
+      // Show the dialog and overlay
+      welcomeDialog.style.display = 'block';
+      welcomeOverlay.style.display = 'block';
+      
+      // Focus input (with delay for mobile)
+      setTimeout(() => {
+        // Only focus on non-touch devices to prevent keyboard popup issues
+        if (!('ontouchstart' in window)) {
+          welcomeInput.focus();
         }
-        
-        // Show the dialog and overlay
-        welcomeDialog.style.display = 'block';
-        welcomeOverlay.style.display = 'block';
-        console.log('Welcome dialog shown');
-        
-        // Focus input (with delay for mobile)
-        setTimeout(() => {
-          // Only focus on non-touch devices to prevent keyboard popup issues
-          if (!('ontouchstart' in window) && welcomeInput) {
-            welcomeInput.focus();
-          }
-        }, 100);
-      } catch (error) {
-        console.error('Error showing welcome dialog:', error);
-        // Fallback: initialize with generated name
-        initializeRoomSystem();
-        return;
-      }
+      }, 100);
       
       // Add explicit touch handling for input field
       welcomeInput.addEventListener('touchstart', (e) => {

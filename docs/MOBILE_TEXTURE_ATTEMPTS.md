@@ -1,10 +1,10 @@
 # Mobile Texture Rendering Attempts Documentation
 
-## 🔴 CURRENT STATUS: UNRESOLVED
-**As of August 12, 2025 - Mobile textures are STILL WHITE despite 17+ different approaches**
+## 🟡 CURRENT STATUS: NEW APPROACH IMPLEMENTED
+**As of December 17, 2024 - Implementing texture reprocessing similar to Sketchfab/Spatial.io**
 
-### Latest Attempt: WebGL 2 - FAILED ❌
-Even with WebGL 2's improved texture support, mobile textures remain white.
+### Latest Attempt #18: Platform-Style Texture Processing
+Reprocessing textures on-the-fly for mobile, similar to how platforms like Sketchfab and Spatial.io handle GLB files.
 
 ## Overview
 This document tracks all the different approaches we've tried to fix mobile texture rendering issues in the 3D Three.js site. The main problem has been textures appearing white or not rendering correctly on mobile devices, while working fine on desktop.
@@ -83,7 +83,19 @@ This document tracks all the different approaches we've tried to fix mobile text
 
 ## Complete List of Failed Attempts
 
-### Summary: 17 Different Approaches - ALL FAILED ❌
+### 18. Platform-Style Texture Reprocessing (Current Attempt)
+**Commit**: Current - Reprocess textures like Sketchfab/Spatial.io
+**Changes**:
+- Canvas-based texture reprocessing for mobile
+- Convert all textures to power-of-2 dimensions
+- Resize to max 1024x1024 for mobile devices
+- Create new CanvasTexture from reprocessed image data
+- Apply to all texture maps (diffuse, normal, roughness, etc.)
+- Mobile debug panel for real-time diagnostics
+- WebGL capability detection and logging
+- **Result**: Testing in progress...
+
+### Summary: 18 Different Approaches Attempted
 
 1. Mobile detection and fallback rendering
 2. Lighting and shadow adjustments  

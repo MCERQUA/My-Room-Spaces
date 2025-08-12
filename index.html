@@ -320,6 +320,103 @@
       display: block;
     }
 
+    /* Mobile Debug Panel */
+    #mobile-debug-panel {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      width: 90%;
+      max-width: 350px;
+      max-height: 50vh;
+      background: rgba(0, 0, 0, 0.95);
+      border: 1px solid rgba(74, 144, 226, 0.5);
+      border-radius: 8px;
+      padding: 15px;
+      font-size: 11px;
+      font-family: 'Courier New', monospace;
+      overflow-y: auto;
+      z-index: 10000;
+      display: none;
+      backdrop-filter: blur(10px);
+    }
+    
+    #mobile-debug-panel.visible {
+      display: block;
+    }
+    
+    #mobile-debug-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #4a90e2;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 5px;
+    }
+    
+    #mobile-debug-panel .debug-section {
+      margin-bottom: 12px;
+      padding: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+    
+    #mobile-debug-panel .debug-section h4 {
+      margin: 0 0 5px 0;
+      color: #4a90e2;
+      font-size: 12px;
+    }
+    
+    #mobile-debug-panel .debug-row {
+      display: flex;
+      justify-content: space-between;
+      margin: 2px 0;
+    }
+    
+    #mobile-debug-panel .debug-label {
+      color: #888;
+      flex: 0 0 45%;
+    }
+    
+    #mobile-debug-panel .debug-value {
+      color: #fff;
+      flex: 0 0 55%;
+      text-align: right;
+      word-break: break-all;
+    }
+    
+    #mobile-debug-panel .debug-warning {
+      color: #ff9800;
+    }
+    
+    #mobile-debug-panel .debug-error {
+      color: #f44336;
+    }
+    
+    #mobile-debug-panel .debug-success {
+      color: #4caf50;
+    }
+    
+    #debug-toggle-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      background: rgba(74, 144, 226, 0.9);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+      z-index: 10001;
+      display: none;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s;
+    }
+    
+    #debug-toggle-btn:active {
+      transform: scale(0.95);
+    }
+
     @media (max-width: 768px) {
       .screen {
         width: 280px;
@@ -1349,6 +1446,13 @@
     <button class="welcome-button" id="welcome-button">Join</button>
   </div>
   
+  <!-- Mobile Debug Panel -->
+  <button id="debug-toggle-btn" onclick="toggleDebugPanel()">🐛</button>
+  <div id="mobile-debug-panel">
+    <h3>Mobile Debug Info</h3>
+    <div id="debug-content"></div>
+  </div>
+  
   <script src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.js"></script>
   <script src="https://unpkg.com/simple-peer@9.11.1/simplepeer.min.js"></script>
   
@@ -1374,11 +1478,115 @@
     // Enhanced mobile detection - define FIRST
     const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
-    // Mobile texture optimization utilities
+    // Mobile Debug Panel Management
+    let debugInfo = {
+      platform: {},
+      webgl: {},
+      textures: [],
+      errors: [],
+      performance: {}
+    };
+    
+    function updateDebugPanel() {
+      if (!isMobileEarly) return;
+      
+      const debugContent = document.getElementById('debug-content');
+      if (!debugContent) return;
+      
+      let html = '';
+      
+      // Platform Info
+      html += '<div class="debug-section"><h4>Platform</h4>';
+      Object.entries(debugInfo.platform).forEach(([key, value]) => {
+        html += `<div class="debug-row"><span class="debug-label">${key}:</span><span class="debug-value">${value}</span></div>`;
+      });
+      html += '</div>';
+      
+      // WebGL Info
+      html += '<div class="debug-section"><h4>WebGL Capabilities</h4>';
+      Object.entries(debugInfo.webgl).forEach(([key, value]) => {
+        const className = key.includes('max') && value < 2048 ? 'debug-warning' : 'debug-value';
+        html += `<div class="debug-row"><span class="debug-label">${key}:</span><span class="${className}">${value}</span></div>`;
+      });
+      html += '</div>';
+      
+      // Texture Info
+      if (debugInfo.textures.length > 0) {
+        html += '<div class="debug-section"><h4>Textures Loaded</h4>';
+        debugInfo.textures.forEach(tex => {
+          const statusClass = tex.success ? 'debug-success' : 'debug-error';
+          html += `<div class="debug-row"><span class="debug-label">${tex.name}:</span><span class="${statusClass}">${tex.status}</span></div>`;
+        });
+        html += '</div>';
+      }
+      
+      // Errors
+      if (debugInfo.errors.length > 0) {
+        html += '<div class="debug-section"><h4>Errors</h4>';
+        debugInfo.errors.forEach(error => {
+          html += `<div class="debug-error">${error}</div>`;
+        });
+        html += '</div>';
+      }
+      
+      // Performance
+      if (Object.keys(debugInfo.performance).length > 0) {
+        html += '<div class="debug-section"><h4>Performance</h4>';
+        Object.entries(debugInfo.performance).forEach(([key, value]) => {
+          html += `<div class="debug-row"><span class="debug-label">${key}:</span><span class="debug-value">${value}</span></div>`;
+        });
+        html += '</div>';
+      }
+      
+      debugContent.innerHTML = html;
+    }
+    
+    function toggleDebugPanel() {
+      const panel = document.getElementById('mobile-debug-panel');
+      if (panel) {
+        panel.classList.toggle('visible');
+        updateDebugPanel();
+      }
+    }
+    
+    // Show debug button on mobile
+    if (isMobileEarly) {
+      window.addEventListener('DOMContentLoaded', () => {
+        const debugBtn = document.getElementById('debug-toggle-btn');
+        if (debugBtn) {
+          debugBtn.style.display = 'block';
+        }
+        document.body.classList.add('is-mobile');
+      });
+    }
+    
+    // Comprehensive WebGL capability detection
     function getMobileTextureSettings() {
       const testRenderer = new THREE.WebGLRenderer();
       const gl = testRenderer.getContext();
-      const maxTextureSize = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      
+      // Get all WebGL capabilities
+      const capabilities = {
+        maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+        maxTextureUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
+        maxVertexTextureUnits: gl.getParameter(gl.MAX_VERTEX_TEXTURE_IMAGE_UNITS),
+        maxAnisotropy: testRenderer.capabilities.getMaxAnisotropy(),
+        precision: testRenderer.capabilities.precision,
+        maxVertexUniforms: gl.getParameter(gl.MAX_VERTEX_UNIFORM_VECTORS),
+        maxFragmentUniforms: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
+        webglVersion: gl.getParameter(gl.VERSION),
+        shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+        vendor: gl.getParameter(gl.VENDOR),
+        renderer: gl.getParameter(gl.RENDERER),
+        // Memory estimation (not directly available but useful indicators)
+        maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS),
+        maxRenderBufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+        // Check for important extensions
+        hasCompressedTextures: gl.getExtension('WEBGL_compressed_texture_s3tc') !== null,
+        hasFloatTextures: gl.getExtension('OES_texture_float') !== null,
+        hasDepthTexture: gl.getExtension('WEBGL_depth_texture') !== null
+      };
+      
       testRenderer.dispose();
       
       // Detect iOS specifically as it has unique texture issues
@@ -1386,16 +1594,24 @@
       const isAndroid = /Android/i.test(navigator.userAgent);
       const isMobileSafari = isIOS && /Version\/[\d\.]+.*Safari/.test(navigator.userAgent);
       
-      console.log('📱 Mobile texture settings:', {
-        maxTextureSize,
+      console.log('📱 WebGL Capabilities Detection:', capabilities);
+      console.log('📱 Mobile Platform:', {
         isIOS,
         isAndroid,
         isMobileSafari,
         userAgent: navigator.userAgent
       });
       
+      // Log warnings for potential issues
+      if (capabilities.maxTextureSize < 2048) {
+        console.warn('⚠️ Low max texture size:', capabilities.maxTextureSize);
+      }
+      if (capabilities.maxTextureUnits < 8) {
+        console.warn('⚠️ Low texture units:', capabilities.maxTextureUnits);
+      }
+      
       return {
-        maxTextureSize,
+        ...capabilities,
         isIOS,
         isAndroid,
         isMobileSafari
@@ -1403,6 +1619,27 @@
     }
     
     const mobileSettings = getMobileTextureSettings();
+    
+    // Populate debug info with platform and WebGL data
+    if (isMobileEarly) {
+      debugInfo.platform = {
+        'Device': mobileSettings.isIOS ? 'iOS' : (mobileSettings.isAndroid ? 'Android' : 'Other'),
+        'Browser': mobileSettings.isMobileSafari ? 'Safari' : 'Other',
+        'Screen': `${window.screen.width}x${window.screen.height}`,
+        'Pixel Ratio': window.devicePixelRatio
+      };
+      
+      debugInfo.webgl = {
+        'Max Texture': mobileSettings.maxTextureSize,
+        'Texture Units': mobileSettings.maxTextureUnits,
+        'Anisotropy': mobileSettings.maxAnisotropy,
+        'Precision': mobileSettings.precision,
+        'WebGL Version': mobileSettings.webglVersion ? mobileSettings.webglVersion.substring(0, 20) : 'Unknown',
+        'Renderer': mobileSettings.renderer ? mobileSettings.renderer.substring(0, 30) : 'Unknown'
+      };
+      
+      updateDebugPanel();
+    }
     
     // Helper to get optimal canvas size for mobile
     function getOptimalCanvasSize(desiredWidth, desiredHeight, isMobile) {
@@ -1775,7 +2012,7 @@
                 child.receiveShadow = true;
               }
               
-              // Detailed material debugging
+              // Process materials - reprocess textures for mobile like Sketchfab/Spatial.io
               if (child.material) {
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
                 
@@ -1784,20 +2021,105 @@
                   console.log('  Type:', material.type);
                   console.log('  Has map:', !!material.map);
                   
-                  if (material.map) {
+                  // Mobile texture reprocessing - similar to platform processing
+                  if (isMobile && material.map && material.map.image) {
                     textureCount++;
-                    console.log('  Texture info:');
-                    console.log('    - UUID:', material.map.uuid);
-                    console.log('    - Image:', material.map.image);
-                    console.log('    - Image type:', material.map.image?.constructor.name);
-                    console.log('    - Width x Height:', material.map.image?.width, 'x', material.map.image?.height);
-                    console.log('    - Source:', material.map.source);
+                    const originalImage = material.map.image;
                     
-                    // Check if it's actually rendering
-                    if (material.map.image && material.map.image.width > 0) {
-                      console.log('    ✅ Texture has valid dimensions');
-                    } else {
-                      console.log('    ❌ Texture has no valid dimensions!');
+                    console.log('  📱 Mobile texture reprocessing...');
+                    console.log('    Original size:', originalImage.width, 'x', originalImage.height);
+                    
+                    // Create canvas for reprocessing
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d', { 
+                      alpha: true,
+                      desynchronized: true,
+                      willReadFrequently: false 
+                    });
+                    
+                    // Calculate optimal mobile size (power-of-2)
+                    const maxMobileSize = 1024;
+                    let targetWidth = Math.min(originalImage.width, maxMobileSize);
+                    let targetHeight = Math.min(originalImage.height, maxMobileSize);
+                    
+                    // Round to nearest power of 2
+                    targetWidth = Math.pow(2, Math.round(Math.log2(targetWidth)));
+                    targetHeight = Math.pow(2, Math.round(Math.log2(targetHeight)));
+                    
+                    canvas.width = targetWidth;
+                    canvas.height = targetHeight;
+                    
+                    // High-quality image resampling
+                    ctx.imageSmoothingEnabled = true;
+                    ctx.imageSmoothingQuality = 'high';
+                    
+                    // Draw the original image to canvas
+                    ctx.drawImage(originalImage, 0, 0, targetWidth, targetHeight);
+                    
+                    // Create new texture from reprocessed canvas
+                    const processedTexture = new THREE.CanvasTexture(canvas);
+                    
+                    // Copy original texture properties
+                    processedTexture.wrapS = material.map.wrapS || THREE.RepeatWrapping;
+                    processedTexture.wrapT = material.map.wrapT || THREE.RepeatWrapping;
+                    processedTexture.repeat.copy(material.map.repeat || new THREE.Vector2(1, 1));
+                    processedTexture.offset.copy(material.map.offset || new THREE.Vector2(0, 0));
+                    processedTexture.rotation = material.map.rotation || 0;
+                    processedTexture.center.copy(material.map.center || new THREE.Vector2(0.5, 0.5));
+                    
+                    // Mobile-optimized settings
+                    processedTexture.minFilter = THREE.LinearMipmapLinearFilter;
+                    processedTexture.magFilter = THREE.LinearFilter;
+                    processedTexture.generateMipmaps = true;
+                    processedTexture.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+                    
+                    // Set correct color space
+                    processedTexture.colorSpace = THREE.SRGBColorSpace;
+                    processedTexture.needsUpdate = true;
+                    
+                    // Replace original texture
+                    material.map.dispose();
+                    material.map = processedTexture;
+                    material.needsUpdate = true;
+                    
+                    console.log(`    ✅ Reprocessed to: ${targetWidth}x${targetHeight}`);
+                    
+                    // Update debug panel
+                    if (isMobileEarly) {
+                      debugInfo.textures.push({
+                        name: child.name || 'unnamed',
+                        success: true,
+                        status: `${targetWidth}x${targetHeight}`
+                      });
+                      updateDebugPanel();
+                    }
+                    
+                    // Process other texture maps if they exist
+                    const otherMaps = ['normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap'];
+                    otherMaps.forEach(mapName => {
+                      if (material[mapName] && material[mapName].image) {
+                        const mapCanvas = document.createElement('canvas');
+                        const mapCtx = mapCanvas.getContext('2d');
+                        mapCanvas.width = targetWidth;
+                        mapCanvas.height = targetHeight;
+                        mapCtx.drawImage(material[mapName].image, 0, 0, targetWidth, targetHeight);
+                        
+                        const newMap = new THREE.CanvasTexture(mapCanvas);
+                        newMap.wrapS = material[mapName].wrapS || THREE.RepeatWrapping;
+                        newMap.wrapT = material[mapName].wrapT || THREE.RepeatWrapping;
+                        newMap.generateMipmaps = true;
+                        newMap.needsUpdate = true;
+                        
+                        material[mapName].dispose();
+                        material[mapName] = newMap;
+                        console.log(`    ✅ Reprocessed ${mapName}`);
+                      }
+                    });
+                  } else if (material.map) {
+                    textureCount++;
+                    console.log('  Desktop texture (no processing)');
+                    if (material.map.image) {
+                      console.log('    Size:', material.map.image.width, 'x', material.map.image.height);
                     }
                   } else {
                     console.log('  No texture map');

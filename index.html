@@ -2110,17 +2110,42 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
           console.log('GLB model loaded successfully from:', modelPath);
           
           // Add extensive logging for mobile debugging
-          if (isMobile) {
+          if (isMobile || isRealIOS) {
             console.log('📱 === MOBILE TEXTURE DEBUGGING ===');
             console.log('Model path:', modelPath);
             console.log('GLTF object:', gltf);
-            console.log('Renderer capabilities:', renderer.capabilities);
-            console.log('WebGL context:', renderer.getContext());
             
-            // Check if textures are even in the GLTF
-            if (gltf.parser && gltf.parser.json && gltf.parser.json.textures) {
-              console.log('GLTF textures array:', gltf.parser.json.textures);
+            // Check if textures are in the GLTF
+            if (gltf.parser && gltf.parser.json) {
+              console.log('GLTF has textures:', gltf.parser.json.textures ? gltf.parser.json.textures.length : 0);
+              console.log('GLTF has images:', gltf.parser.json.images ? gltf.parser.json.images.length : 0);
             }
+            
+            // Test manual texture loading
+            console.log('Testing manual texture load...');
+            const testLoader = new THREE.TextureLoader();
+            testLoader.load(
+              './models/unpacked-mobile/couchbake.jpg',
+              (texture) => {
+                console.log('✅ Manual texture loaded successfully:', texture);
+                console.log('Texture dimensions:', texture.image.width, 'x', texture.image.height);
+                
+                // Try applying this texture to the couch
+                gltf.scene.traverse((child) => {
+                  if (child.isMesh && child.name && child.name.toLowerCase().includes('couch')) {
+                    console.log('Found couch mesh, applying test texture...');
+                    if (child.material) {
+                      child.material.map = texture;
+                      child.material.needsUpdate = true;
+                    }
+                  }
+                });
+              },
+              undefined,
+              (error) => {
+                console.error('❌ Manual texture load failed:', error);
+              }
+            );
           }
           
           const roomModel = gltf.scene;

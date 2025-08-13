@@ -1,7 +1,7 @@
 # Mobile Texture Rendering Attempts Documentation
 
-## 🔴 CURRENT STATUS: STILL UNRESOLVED 
-**As of December 17, 2024 - 22 attempts made, iOS GLB textures remain white**
+## 🔴 CURRENT STATUS: TESTING EXTERNAL TEXTURES 
+**As of December 17, 2024 - 23 attempts made, testing GLTF with external texture files**
 
 ### Critical Context Discovery
 **The GLB files WORK on Sketchfab and Spatial.io on mobile**, which means:
@@ -171,8 +171,8 @@ ctx.imageSmoothingQuality = 'high';
 - Replace original texture
 **Result**: ❌ Still white - image data might not be available
 
-### 22. Delayed Texture Fix with Verification (Current)
-**Commit**: Current - Multiple attempts with delays and pixel verification
+### 22. Delayed Texture Fix with Verification (December 17, 2024)
+**Commit**: `20cd46e` - Multiple attempts with delays and pixel verification
 **Approach**: 
 - Wait for images to fully load
 - Verify pixel data is available
@@ -182,9 +182,36 @@ ctx.imageSmoothingQuality = 'high';
 - Test pixel extraction before full conversion
 - Multiple retry attempts with 2-second delays
 - Verify image dimensions and data availability
+**Result**: ❌ Still white - image data not extractable from GLB textures
+
+### 23. GLTF with External Textures (December 17, 2024)
+**Commit**: `6fd4b18` - Extract textures from GLB and load as separate files
+**Approach**: Since Sketchfab/Spatial.io work, they likely use external textures
+**Implementation**:
+```bash
+# Extract textures using gltf-pipeline
+gltf-pipeline -i WEBROOM1-mob.glb -o unpacked-mobile/WEBROOM1-mob.gltf --separate
+```
+**Files Created**:
+- `WEBROOM1-mob.gltf` (47KB) - GLTF with external texture references
+- `WEBROOM1-mob.bin` (53KB) - Binary geometry data
+- 10 JPG texture files (FBWALLSBK.jpg, couchbake.jpg, floorbake.jpg, etc.)
+**Code Change**:
+```javascript
+// Load GLTF with external textures for mobile
+const shouldUseMobileGLTF = isMobile || isRealIOS;
+const modelPath = shouldUseMobileGLTF 
+  ? './models/unpacked-mobile/WEBROOM1-mob.gltf'  // External textures
+  : './models/BAKE-WEBROOM1.glb';                 // Embedded textures
+```
+**Why This Should Work**:
+- External texture files bypass iOS WebKit's GLB texture binding issue
+- Textures load via standard image loading, not GLB extraction
+- Each texture is a separate HTTP request with proper MIME type
+- Three.js TextureLoader handles external files better than embedded
 **Result**: Testing in progress...
 
-### Summary: 22 Different Approaches Attempted
+### Summary: 23 Different Approaches Attempted
 
 1. Mobile detection and fallback rendering
 2. Lighting and shadow adjustments  
@@ -202,7 +229,13 @@ ctx.imageSmoothingQuality = 'high';
 14. Simplified GLB loading (let GLTFLoader handle everything)
 15. Force render updates on mobile
 16. Debug findings (textures load but don't render)
-17. **WebGL 2 implementation** (latest attempt - still doesn't work)
+17. WebGL 2 implementation
+18. Platform-style Canvas texture reprocessing
+19. Simplified no-processing approach
+20. Diagnostic test planes (Canvas textures work)
+21. Canvas texture conversion from GLB
+22. Delayed texture fix with pixel verification
+23. **GLTF with external textures** (latest attempt - testing)
 
 ## Attempts Made (Chronological)
 
@@ -636,22 +669,23 @@ const renderer = new THREE.WebGLRenderer({ /* params */ });
 
 ## 📊 COMPLETE ATTEMPT SUMMARY
 
-### Total Attempts: 18 (+ 8 planned approaches)
+### Total Attempts: 23 (+ 3 remaining planned approaches)
 
 **Approach Categories Tried**:
 1. **Texture Configuration** (Attempts 1-10): Power-of-2, wrapping modes, filters
 2. **Material Modifications** (Attempts 11-13): Material simplification, color space
 3. **GLB File Changes** (Attempts 11, 14-15): WebP to JPG conversion, separate mobile GLB
 4. **WebGL Context** (Attempt 17): WebGL 2 implementation
-5. **Platform Emulation** (Attempt 18): Canvas reprocessing like Sketchfab/Spatial.io
+5. **Platform Emulation** (Attempts 18-22): Canvas reprocessing, test planes, delayed loading
+6. **External Textures** (Attempt 23): GLTF with separate texture files
 
 **Current Status**: 
-- ⏳ Attempt #18 implemented and deployed
-- 🐛 Debug panel added for mobile diagnostics
+- ✅ Attempt #23 implemented and deployed
+- 📂 GLTF with 10 external texture files created
 - 📱 Awaiting test results on iPhone 14 Max
 
-**If #18 Succeeds**: Document the solution and optimize performance
-**If #18 Fails**: Proceed with approaches #19-26 in order of likelihood
+**If #23 Succeeds**: Document the solution and optimize loading
+**If #23 Fails**: Consider server-side processing or KTX2 compression
 
 ## 🔑 KEY TAKEAWAYS
 

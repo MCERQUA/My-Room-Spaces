@@ -1459,7 +1459,7 @@
   </div>
   
   <!-- Mobile Debug Panel -->
-  <button id="debug-toggle-btn" aria-label="Debug Console">⚙️</button>
+  <button id="debug-toggle-btn" aria-label="Debug Console">⚙</button>
   <div id="mobile-debug-panel">
     <h3>Mobile Debug Info</h3>
     <div id="debug-content"></div>
@@ -1493,6 +1493,11 @@
 
     // Enhanced mobile detection - define FIRST
     const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Check for real iOS even if Chrome masks it - define globally for use everywhere
+    const isRealIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
+                      /iPhone|iPad|iPod/.test(navigator.platform) ||
+                      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
     // Mobile Debug Panel Management
     let debugInfo = {
@@ -2127,11 +2132,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       console.log('isMobileEarly:', isMobileEarly);
       console.log('User Agent:', navigator.userAgent);
       
-      // Check for real iOS even if Chrome masks it
-      const isRealIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || 
-                        /iPhone|iPad|iPod/.test(navigator.platform) ||
-                        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-      
+      // isRealIOS is already defined globally at the top
       console.log('Is Real iOS device:', isRealIOS);
       
       // Use unpacked GLTF with external textures for mobile (iOS texture fix)

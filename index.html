@@ -2054,8 +2054,8 @@
                   console.log('  Type:', material.type);
                   console.log('  Has map:', !!material.map);
                   
-                  // iOS FIX: Check if texture image is actually loaded
-                  if (isMobile && material.map) {
+                  // iOS FIX: Check if texture image is actually loaded (skip SHARESCREEN)
+                  if (isMobile && material.map && child.name !== 'SHARESCREEN' && child.name !== 'SHARESCREEN-HERE') {
                     textureCount++;
                     console.log('  📱 iOS Texture Debug for:', child.name);
                     
@@ -2252,79 +2252,51 @@
         
         console.log('Room model loaded successfully');
         
-        // Mobile: Try delayed texture fix since images might not be ready
+        // Mobile: Simple test - just log what we have
         if (isMobile) {
-          console.log('📱 === MOBILE TEXTURE DELAYED FIX ===');
+          console.log('📱 === MOBILE TEXTURE ANALYSIS ===');
           
-          // Try multiple times with delays
-          const attemptFix = (attemptNum) => {
-            console.log(`📱 Texture fix attempt ${attemptNum}...`);
-            
-            let fixedCount = 0;
+          setTimeout(() => {
+            let textureInfo = [];
             roomModel.traverse((child) => {
               if (child.isMesh && child.material) {
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
                 
-                materials.forEach(material => {
-                  if (material.map && material.map.image) {
-                    const img = material.map.image;
+                materials.forEach((material, idx) => {
+                  if (material.map) {
+                    const info = {
+                      mesh: child.name || 'unnamed',
+                      materialIndex: idx,
+                      hasImage: !!material.map.image,
+                      imageType: material.map.image ? material.map.image.constructor.name : 'none',
+                      width: material.map.image ? material.map.image.width : 0,
+                      height: material.map.image ? material.map.image.height : 0,
+                      source: material.map.source,
+                      uuid: material.map.uuid
+                    };
+                    textureInfo.push(info);
+                    console.log('Texture:', info);
                     
-                    // Only fix if not already fixed
-                    if (!material._iosFixed && img.width > 0 && img.height > 0) {
-                      try {
-                        // Create canvas
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        
-                        // Draw image
-                        ctx.drawImage(img, 0, 0);
-                        
-                        // Verify we got data
-                        const testData = ctx.getImageData(0, 0, 1, 1).data;
-                        if (testData[0] > 0 || testData[1] > 0 || testData[2] > 0 || testData[3] > 0) {
-                          // Create new texture
-                          const newTexture = new THREE.CanvasTexture(canvas);
-                          
-                          // Copy properties
-                          newTexture.wrapS = material.map.wrapS;
-                          newTexture.wrapT = material.map.wrapT;
-                          newTexture.repeat.copy(material.map.repeat);
-                          newTexture.offset.copy(material.map.offset);
-                          newTexture.flipY = false;
-                          newTexture.colorSpace = THREE.SRGBColorSpace;
-                          newTexture.needsUpdate = true;
-                          
-                          // Replace
-                          material.map.dispose();
-                          material.map = newTexture;
-                          material.needsUpdate = true;
-                          material._iosFixed = true;
-                          
-                          fixedCount++;
-                          console.log(`  ✅ Fixed texture for ${child.name}`);
-                        }
-                      } catch (e) {
-                        console.log(`  ❌ Failed to fix ${child.name}:`, e.message);
-                      }
+                    // Try the simplest possible fix - just set needsUpdate
+                    if (material.map.image && material.map.image.width > 0) {
+                      material.map.needsUpdate = true;
+                      material.needsUpdate = true;
                     }
                   }
                 });
               }
             });
             
-            console.log(`  Fixed ${fixedCount} textures in attempt ${attemptNum}`);
-            renderer.render(scene, camera);
+            console.log('Total textures found:', textureInfo.length);
             
-            // Try again if we haven't fixed many textures
-            if (attemptNum < 5 && fixedCount < 10) {
-              setTimeout(() => attemptFix(attemptNum + 1), 2000);
+            // Force multiple renders
+            for (let i = 0; i < 5; i++) {
+              setTimeout(() => {
+                renderer.render(scene, camera);
+                console.log(`Render ${i + 1} complete`);
+              }, i * 1000);
             }
-          };
-          
-          // Start fix attempts after a delay
-          setTimeout(() => attemptFix(1), 2000);
+          }, 3000);
         }
         },
         function(progress) {

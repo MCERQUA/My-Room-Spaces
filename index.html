@@ -2145,10 +2145,12 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
             // Since GLTF isn't linking textures properly, manually load and apply them
             const textureLoader = new THREE.TextureLoader();
             const textureMap = {
-              'couchbake.jpg': ['couch', 'sofa'],
+              'couchbake.jpg': ['Back_low_lambert1_0', 'lambert1', 'back_low'],  // Couch mesh names
+              'Image_2.jpg': ['Back_low_lambert1_0'],  // Also for couch
+              'Image_1.jpg': ['Back_low_lambert1_0'],  // Also for couch
               'floorbake.jpg': ['floor', 'ground'],
               'ceiling.jpg': ['ceiling', 'roof'],
-              'FBWALLSBK.jpg': ['wall', 'front', 'back'],
+              'FBWALLSBK.jpg': ['wall', 'front'],
               'LRWALLSBK.jpg': ['wall', 'left', 'right']
             };
             
@@ -2166,20 +2168,35 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
                   // Find matching meshes and apply texture
                   gltf.scene.traverse((child) => {
                     if (child.isMesh) {
-                      const meshName = (child.name || '').toLowerCase();
+                      const meshName = child.name || '';
+                      const meshNameLower = meshName.toLowerCase();
                       
                       // Skip SHARESCREEN object
-                      if (meshName.includes('sharescreen') || meshName.includes('screen')) {
+                      if (meshNameLower.includes('sharescreen') || meshNameLower.includes('screen')) {
                         return; // Don't modify screen share
                       }
                       
                       // Check if this mesh matches any of the target names
-                      const shouldApply = meshNames.some(name => meshName.includes(name));
+                      // Check both exact name and lowercase partial matches
+                      const shouldApply = meshNames.some(name => {
+                        const nameLower = name.toLowerCase();
+                        return meshName === name || meshNameLower.includes(nameLower);
+                      });
                       
                       if (shouldApply && child.material) {
                         console.log(`  Applying ${filename} to ${child.name}`);
-                        child.material.map = texture;
-                        child.material.needsUpdate = true;
+                        
+                        // Special handling for couch - it might need multiple textures
+                        if (meshName === 'Back_low_lambert1_0' && filename === 'couchbake.jpg') {
+                          // This is definitely the couch, apply the texture
+                          child.material.map = texture;
+                          child.material.needsUpdate = true;
+                          console.log('  ✅ Applied couchbake.jpg to couch mesh');
+                        } else if (!meshName.includes('Back_low_lambert1_0')) {
+                          // Only apply to non-couch meshes if it's not the couch texture
+                          child.material.map = texture;
+                          child.material.needsUpdate = true;
+                        }
                       }
                     }
                   });
@@ -2191,6 +2208,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
               );
             });
             
+            // Also log all mesh names to debug
+            console.log('=== ALL MESH NAMES IN MODEL ===');
+            gltf.scene.traverse((child) => {
+              if (child.isMesh) {
+                console.log(`Mesh: "${child.name}" (${child.material ? child.material.type : 'no material'})`);
+              }
+            });
+            
             // Also apply to any mesh without a texture
             setTimeout(() => {
               console.log('Checking for meshes without textures...');
@@ -2198,22 +2223,26 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
               
               gltf.scene.traverse((child) => {
                 if (child.isMesh && child.material && !child.material.map) {
-                  const meshName = (child.name || '').toLowerCase();
+                  const meshName = (child.name || '');
+                  const meshNameLower = meshName.toLowerCase();
                   
                   // Skip SHARESCREEN object
-                  if (meshName.includes('sharescreen') || meshName.includes('screen')) {
+                  if (meshNameLower.includes('sharescreen') || meshNameLower.includes('screen')) {
                     return; // Don't apply textures to screen
                   }
                   
                   untexturedCount++;
                   console.log(`Mesh without texture: ${child.name}`);
                   
-                  // Apply a default texture based on name
+                  // Apply a default texture based on name - check exact names first
                   let defaultTexture = 'floorbake.jpg';
                   
-                  if (meshName.includes('wall')) defaultTexture = 'FBWALLSBK.jpg';
-                  else if (meshName.includes('ceiling')) defaultTexture = 'ceiling.jpg';
-                  else if (meshName.includes('couch')) defaultTexture = 'couchbake.jpg';
+                  if (meshName === 'Back_low_lambert1_0' || meshNameLower.includes('lambert1')) {
+                    defaultTexture = 'couchbake.jpg';  // This is the couch
+                  } else if (meshNameLower.includes('wall')) {
+                    defaultTexture = 'FBWALLSBK.jpg';
+                  } else if (meshNameLower.includes('ceiling')) {
+                    defaultTexture = 'ceiling.jpg';
                   
                   textureLoader.load(
                     `./models/unpacked-mobile/${defaultTexture}`,

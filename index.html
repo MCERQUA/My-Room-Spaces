@@ -2126,78 +2126,17 @@ ${debugInfo.logs.slice(-50).join('\n')}
                   console.log('  Type:', material.type);
                   console.log('  Has map:', !!material.map);
                   
-                  // iOS FIX: Check if texture image is actually loaded (skip SHARESCREEN)
-                  if (isMobile && material.map && child.name !== 'SHARESCREEN' && child.name !== 'SHARESCREEN-HERE') {
+                  // MOBILE: Just log texture info, don't modify anything
+                  if (material.map) {
                     textureCount++;
-                    console.log('  📱 iOS Texture Debug for:', child.name);
                     
-                    if (material.map.image) {
-                      const img = material.map.image;
-                      console.log('    Image exists:', img);
-                      console.log('    Image type:', img.constructor.name);
-                      console.log('    Image dimensions:', img.width, 'x', img.height);
-                      console.log('    Image complete:', img.complete);
-                      console.log('    Image src:', img.src ? img.src.substring(0, 100) : 'No src');
-                      
-                      // Check if image has actual data
-                      if (img.width > 0 && img.height > 0) {
-                        // Try to extract pixel data to verify image is loaded
-                        const testCanvas = document.createElement('canvas');
-                        testCanvas.width = Math.min(4, img.width);
-                        testCanvas.height = Math.min(4, img.height);
-                        const testCtx = testCanvas.getContext('2d');
-                        
-                        try {
-                          testCtx.drawImage(img, 0, 0, testCanvas.width, testCanvas.height);
-                          const pixelData = testCtx.getImageData(0, 0, 1, 1).data;
-                          console.log('    First pixel RGBA:', pixelData[0], pixelData[1], pixelData[2], pixelData[3]);
-                          
-                          // If we can read pixel data, image is loaded
-                          if (pixelData[3] > 0) { // Has alpha
-                            console.log('    ✅ Image has valid pixel data, creating CanvasTexture...');
-                            
-                            // Now create the full canvas texture
-                            const canvas = document.createElement('canvas');
-                            canvas.width = img.width;
-                            canvas.height = img.height;
-                            const ctx = canvas.getContext('2d');
-                            
-                            // Fill with debug color first
-                            ctx.fillStyle = '#FF00FF'; // Magenta for debugging
-                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-                            
-                            // Draw the image
-                            ctx.drawImage(img, 0, 0);
-                            
-                            // Create new texture
-                            const newTexture = new THREE.CanvasTexture(canvas);
-                            newTexture.wrapS = material.map.wrapS;
-                            newTexture.wrapT = material.map.wrapT;
-                            newTexture.repeat.copy(material.map.repeat);
-                            newTexture.offset.copy(material.map.offset);
-                            newTexture.rotation = material.map.rotation;
-                            newTexture.center.copy(material.map.center);
-                            newTexture.flipY = false; // GLB textures shouldn't be flipped
-                            newTexture.colorSpace = THREE.SRGBColorSpace;
-                            newTexture.needsUpdate = true;
-                            
-                            // Replace texture
-                            material.map.dispose();
-                            material.map = newTexture;
-                            material.needsUpdate = true;
-                            
-                            console.log('    ✅ Texture replaced with CanvasTexture');
-                          } else {
-                            console.log('    ❌ Image has no alpha/data');
-                          }
-                        } catch (e) {
-                          console.error('    ❌ Cannot read image data:', e);
-                        }
-                      } else {
-                        console.log('    ❌ Image has no dimensions');
-                      }
-                    } else {
-                      console.log('    ❌ No image in texture');
+                    if (isMobile) {
+                      console.log(`  📱 Texture for ${child.name}:`, {
+                        hasImage: !!material.map.image,
+                        width: material.map.image?.width || 0,
+                        height: material.map.image?.height || 0,
+                        type: material.map.image?.constructor.name || 'unknown'
+                      });
                     }
                     
                     // Update debug panel
@@ -2324,68 +2263,48 @@ ${debugInfo.logs.slice(-50).join('\n')}
         
         console.log('Room model loaded successfully');
         
-        // Mobile: Simple test - just log what we have
+        // Mobile: Just log analysis, don't modify anything
         if (isMobile) {
-          console.log('📱 === MOBILE TEXTURE ANALYSIS ===');
+          console.log('📱 === MOBILE GLB ANALYSIS ===');
           
+          // Log what we loaded
           setTimeout(() => {
-            let textureInfo = [];
             let meshCount = 0;
+            let textureCount = 0;
+            let texturesWithImages = 0;
+            
             roomModel.traverse((child) => {
-              if (child.isMesh && child.material) {
+              if (child.isMesh) {
                 meshCount++;
-                const materials = Array.isArray(child.material) ? child.material : [child.material];
-                
-                materials.forEach((material, idx) => {
-                  if (material.map) {
-                    const info = {
-                      mesh: child.name || 'unnamed',
-                      materialIndex: idx,
-                      materialType: material.type,
-                      hasImage: !!material.map.image,
-                      imageType: material.map.image ? material.map.image.constructor.name : 'none',
-                      width: material.map.image ? material.map.image.width : 0,
-                      height: material.map.image ? material.map.image.height : 0,
-                      complete: material.map.image && material.map.image.complete !== false,
-                      source: material.map.source,
-                      uuid: material.map.uuid,
-                      colorSpace: material.map.colorSpace,
-                      minFilter: material.map.minFilter,
-                      magFilter: material.map.magFilter
-                    };
-                    textureInfo.push(info);
-                    console.log('Texture:', JSON.stringify(info, null, 2));
-                    
-                    // Update debug panel with detailed texture info
-                    debugInfo.textures.push(info);
-                    
-                    // Try the simplest possible fix - just set needsUpdate
-                    if (material.map.image && material.map.image.width > 0) {
-                      material.map.needsUpdate = true;
-                      material.needsUpdate = true;
+                if (child.material) {
+                  const materials = Array.isArray(child.material) ? child.material : [child.material];
+                  materials.forEach(material => {
+                    if (material.map) {
+                      textureCount++;
+                      if (material.map.image) {
+                        texturesWithImages++;
+                      }
                     }
-                  }
-                });
+                  });
+                }
               }
             });
             
-            console.log('=== TEXTURE SUMMARY ===');
-            console.log('Total meshes:', meshCount);
-            console.log('Total textures:', textureInfo.length);
-            console.log('Textures with images:', textureInfo.filter(t => t.hasImage).length);
-            console.log('Textures with valid dimensions:', textureInfo.filter(t => t.width > 0).length);
+            console.log('=== GLB LOAD SUMMARY ===');
+            console.log('Meshes:', meshCount);
+            console.log('Textures:', textureCount);
+            console.log('Textures with images:', texturesWithImages);
+            console.log('Model loaded from:', modelPath);
             
-            // Update debug panel
+            // Update debug info
+            debugInfo.performance = {
+              'Meshes': meshCount,
+              'Textures': textureCount,
+              'Images Loaded': texturesWithImages,
+              'Model': modelPath.includes('mob') ? 'Mobile GLB' : 'Desktop GLB'
+            };
             updateDebugPanel();
-            
-            // Force multiple renders
-            for (let i = 0; i < 5; i++) {
-              setTimeout(() => {
-                renderer.render(scene, camera);
-                console.log(`Render ${i + 1} complete`);
-              }, i * 1000);
-            }
-          }, 3000);
+          }, 2000);
         }
         },
         function(progress) {

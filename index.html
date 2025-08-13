@@ -2095,10 +2095,12 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       
       console.log('Is Real iOS device:', isRealIOS);
       
-      // Use mobile GLB for any mobile device OR iOS
-      const shouldUseMobileGLB = isMobile || isRealIOS;
-      const modelPath = shouldUseMobileGLB ? './models/WEBROOM1-mob.glb' : './models/BAKE-WEBROOM1.glb';
-      console.log(`Loading ${shouldUseMobileGLB ? 'mobile-optimized (JPG textures)' : 'desktop (WebP textures)'} room model...`);
+      // Use unpacked GLTF with external textures for mobile (iOS texture fix)
+      const shouldUseMobileGLTF = isMobile || isRealIOS;
+      const modelPath = shouldUseMobileGLTF 
+        ? './models/unpacked-mobile/WEBROOM1-mob.gltf'  // External textures for iOS
+        : './models/BAKE-WEBROOM1.glb';                 // Desktop GLB
+      console.log(`Loading ${shouldUseMobileGLTF ? 'mobile GLTF (external JPG textures)' : 'desktop GLB (embedded WebP textures)'} room model...`);
       
       // BEST PRACTICE: Let GLTFLoader handle everything automatically
       // GLB files embed textures directly, and GLTFLoader handles them properly
@@ -2332,8 +2334,15 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         }
         },
         function(progress) {
-          // Progress callback (optional)
-          console.log('Room loading progress:', (progress.loaded / progress.total * 100) + '%');
+          // Progress callback
+          const percentComplete = (progress.loaded / progress.total * 100).toFixed(2);
+          console.log('Room loading progress:', percentComplete + '%');
+          
+          // Update debug panel with loading progress
+          if (isMobileEarly) {
+            debugInfo.performance['Loading'] = percentComplete + '%';
+            updateDebugPanel();
+          }
         },
         function(error) {
           console.error('An error occurred loading the GLB model:', error);

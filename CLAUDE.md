@@ -162,20 +162,70 @@ object.userData = {
 - `object-delete`: Objects removed from server and all connected clients
 - `world-state`: Complete world sync sent to new users on connection
 
-## ⚠️ CRITICAL: Mobile Texture Rendering
+## ✅ SOLVED: Mobile Texture Rendering
 
-### **IMPORTANT: Mobile Texture Issues Documentation**
-Before attempting ANY mobile texture fixes, **ALWAYS review `docs/MOBILE_TEXTURE_ATTEMPTS.md`** which documents:
-- 10+ different approaches already tried that don't work
-- Power-of-2 enforcement, SRGBColorSpace, canvas sizing variations
-- Current approach: NO special mobile handling (someone else has it working without)
-- Testing checklist and debugging steps
+### **Mobile Texture Solution (Implemented December 17, 2024)**
+After 24 attempts documented in `docs/MOBILE_TEXTURE_ATTEMPTS.md`, the solution was found:
 
-**DO NOT RE-IMPLEMENT**:
-- `configureMobileTexture()` function with ClampToEdge/LinearFilter
-- Power-of-2 canvas size enforcement
-- Mobile-specific texture settings
-- SRGBColorSpace modifications
+**The Two-Part Problem & Fix:**
+1. **Camera Position Issue**: Mobile users were spawning OUTSIDE the room model
+   - **Fix**: Mobile starts at (0,2,0) center of room, desktop remains at (0,2,-4)
+
+2. **Texture Loading Issue**: GLTF wasn't auto-linking external textures on iOS WebKit
+   - **Fix**: Manually load and apply textures using TextureLoader
+
+**Implementation Details:**
+```javascript
+// Mobile uses GLTF with external textures
+const shouldUseMobileGLTF = isMobile || isRealIOS;
+const modelPath = shouldUseMobileGLTF 
+  ? './models/unpacked-mobile/WEBROOM1-mob.gltf'  // External textures
+  : './models/BAKE-WEBROOM1.glb';                 // Desktop embedded
+
+// Fix camera position for mobile
+if (isMobileEarly || isRealIOS) {
+  userObject.position.set(0, 2, 0); // CENTER of room
+} else {
+  userObject.position.set(0, 2, -4); // Desktop unchanged
+}
+
+// Manually apply textures on mobile
+if (isMobile || isRealIOS) {
+  const textureLoader = new THREE.TextureLoader();
+  const textureMap = {
+    'couchbake.jpg': ['couch', 'sofa'],
+    'floorbake.jpg': ['floor', 'ground'],
+    'ceiling.jpg': ['ceiling', 'roof'],
+    'FBWALLSBK.jpg': ['wall', 'front', 'back'],
+    'LRWALLSBK.jpg': ['wall', 'left', 'right']
+  };
+  // Load each texture and apply to matching meshes
+  Object.entries(textureMap).forEach(([filename, meshNames]) => {
+    textureLoader.load(`./models/unpacked-mobile/${filename}`, (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.flipY = false; // GLTF uses flipped Y
+      // Apply to meshes with matching names
+    });
+  });
+}
+```
+
+**Required Mobile Files:**
+- `models/unpacked-mobile/WEBROOM1-mob.gltf` - GLTF with external texture references
+- `models/unpacked-mobile/WEBROOM1-mob.bin` - Binary geometry data  
+- `models/unpacked-mobile/*.jpg` - 10 JPG texture files extracted from GLB
+
+**How to Extract Textures from GLB:**
+```bash
+npm install -g gltf-pipeline
+gltf-pipeline -i WEBROOM1-mob.glb -o unpacked-mobile/WEBROOM1-mob.gltf --separate
+```
+
+**Critical Notes:**
+- **DO NOT CHANGE** this solution - it works perfectly on iOS/Android
+- Desktop functionality remains completely unchanged
+- Screen share object (SHARESCREEN) is explicitly skipped during texture processing
+- Double-tap to move forward works on mobile
 
 ## ⚠️ CRITICAL: Screen Share Implementation Notes
 

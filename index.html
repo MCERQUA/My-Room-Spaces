@@ -2102,12 +2102,40 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         : './models/BAKE-WEBROOM1.glb';                 // Desktop GLB
       console.log(`Loading ${shouldUseMobileGLTF ? 'mobile GLTF (external JPG textures)' : 'desktop GLB (embedded WebP textures)'} room model...`);
       
+      // Test if we can load textures at all on mobile
+      if (shouldUseMobileGLTF) {
+        console.log('🔍 Testing texture loading capability...');
+        const testTextureLoader = new THREE.TextureLoader();
+        
+        // Try to load one texture file directly
+        const testTexturePath = './models/unpacked-mobile/couchbake.jpg';
+        console.log('Attempting to load test texture:', testTexturePath);
+        
+        testTextureLoader.load(
+          testTexturePath,
+          (texture) => {
+            console.log('✅ TEST TEXTURE LOADED:', texture);
+            console.log('Test texture size:', texture.image.width, 'x', texture.image.height);
+            updateDebugPanel(`Test texture OK: ${texture.image.width}x${texture.image.height}`);
+          },
+          (progress) => {
+            console.log('Test texture loading progress:', progress);
+          },
+          (error) => {
+            console.error('❌ TEST TEXTURE FAILED:', error);
+            updateDebugPanel('Test texture FAILED');
+          }
+        );
+      }
+      
       // BEST PRACTICE: Let GLTFLoader handle everything automatically
       // GLB files embed textures directly, and GLTFLoader handles them properly
+      console.log('Starting GLTF loader...');
       loader.load(
         modelPath,
         function (gltf) {
-          console.log('GLB model loaded successfully from:', modelPath);
+          console.log('✅ GLTF/GLB model loaded successfully from:', modelPath);
+          updateDebugPanel('Model loaded');
           
           // Add extensive logging for mobile debugging
           if (isMobile || isRealIOS) {
@@ -2358,19 +2386,40 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
           }, 2000);
         }
         },
-        function(progress) {
-          // Progress callback
-          const percentComplete = (progress.loaded / progress.total * 100).toFixed(2);
-          console.log('Room loading progress:', percentComplete + '%');
-          
-          // Update debug panel with loading progress
-          if (isMobileEarly) {
-            debugInfo.performance['Loading'] = percentComplete + '%';
-            updateDebugPanel();
+        function(xhr) {
+          // Progress callback - fix Infinity% issue
+          if (xhr.total && xhr.total > 0) {
+            const percentComplete = (xhr.loaded / xhr.total * 100).toFixed(2);
+            console.log('Room loading progress:', percentComplete + '%');
+            
+            // Update debug panel with loading progress
+            if (isMobileEarly || isRealIOS) {
+              debugInfo.performance['Loading'] = percentComplete + '%';
+              updateDebugPanel();
+            }
+          } else {
+            // When total is not available (CORS or chunked transfer)
+            console.log('Room loading:', xhr.loaded, 'bytes');
+            if (isMobileEarly || isRealIOS) {
+              debugInfo.performance['Loading'] = Math.round(xhr.loaded / 1024) + 'KB';
+              updateDebugPanel();
+            }
           }
         },
         function(error) {
-          console.error('An error occurred loading the GLB model:', error);
+          console.error('❌ An error occurred loading the GLTF/GLB model:', error);
+          console.log('Model path was:', modelPath);
+          
+          if (isMobileEarly || isRealIOS) {
+            console.error('Mobile model load error details:', {
+              message: error.message,
+              type: error.type,
+              path: modelPath
+            });
+            debugInfo.performance['Loading'] = 'ERROR';
+            updateDebugPanel();
+          }
+          
           console.log('Creating fallback screen instead');
           createFallbackScreen();
         }

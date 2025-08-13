@@ -323,7 +323,7 @@
     /* Mobile Debug Panel */
     #mobile-debug-panel {
       position: fixed;
-      bottom: 10px;
+      bottom: 70px;
       left: 10px;
       width: 90%;
       max-width: 350px;
@@ -398,19 +398,31 @@
     #debug-toggle-btn {
       position: fixed;
       bottom: 20px;
-      right: 20px;
-      width: 50px;
-      height: 50px;
-      background: rgba(74, 144, 226, 0.9);
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 50%;
-      color: white;
-      font-size: 24px;
+      left: 20px;
+      width: 40px;
+      height: 40px;
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 12px;
+      color: rgba(255, 255, 255, 0.4);
+      font-size: 16px;
       cursor: pointer;
       z-index: 10001;
       display: none;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      transition: transform 0.2s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      transition: all 0.3s ease;
+      line-height: 40px;
+      padding: 0;
+      text-align: center;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    
+    #debug-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: rgba(255, 255, 255, 0.6);
     }
     
     #debug-toggle-btn:active {
@@ -1447,7 +1459,7 @@
   </div>
   
   <!-- Mobile Debug Panel -->
-  <button id="debug-toggle-btn" onclick="event.stopPropagation(); window.toggleDebugPanel && window.toggleDebugPanel();">🐛</button>
+  <button id="debug-toggle-btn" aria-label="Debug Console">⚙️</button>
   <div id="mobile-debug-panel">
     <h3>Mobile Debug Info</h3>
     <div id="debug-content"></div>
@@ -1642,12 +1654,37 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       const panel = document.getElementById('mobile-debug-panel');
       if (panel) {
         panel.classList.toggle('visible');
-        updateDebugPanel();
+        if (panel.classList.contains('visible')) {
+          updateDebugPanel();
+        }
       }
     }
     
     // Make toggleDebugPanel globally accessible
     window.toggleDebugPanel = toggleDebugPanel;
+    
+    // Setup debug button click handler
+    function setupDebugButton() {
+      const debugBtn = document.getElementById('debug-toggle-btn');
+      if (debugBtn) {
+        // Remove any existing inline onclick
+        debugBtn.onclick = null;
+        
+        // Add proper event listeners
+        debugBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleDebugPanel();
+        });
+        
+        // Add touch handler for better mobile support
+        debugBtn.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleDebugPanel();
+        }, { passive: false });
+      }
+    }
     
     // Show debug button on mobile
     if (isMobileEarly) {
@@ -1656,7 +1693,8 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         const debugBtn = document.getElementById('debug-toggle-btn');
         if (debugBtn) {
           debugBtn.style.display = 'block';
-          console.log('📱 Debug button shown');
+          setupDebugButton();
+          console.log('📱 Debug button shown and configured');
         }
         document.body.classList.add('is-mobile');
         
@@ -1664,12 +1702,13 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         console.log('📱 Mobile Debug Initialized');
         console.log('Platform:', typeof mobileSettings !== 'undefined' ? mobileSettings : 'Settings not ready');
         
-        // Also show the debug panel immediately for testing
+        // Panel starts closed - do not auto-show
         const panel = document.getElementById('mobile-debug-panel');
         if (panel) {
-          panel.classList.add('visible');
+          // Ensure panel starts hidden
+          panel.classList.remove('visible');
           updateDebugPanel();
-          console.log('📱 Debug panel shown automatically');
+          console.log('📱 Debug panel initialized (closed)');
         }
       }, 100);
     }

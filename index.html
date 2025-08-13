@@ -5006,6 +5006,12 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       e.stopPropagation();
       const menu = document.getElementById('glass-menu');
       menu.classList.toggle('collapsed');
+      
+      // Close any active popup when closing the menu
+      if (menu.classList.contains('collapsed') && activePopup) {
+        document.getElementById(activePopup).classList.remove('active');
+        activePopup = null;
+      }
     });
     
     document.getElementById('users-toggle').addEventListener('click', (e) => {

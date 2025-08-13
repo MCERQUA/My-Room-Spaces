@@ -1451,7 +1451,10 @@
   <div id="mobile-debug-panel">
     <h3>Mobile Debug Info</h3>
     <div id="debug-content"></div>
-    <button onclick="this.parentElement.classList.remove('visible');" style="margin-top: 10px; padding: 5px 10px; background: #4a90e2; color: white; border: none; border-radius: 4px;">Close</button>
+    <div style="margin-top: 10px; display: flex; gap: 10px;">
+      <button onclick="window.copyDebugInfo && window.copyDebugInfo();" style="padding: 5px 10px; background: #28a745; color: white; border: none; border-radius: 4px;">📋 Copy All</button>
+      <button onclick="this.parentElement.parentElement.classList.remove('visible');" style="padding: 5px 10px; background: #4a90e2; color: white; border: none; border-radius: 4px;">Close</button>
+    </div>
   </div>
   
   <script src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.js"></script>
@@ -1485,7 +1488,23 @@
       webgl: {},
       textures: [],
       errors: [],
-      performance: {}
+      performance: {},
+      logs: []  // Store all console logs
+    };
+    
+    // Override console.log to capture logs
+    const originalConsoleLog = console.log;
+    console.log = function(...args) {
+      originalConsoleLog.apply(console, args);
+      if (isMobileEarly) {
+        debugInfo.logs.push(args.map(arg => 
+          typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+        ).join(' '));
+        // Keep only last 100 logs
+        if (debugInfo.logs.length > 100) {
+          debugInfo.logs.shift();
+        }
+      }
     };
     
     function updateDebugPanel() {
@@ -1539,7 +1558,60 @@
         html += '</div>';
       }
       
+      // Console Logs (last 20)
+      if (debugInfo.logs.length > 0) {
+        html += '<div class="debug-section"><h4>Console Logs (Recent)</h4>';
+        html += '<div style="max-height: 200px; overflow-y: auto; font-size: 10px; background: rgba(0,0,0,0.5); padding: 5px; border-radius: 4px;">';
+        debugInfo.logs.slice(-20).forEach(log => {
+          html += `<div style="white-space: pre-wrap; word-break: break-all; margin-bottom: 5px; border-bottom: 1px solid rgba(255,255,255,0.1);">${log}</div>`;
+        });
+        html += '</div>';
+        html += '</div>';
+      }
+      
       debugContent.innerHTML = html;
+    }
+    
+    // Copy debug info to clipboard
+    window.copyDebugInfo = function() {
+      const debugText = `=== MOBILE DEBUG INFO ===
+Platform: ${JSON.stringify(debugInfo.platform, null, 2)}
+WebGL: ${JSON.stringify(debugInfo.webgl, null, 2)}
+Textures: ${JSON.stringify(debugInfo.textures, null, 2)}
+Errors: ${JSON.stringify(debugInfo.errors, null, 2)}
+
+=== RECENT CONSOLE LOGS ===
+${debugInfo.logs.slice(-50).join('\n')}
+`;
+      
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(debugText).then(() => {
+          alert('Debug info copied to clipboard!');
+        }).catch(err => {
+          // Fallback method
+          fallbackCopy(debugText);
+        });
+      } else {
+        // Fallback for older browsers
+        fallbackCopy(debugText);
+      }
+      
+      function fallbackCopy(text) {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+          document.execCommand('copy');
+          alert('Debug info copied to clipboard!');
+        } catch (err) {
+          alert('Failed to copy. Please try selecting and copying manually.');
+        }
+        document.body.removeChild(textarea);
+      }
     }
     
     function toggleDebugPanel() {
@@ -2258,8 +2330,10 @@
           
           setTimeout(() => {
             let textureInfo = [];
+            let meshCount = 0;
             roomModel.traverse((child) => {
               if (child.isMesh && child.material) {
+                meshCount++;
                 const materials = Array.isArray(child.material) ? child.material : [child.material];
                 
                 materials.forEach((material, idx) => {
@@ -2267,15 +2341,23 @@
                     const info = {
                       mesh: child.name || 'unnamed',
                       materialIndex: idx,
+                      materialType: material.type,
                       hasImage: !!material.map.image,
                       imageType: material.map.image ? material.map.image.constructor.name : 'none',
                       width: material.map.image ? material.map.image.width : 0,
                       height: material.map.image ? material.map.image.height : 0,
+                      complete: material.map.image && material.map.image.complete !== false,
                       source: material.map.source,
-                      uuid: material.map.uuid
+                      uuid: material.map.uuid,
+                      colorSpace: material.map.colorSpace,
+                      minFilter: material.map.minFilter,
+                      magFilter: material.map.magFilter
                     };
                     textureInfo.push(info);
-                    console.log('Texture:', info);
+                    console.log('Texture:', JSON.stringify(info, null, 2));
+                    
+                    // Update debug panel with detailed texture info
+                    debugInfo.textures.push(info);
                     
                     // Try the simplest possible fix - just set needsUpdate
                     if (material.map.image && material.map.image.width > 0) {
@@ -2287,7 +2369,14 @@
               }
             });
             
-            console.log('Total textures found:', textureInfo.length);
+            console.log('=== TEXTURE SUMMARY ===');
+            console.log('Total meshes:', meshCount);
+            console.log('Total textures:', textureInfo.length);
+            console.log('Textures with images:', textureInfo.filter(t => t.hasImage).length);
+            console.log('Textures with valid dimensions:', textureInfo.filter(t => t.width > 0).length);
+            
+            // Update debug panel
+            updateDebugPanel();
             
             // Force multiple renders
             for (let i = 0; i < 5; i++) {

@@ -2006,32 +2006,36 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     console.log('=== SCENE INFO ===');
     console.log('Scene background:', scene.background);
 
-    // Post-processing setup for subtle bloom effect (desktop only)
+    // Post-processing setup for subtle bloom effect
     let composer = null;
-    if (!isMobile) {
-      composer = new EffectComposer(renderer);
-      
-      // Basic render pass
-      const renderPass = new RenderPass(scene, camera);
-      composer.addPass(renderPass);
-      
-      // Bloom pass - very subtle
-      const bloomPass = new UnrealBloomPass(
-        new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.15,   // strength (very subtle)
-        0.4,    // radius  
-        0.95    // threshold (high = less blooming)
-      );
-      composer.addPass(bloomPass);
-      
-      // Output pass for proper color space
-      const outputPass = new OutputPass();
-      composer.addPass(outputPass);
-      
-      console.log('Bloom post-processing enabled for desktop');
-    } else {
-      console.log('Using direct rendering for mobile compatibility');
+    
+    // Enable bloom for both desktop and mobile
+    composer = new EffectComposer(renderer);
+    
+    // Basic render pass
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+    
+    // Bloom pass - optimized settings for mobile vs desktop
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      isMobile ? 0.12 : 0.15,   // strength (slightly less on mobile for performance)
+      isMobile ? 0.3 : 0.4,      // radius (smaller on mobile)
+      isMobile ? 0.96 : 0.95     // threshold (higher on mobile = less bloom)
+    );
+    
+    // Mobile-optimized bloom resolution
+    if (isMobile) {
+      bloomPass.resolution.set(window.innerWidth * 0.5, window.innerHeight * 0.5);
     }
+    
+    composer.addPass(bloomPass);
+    
+    // Output pass for proper color space
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+    
+    console.log(`Bloom post-processing enabled for ${isMobile ? 'mobile' : 'desktop'}`);
 
     // Ultra-simple lighting for maximum mobile compatibility
     const ambientLight = new THREE.AmbientLight(0xffffff, isMobile ? 2.0 : 0.3);
@@ -4775,18 +4779,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       }
       
       
-      // Mobile-optimized rendering with explicit clearing
       // ===== USER POSITION TRACKING =====
       trackUserPosition();
       
-      if (isMobile) {
-        // Explicit clear for mobile compatibility
-        renderer.clear(true, true, true);
-        // Force immediate render without composer
-        renderer.render(scene, camera);
-      } else if (composer) {
+      // Use composer for both mobile and desktop now
+      if (composer) {
         composer.render();
       } else {
+        // Fallback to direct rendering if composer fails
         renderer.render(scene, camera);
       }
     }

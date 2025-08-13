@@ -2139,41 +2139,98 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
           
           // Add extensive logging for mobile debugging
           if (isMobile || isRealIOS) {
-            console.log('📱 === MOBILE TEXTURE DEBUGGING ===');
-            console.log('Model path:', modelPath);
-            console.log('GLTF object:', gltf);
+            console.log('📱 === MOBILE TEXTURE FIX ===');
+            console.log('Model loaded, now manually applying textures...');
             
-            // Check if textures are in the GLTF
-            if (gltf.parser && gltf.parser.json) {
-              console.log('GLTF has textures:', gltf.parser.json.textures ? gltf.parser.json.textures.length : 0);
-              console.log('GLTF has images:', gltf.parser.json.images ? gltf.parser.json.images.length : 0);
-            }
+            // Since GLTF isn't linking textures properly, manually load and apply them
+            const textureLoader = new THREE.TextureLoader();
+            const textureMap = {
+              'couchbake.jpg': ['couch', 'sofa'],
+              'floorbake.jpg': ['floor', 'ground'],
+              'ceiling.jpg': ['ceiling', 'roof'],
+              'FBWALLSBK.jpg': ['wall', 'front', 'back'],
+              'LRWALLSBK.jpg': ['wall', 'left', 'right']
+            };
             
-            // Test manual texture loading
-            console.log('Testing manual texture load...');
-            const testLoader = new THREE.TextureLoader();
-            testLoader.load(
-              './models/unpacked-mobile/couchbake.jpg',
-              (texture) => {
-                console.log('✅ Manual texture loaded successfully:', texture);
-                console.log('Texture dimensions:', texture.image.width, 'x', texture.image.height);
-                
-                // Try applying this texture to the couch
-                gltf.scene.traverse((child) => {
-                  if (child.isMesh && child.name && child.name.toLowerCase().includes('couch')) {
-                    console.log('Found couch mesh, applying test texture...');
-                    if (child.material) {
+            // Load and apply each texture
+            Object.entries(textureMap).forEach(([filename, meshNames]) => {
+              const texturePath = `./models/unpacked-mobile/${filename}`;
+              
+              textureLoader.load(
+                texturePath,
+                (texture) => {
+                  console.log(`✅ Loaded texture: ${filename}`);
+                  texture.colorSpace = THREE.SRGBColorSpace;
+                  texture.flipY = false; // GLTF uses flipped Y
+                  
+                  // Find matching meshes and apply texture
+                  gltf.scene.traverse((child) => {
+                    if (child.isMesh) {
+                      const meshName = (child.name || '').toLowerCase();
+                      
+                      // Skip SHARESCREEN object
+                      if (meshName.includes('sharescreen') || meshName.includes('screen')) {
+                        return; // Don't modify screen share
+                      }
+                      
+                      // Check if this mesh matches any of the target names
+                      const shouldApply = meshNames.some(name => meshName.includes(name));
+                      
+                      if (shouldApply && child.material) {
+                        console.log(`  Applying ${filename} to ${child.name}`);
+                        child.material.map = texture;
+                        child.material.needsUpdate = true;
+                      }
+                    }
+                  });
+                },
+                undefined,
+                (error) => {
+                  console.error(`❌ Failed to load ${filename}:`, error);
+                }
+              );
+            });
+            
+            // Also apply to any mesh without a texture
+            setTimeout(() => {
+              console.log('Checking for meshes without textures...');
+              let untexturedCount = 0;
+              
+              gltf.scene.traverse((child) => {
+                if (child.isMesh && child.material && !child.material.map) {
+                  const meshName = (child.name || '').toLowerCase();
+                  
+                  // Skip SHARESCREEN object
+                  if (meshName.includes('sharescreen') || meshName.includes('screen')) {
+                    return; // Don't apply textures to screen
+                  }
+                  
+                  untexturedCount++;
+                  console.log(`Mesh without texture: ${child.name}`);
+                  
+                  // Apply a default texture based on name
+                  let defaultTexture = 'floorbake.jpg';
+                  
+                  if (meshName.includes('wall')) defaultTexture = 'FBWALLSBK.jpg';
+                  else if (meshName.includes('ceiling')) defaultTexture = 'ceiling.jpg';
+                  else if (meshName.includes('couch')) defaultTexture = 'couchbake.jpg';
+                  
+                  textureLoader.load(
+                    `./models/unpacked-mobile/${defaultTexture}`,
+                    (texture) => {
+                      texture.colorSpace = THREE.SRGBColorSpace;
+                      texture.flipY = false;
                       child.material.map = texture;
                       child.material.needsUpdate = true;
+                      console.log(`Applied default ${defaultTexture} to ${child.name}`);
                     }
-                  }
-                });
-              },
-              undefined,
-              (error) => {
-                console.error('❌ Manual texture load failed:', error);
-              }
-            );
+                  );
+                }
+              });
+              
+              console.log(`Found ${untexturedCount} meshes without textures`);
+              updateDebugPanel(`Fixed ${untexturedCount} textures`);
+            }, 1000);
           }
           
           const roomModel = gltf.scene;
@@ -3629,7 +3686,20 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     }
 
     // User object position - positioned at couch facing the screen (further back and slightly higher)
-    userObject.position.set(0, 2, -4);
+    // On mobile, start closer to center of room
+    if (isMobileEarly || isRealIOS) {
+      userObject.position.set(0, 2, 0); // Center of room
+      console.log('📱 Mobile camera position: center of room (0, 2, 0)');
+      
+      // Show position in debug panel
+      if (debugInfo) {
+        debugInfo.performance['Camera'] = 'X:0 Y:2 Z:0';
+        updateDebugPanel();
+      }
+    } else {
+      userObject.position.set(0, 2, -4); // Desktop position (unchanged)
+    }
+    
     // Camera is now at origin relative to user object
     camera.position.set(0, 0, 0);
     camera.lookAt(0, 0, -4); // Look forward relative to user object
@@ -4461,6 +4531,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         const direction = new THREE.Vector3(0, 0, -1);
         direction.applyQuaternion(camera.quaternion);
         userObject.position.add(direction.multiplyScalar(0.1));
+        
+        // Update position in debug panel on mobile
+        if ((isMobileEarly || isRealIOS) && mobileDebugPanel) {
+          const pos = userObject.position;
+          debugInfo.performance['Camera'] = `X:${pos.x.toFixed(1)} Y:${pos.y.toFixed(1)} Z:${pos.z.toFixed(1)}`;
+          updateDebugPanel();
+        }
+        
         requestAnimationFrame(moveForward);
       }
     }

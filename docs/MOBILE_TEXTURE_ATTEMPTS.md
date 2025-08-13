@@ -204,12 +204,12 @@ const modelPath = shouldUseMobileGLTF
   ? './models/unpacked-mobile/WEBROOM1-mob.gltf'  // External textures
   : './models/BAKE-WEBROOM1.glb';                 // Embedded textures
 ```
-**Why This Should Work**:
-- External texture files bypass iOS WebKit's GLB texture binding issue
-- Textures load via standard image loading, not GLB extraction
-- Each texture is a separate HTTP request with proper MIME type
-- Three.js TextureLoader handles external files better than embedded
-**Result**: Testing in progress...
+**Critical Finding**:
+- ✅ TextureLoader CAN load JPG files (couchbake.jpg loaded as 4000x4000)
+- ✅ GLTF model loads successfully
+- ❌ But GLTF doesn't link to external textures properly
+- ❌ Textures show grey (materials load but textures don't apply)
+**Result**: Textures still grey - GLTF not linking textures correctly
 
 ### Summary: 23 Different Approaches Attempted
 

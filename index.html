@@ -1572,46 +1572,70 @@
       debugContent.innerHTML = html;
     }
     
-    // Copy debug info to clipboard
+    // Copy debug info to clipboard - simplified for mobile
     window.copyDebugInfo = function() {
       const debugText = `=== MOBILE DEBUG INFO ===
 Platform: ${JSON.stringify(debugInfo.platform, null, 2)}
 WebGL: ${JSON.stringify(debugInfo.webgl, null, 2)}
+Textures Found: ${debugInfo.textures.length}
 Textures: ${JSON.stringify(debugInfo.textures, null, 2)}
+Performance: ${JSON.stringify(debugInfo.performance, null, 2)}
 Errors: ${JSON.stringify(debugInfo.errors, null, 2)}
 
-=== RECENT CONSOLE LOGS ===
-${debugInfo.logs.slice(-50).join('\n')}
+=== TEXTURE LOGS ===
+${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') || log.includes('MOBILE')).join('\n')}
 `;
       
-      // Try modern clipboard API first
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(debugText).then(() => {
-          alert('Debug info copied to clipboard!');
-        }).catch(err => {
-          // Fallback method
-          fallbackCopy(debugText);
-        });
-      } else {
-        // Fallback for older browsers
-        fallbackCopy(debugText);
-      }
+      // Simple fallback method that works on mobile
+      const textarea = document.createElement('textarea');
+      textarea.value = debugText;
+      textarea.style.position = 'fixed';
+      textarea.style.top = '50%';
+      textarea.style.left = '50%';
+      textarea.style.transform = 'translate(-50%, -50%)';
+      textarea.style.width = '80%';
+      textarea.style.height = '200px';
+      textarea.style.zIndex = '99999';
+      textarea.style.background = 'white';
+      textarea.style.color = 'black';
+      textarea.style.border = '2px solid blue';
+      textarea.style.padding = '10px';
+      textarea.style.fontSize = '12px';
       
-      function fallbackCopy(text) {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        try {
-          document.execCommand('copy');
-          alert('Debug info copied to clipboard!');
-        } catch (err) {
-          alert('Failed to copy. Please try selecting and copying manually.');
-        }
-        document.body.removeChild(textarea);
-      }
+      document.body.appendChild(textarea);
+      
+      // Select the text
+      textarea.select();
+      textarea.setSelectionRange(0, 99999); // For mobile devices
+      
+      // Add instructions
+      const instructions = document.createElement('div');
+      instructions.innerHTML = 'Text selected! Now:<br>1. Long press on selected text<br>2. Choose "Copy"<br>3. Tap outside to close';
+      instructions.style.position = 'fixed';
+      instructions.style.top = '30%';
+      instructions.style.left = '50%';
+      instructions.style.transform = 'translateX(-50%)';
+      instructions.style.background = 'yellow';
+      instructions.style.color = 'black';
+      instructions.style.padding = '10px';
+      instructions.style.zIndex = '99999';
+      instructions.style.borderRadius = '5px';
+      instructions.style.fontSize = '14px';
+      instructions.style.fontWeight = 'bold';
+      instructions.style.textAlign = 'center';
+      
+      document.body.appendChild(instructions);
+      
+      // Remove on click outside
+      setTimeout(() => {
+        document.addEventListener('click', function removeTextarea(e) {
+          if (e.target !== textarea) {
+            document.body.removeChild(textarea);
+            document.body.removeChild(instructions);
+            document.removeEventListener('click', removeTextarea);
+          }
+        });
+      }, 100);
     }
     
     function toggleDebugPanel() {

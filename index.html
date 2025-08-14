@@ -1652,6 +1652,7 @@
   </script>
   
   <script src="glb-processor-client.js"></script>
+  <script src="./spaces-config.js"></script>
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -2415,6 +2416,12 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     }
     
     async function loadRoomModel() {
+      // Get current space configuration
+      const spaceConfig = getCurrentSpaceConfig();
+      console.log('=== LOADING SPACE ===');
+      console.log('Space ID:', spaceConfig.id);
+      console.log('Space Name:', spaceConfig.name);
+      
       // Debug mobile detection
       console.log('=== MOBILE DETECTION DEBUG ===');
       console.log('isMobile:', isMobile);
@@ -2427,19 +2434,19 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       // Check if we have a processed room model available
       const processedRoom = glbProcessor.processedModels.get('WEBROOM1');
       
-      if (processedRoom) {
-        // Use pre-processed model
+      if (processedRoom && spaceConfig.id === 'default') {
+        // Use pre-processed model for default space only
         console.log('Using pre-processed room model');
         const model = glbProcessor.applyProcessedModel(scene, processedRoom, isMobile || isRealIOS);
         setupRoomModel(model);
         return;
       }
       
-      // Fall back to old loading method for now
+      // Use space-specific model paths
       const shouldUseMobileGLTF = isMobile || isRealIOS;
       const modelPath = shouldUseMobileGLTF 
-        ? './models/unpacked-mobile/WEBROOM1-mob.gltf'  // External textures for iOS
-        : './models/BAKE-WEBROOM1.glb';                 // Desktop GLB
+        ? spaceConfig.roomModel.mobile  // Mobile model from config
+        : spaceConfig.roomModel.desktop; // Desktop model from config
       console.log(`Loading ${shouldUseMobileGLTF ? 'mobile GLTF (external JPG textures)' : 'desktop GLB (embedded WebP textures)'} room model...`);
       
       // Test if we can load textures at all on mobile
@@ -3204,6 +3211,22 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       const welcomeOverlay = document.getElementById('welcome-overlay');
       const welcomeInput = document.getElementById('welcome-input');
       const welcomeButton = document.getElementById('welcome-button');
+      
+      // Get space configuration and update welcome message
+      const spaceConfig = getCurrentSpaceConfig();
+      const welcomeTitle = welcomeDialog.querySelector('h2');
+      if (welcomeTitle) {
+        welcomeTitle.textContent = spaceConfig.name || 'Welcome';
+      }
+      const welcomeText = welcomeDialog.querySelector('p');
+      if (welcomeText) {
+        welcomeText.textContent = spaceConfig.welcomeMessage || 'Enter your name to join';
+      }
+      
+      // Apply space theme color to loading animation
+      if (spaceConfig.themeColor) {
+        document.documentElement.style.setProperty('--theme-color', spaceConfig.themeColor);
+      }
       
       // Show the dialog and overlay
       welcomeDialog.style.display = 'block';
@@ -4099,18 +4122,24 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     }
 
     // User object position - positioned at couch facing the screen (further back and slightly higher)
-    // On mobile, start closer to center of room
+    // Get space configuration for camera positions
+    const spaceConfig = getCurrentSpaceConfig();
+    
+    // On mobile, use mobile camera position from config
     if (isMobileEarly || isRealIOS) {
-      userObject.position.set(0, 2, 0); // Center of room
-      console.log('📱 Mobile camera position: center of room (0, 2, 0)');
+      const pos = spaceConfig.mobileCameraPosition;
+      userObject.position.set(pos.x, pos.y, pos.z);
+      console.log(`📱 Mobile camera position: (${pos.x}, ${pos.y}, ${pos.z})`);
       
       // Show position in debug panel
       if (debugInfo) {
-        debugInfo.performance['Camera'] = 'X:0 Y:2 Z:0';
+        debugInfo.performance['Camera'] = `X:${pos.x} Y:${pos.y} Z:${pos.z}`;
         updateDebugPanel();
       }
     } else {
-      userObject.position.set(0, 2, -4); // Desktop position (unchanged)
+      const pos = spaceConfig.cameraPosition;
+      userObject.position.set(pos.x, pos.y, pos.z);
+      console.log(`🖥️ Desktop camera position: (${pos.x}, ${pos.y}, ${pos.z})`);
     }
     
     // Camera is now at origin relative to user object

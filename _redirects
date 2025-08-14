@@ -1,0 +1,14 @@
+# Netlify Redirects for Multi-Space Deployment
+# This file handles URL routing for different 3D spaces
+
+# Path-based routing (keeps URL structure)
+/space/white/*    /index.html?space=white    200
+/space/custom/*   /index.html?space=custom   200
+/space/default/*  /index.html?space=default  200
+
+# Short aliases
+/white    /index.html?space=white    200
+/custom   /index.html?space=custom   200
+
+# SPA fallback for client-side routing
+/*    /index.html    200

@@ -2137,9 +2137,11 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
 
     // Load the room model and setup SHARESCREEN object
     let largeScreen = null;
+    let currentRoomModel = null; // Track the current room model for easy removal
     
     // Helper function to setup room model after loading
     function setupRoomModel(roomModel) {
+      roomModel.name = 'RoomModel'; // Ensure name is set for removal
       roomModel.position.set(0, 0, 0);
       roomModel.scale.set(1, 1, 1);
       
@@ -2161,6 +2163,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       });
       
       scene.add(roomModel);
+      currentRoomModel = roomModel; // Track for easy removal
       console.log('Room model setup complete');
     }
     
@@ -2404,6 +2407,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
           }
           
           const roomModel = gltf.scene;
+          roomModel.name = 'RoomModel'; // Set name for later removal
           
           // Just add the model to the scene - GLTFLoader handles textures automatically
           roomModel.position.set(0, 0, 0);
@@ -2474,6 +2478,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
           console.log(`Summary: ${meshCount} meshes, ${textureCount} textures found`);
         
         scene.add(roomModel);
+        currentRoomModel = roomModel; // Track the room model for removal
         
         // Force a render update on ALL mobile devices
         const isAnyMobile = isMobile || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -5028,11 +5033,35 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
             // Store as WEBROOM1 for future use
             glbProcessor.processedModels.set('WEBROOM1', processed);
             
-            // Remove existing room model
+            // Remove existing room model using tracked reference first
+            if (currentRoomModel) {
+              scene.remove(currentRoomModel);
+              console.log('Removed tracked room model');
+              currentRoomModel = null;
+            }
+            
+            // Also check by name as backup
             const existingRoom = scene.getObjectByName('RoomModel');
             if (existingRoom) {
               scene.remove(existingRoom);
+              console.log('Removed existing room model by name');
             }
+            
+            // Finally, remove any large mesh that might be the room (fallback)
+            const objectsToRemove = [];
+            scene.traverse((child) => {
+              // Look for the room model characteristics
+              if (child.name === 'RoomModel' || 
+                  (child.type === 'Group' && child.children.length > 5) ||
+                  (child.name && (child.name.includes('WEBROOM') || child.name.includes('BAKE')))) {
+                objectsToRemove.push(child);
+              }
+            });
+            
+            objectsToRemove.forEach(obj => {
+              scene.remove(obj);
+              console.log(`Removed room object: ${obj.name || obj.type}`);
+            });
             
             // Apply the new room model
             const roomModel = glbProcessor.applyProcessedModel(scene, processed, isMobile || isRealIOS);

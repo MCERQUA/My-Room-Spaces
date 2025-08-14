@@ -2491,17 +2491,37 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
             
             // Since GLTF isn't linking textures properly, manually load and apply them
             const textureLoader = new THREE.TextureLoader();
-            const textureMap = {
-              'couchbake.jpg': ['Back_low_lambert1_0'],  // Exact couch mesh name
-              'floorbake.jpg': ['floor', 'ground'],
-              'ceiling.jpg': ['ceiling', 'roof'],
-              'FBWALLSBK.jpg': ['wall', 'front', 'back'],
-              'LRWALLSBK.jpg': ['wall', 'left', 'right']
-            };
+            
+            // Different texture maps for different spaces
+            let textureMap = {};
+            
+            if (spaceConfig.id === 'white') {
+              // White room texture mapping
+              textureMap = {
+                'floorbake.jpg': ['floor', 'ground'],
+                'floor.jpg': ['floor', 'ground'],
+                'ceilig.jpg': ['ceiling', 'roof'],
+                'fb-walld.jpg': ['wall', 'front', 'back'],
+                'lr-wall.jpg': ['wall', 'left', 'right'],
+                'posters1.jpg': ['poster', 'picture']
+              };
+            } else {
+              // Default room texture mapping
+              textureMap = {
+                'couchbake.jpg': ['Back_low_lambert1_0'],  // Exact couch mesh name
+                'floorbake.jpg': ['floor', 'ground'],
+                'ceiling.jpg': ['ceiling', 'roof'],
+                'FBWALLSBK.jpg': ['wall', 'front', 'back'],
+                'LRWALLSBK.jpg': ['wall', 'left', 'right']
+              };
+            }
             
             // Load and apply each texture
             Object.entries(textureMap).forEach(([filename, meshNames]) => {
-              const texturePath = `./models/unpacked-mobile/${filename}`;
+              // Dynamic texture path based on space
+              const texturePath = spaceConfig.id === 'white' 
+                ? `./models/unpacked-white/${filename}`
+                : `./models/unpacked-mobile/${filename}`;
               
               textureLoader.load(
                 texturePath,

@@ -21,7 +21,7 @@ const SPACES_CONFIG = {
     name: 'White Room',
     roomModel: {
       desktop: './models/white-room1.glb',
-      mobile: './models/white-room1.glb' // Use same model for mobile until optimized version available
+      mobile: './models/unpacked-white/white-room-mobile.gltf' // Mobile-optimized with JPG textures
     },
     serverEndpoint: 'https://3d-threejs-site-production.up.railway.app',
     welcomeMessage: 'Welcome to the White Room',

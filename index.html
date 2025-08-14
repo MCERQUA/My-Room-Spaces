@@ -2339,7 +2339,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     // Hide loading animation
     function hideLoadingAnimation() {
       const loadingContainer = document.getElementById('loading-container');
-      if (loadingContainer) {
+      if (loadingContainer && loadingContainer.classList.contains('active')) {
         // Add a slight delay for smooth transition
         setTimeout(() => {
           loadingContainer.classList.remove('active');
@@ -3231,6 +3231,11 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         const loadingContainer = document.getElementById('loading-container');
         if (loadingContainer) {
           loadingContainer.classList.add('active');
+          
+          // Auto-hide loading animation after 4 seconds max
+          setTimeout(() => {
+            hideLoadingAnimation();
+          }, 4000);
         }
         
         // Initialize room system with chosen name

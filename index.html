@@ -2332,8 +2332,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       currentRoomModel = roomModel; // Track for easy removal
       console.log('Room model setup complete');
       
-      // Hide loading animation once room is loaded
-      hideLoadingAnimation();
+      // Mark room as loaded and check if we should hide loading
+      if (window.loadingStates) {
+        window.loadingStates.roomLoaded = true;
+        window.checkLoadingComplete();
+      } else {
+        // Fallback if loading states not initialized
+        hideLoadingAnimation();
+      }
     }
     
     // Hide loading animation
@@ -3232,10 +3238,25 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         if (loadingContainer) {
           loadingContainer.classList.add('active');
           
-          // Auto-hide loading animation after 4 seconds max
+          // Track loading states
+          window.loadingStates = {
+            roomLoaded: false,
+            sceneReady: false,
+            timeoutReached: false
+          };
+          
+          // Check if all critical components are loaded
+          window.checkLoadingComplete = function() {
+            if (window.loadingStates.roomLoaded || window.loadingStates.timeoutReached) {
+              hideLoadingAnimation();
+            }
+          };
+          
+          // Fallback: Auto-hide loading animation after 5 seconds max
           setTimeout(() => {
-            hideLoadingAnimation();
-          }, 4000);
+            window.loadingStates.timeoutReached = true;
+            window.checkLoadingComplete();
+          }, 5000);
         }
         
         // Initialize room system with chosen name
@@ -5084,8 +5105,22 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     window.addEventListener('resize', onWindowResize);
 
     // Animation loop with context loss tracking
+    let firstRenderComplete = false;
     function animate() {
       window.animationId = requestAnimationFrame(animate);
+      
+      // Mark first successful render
+      if (!firstRenderComplete && window.loadingStates) {
+        firstRenderComplete = true;
+        console.log('First render complete');
+        // Give a moment for everything to settle
+        setTimeout(() => {
+          if (window.loadingStates && !window.loadingStates.roomLoaded) {
+            window.loadingStates.sceneReady = true;
+            window.checkLoadingComplete();
+          }
+        }, 100);
+      }
       
       camera.rotation.order = 'YXZ';
       camera.rotation.y = cameraRotation.y;
@@ -5464,6 +5499,18 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
 
     // Show welcome dialog first, then initialize room system
     showWelcomeDialog();
+    
+    // Additional check for page fully loaded
+    window.addEventListener('load', () => {
+      console.log('Page fully loaded');
+      // If loading animation is still showing after page load, check completion
+      setTimeout(() => {
+        if (window.loadingStates && !window.loadingStates.roomLoaded) {
+          console.log('Page loaded but room not ready, checking loading state...');
+          window.checkLoadingComplete && window.checkLoadingComplete();
+        }
+      }, 1000);
+    });
     
     // Initialize Cloudflare visitor counter immediately (Disabled)
     // initializeCloudflareVisitorCounter();

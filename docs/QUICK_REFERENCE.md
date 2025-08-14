@@ -43,6 +43,7 @@ function showWelcomeDialog() {
 | Object Manipulation | ✅ | ✅ | ✅ |
 | Touch Controls | ✅ | ✅ | N/A |
 | Vertical Menu | ✅ | ✅ | ✅ |
+| Multi-Space Support | ✅ | ✅ | ✅ |
 
 ## Critical Files & Lines
 
@@ -84,6 +85,32 @@ console.log('Socket connected:', socket.connected);
 // Reconnect
 socket.connect();
 ```
+
+## Multi-Space Quick Access
+
+```bash
+# Access different spaces via URL
+?space=default      # Main space
+?space=white        # White room
+?space=custom       # Custom space
+
+# Or use path-based URLs
+/white              # White room space
+/custom             # Custom space
+/space/white        # Alternative format
+```
+
+### Add New Space
+1. Add GLB to `models/` directory
+2. Edit `spaces-config.js`:
+```javascript
+'newspace': {
+  name: 'New Space',
+  roomModel: { desktop: './models/new.glb' },
+  welcomeMessage: 'Welcome!'
+}
+```
+3. Access: `yourdomain.com/?space=newspace`
 
 ## Development Commands
 

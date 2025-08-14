@@ -44,6 +44,7 @@ A modern, real-time 3D virtual world that multiple users can join and interact w
 - **Auto-scaling Backend**: Railway handles traffic and server resources automatically
 - **CDN Frontend**: Netlify-hosted static site with global CDN distribution
 - **Visitor Counter**: Persistent visitor tracking that survives server restarts (Cloudflare KV)
+- **Multi-Space Support**: Deploy multiple independent 3D environments with different GLB models
 
 ## 🎯 **Live Demo**
 
@@ -129,6 +130,7 @@ npm run dev        # Backend (http://localhost:3001)
 ### Technical Documentation
 - **[User Guide](docs/USER_GUIDE.md)** - Comprehensive feature reference
 - **[GLB Processing System](docs/GLB_PROCESSING.md)** - Technical details of model processing
+- **[Multi-Space Deployment](docs/MULTI_SPACE_DEPLOYMENT.md)** - Deploy multiple independent 3D environments
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
 - **[Contributing](docs/CONTRIBUTING.md)** - Development setup and guidelines
 
@@ -199,6 +201,22 @@ ENTER - Send chat message (when input focused)
 - **WebRTC Encryption**: All P2P media streams are encrypted
 - **Open Source**: Full transparency with public source code
 
+## 🌍 Multi-Space Deployment
+
+Deploy multiple independent 3D environments with different GLB room models:
+
+### **Access Different Spaces**
+- **Default Space**: `yourdomain.com`
+- **White Room**: `yourdomain.com/?space=white` or `yourdomain.com/white`
+- **Custom Spaces**: Add your own GLB models and configure in `spaces-config.js`
+
+### **Quick Setup**
+1. Add your GLB file to `models/` directory
+2. Configure the space in `spaces-config.js`
+3. Access via URL parameter: `?space=yourspace`
+
+See the [Multi-Space Deployment Guide](docs/MULTI_SPACE_DEPLOYMENT.md) for complete instructions.
+
 ## 💡 Use Cases
 
 - **Virtual Meetings**: Host 3D meetings with screen sharing
@@ -206,6 +224,7 @@ ENTER - Send chat message (when input focused)
 - **Social Hangouts**: Casual virtual spaces for friends and communities
 - **Collaborative Design**: Share and discuss 3D models in real-time
 - **Event Hosting**: Virtual events, presentations, and exhibitions
+- **Multiple Environments**: Deploy different spaces for different purposes
 
 ## 🛠️ **Development**
 

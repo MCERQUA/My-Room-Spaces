@@ -1082,6 +1082,156 @@
       font-size: 14px;
     }
 
+    /* High-tech loading animation */
+    .loading-container {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10002;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+    }
+    
+    .loading-container.active {
+      display: flex;
+    }
+    
+    .tech-loader {
+      width: 120px;
+      height: 120px;
+      position: relative;
+    }
+    
+    .tech-loader .core {
+      position: absolute;
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #00ffcc, #0099ff);
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 40px #00ffcc, 0 0 80px #0099ff;
+      animation: corePulse 2s ease-in-out infinite;
+    }
+    
+    .tech-loader .ring {
+      position: absolute;
+      border: 2px solid transparent;
+      border-radius: 50%;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: inset 0 0 20px rgba(0, 255, 204, 0.2);
+    }
+    
+    .tech-loader .ring:nth-child(2) {
+      width: 60px;
+      height: 60px;
+      border-top-color: #00ffcc;
+      animation: spin 1.5s linear infinite;
+    }
+    
+    .tech-loader .ring:nth-child(3) {
+      width: 80px;
+      height: 80px;
+      border-right-color: #0099ff;
+      animation: spinReverse 2s linear infinite;
+    }
+    
+    .tech-loader .ring:nth-child(4) {
+      width: 100px;
+      height: 100px;
+      border-bottom-color: #00ccff;
+      animation: spin 2.5s linear infinite;
+    }
+    
+    .tech-loader .ring:nth-child(5) {
+      width: 120px;
+      height: 120px;
+      border-left-color: rgba(0, 153, 255, 0.5);
+      animation: spinReverse 3s linear infinite;
+    }
+    
+    .loading-text {
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      text-align: center;
+      opacity: 0.9;
+      animation: textGlow 2s ease-in-out infinite;
+    }
+    
+    .loading-subtext {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 14px;
+      text-align: center;
+      margin-top: -16px;
+      animation: fadeInOut 3s ease-in-out infinite;
+    }
+    
+    .loading-progress {
+      width: 200px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+    
+    .loading-progress-bar {
+      position: absolute;
+      height: 100%;
+      width: 30%;
+      background: linear-gradient(90deg, transparent, #00ffcc, transparent);
+      animation: progressScan 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes corePulse {
+      0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 0 40px #00ffcc, 0 0 80px #0099ff;
+      }
+      50% {
+        transform: translate(-50%, -50%) scale(1.2);
+        box-shadow: 0 0 60px #00ffcc, 0 0 120px #0099ff;
+      }
+    }
+    
+    @keyframes spin {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+    
+    @keyframes spinReverse {
+      0% { transform: translate(-50%, -50%) rotate(360deg); }
+      100% { transform: translate(-50%, -50%) rotate(0deg); }
+    }
+    
+    @keyframes textGlow {
+      0%, 100% {
+        text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
+      }
+      50% {
+        text-shadow: 0 0 20px rgba(0, 255, 204, 0.8), 0 0 30px rgba(0, 153, 255, 0.6);
+      }
+    }
+    
+    @keyframes fadeInOut {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+    
+    @keyframes progressScan {
+      0% { left: -30%; }
+      100% { left: 100%; }
+    }
+
     .welcome-input {
       width: 100%;
       background: rgba(255, 255, 255, 0.1);
@@ -1460,6 +1610,22 @@
     <p>Enter your name to join</p>
     <input type="text" class="welcome-input" id="welcome-input" placeholder="Your name" maxlength="20" autocomplete="off">
     <button class="welcome-button" id="welcome-button">Join</button>
+  </div>
+
+  <!-- High-tech loading animation -->
+  <div class="loading-container" id="loading-container">
+    <div class="tech-loader">
+      <div class="core"></div>
+      <div class="ring"></div>
+      <div class="ring"></div>
+      <div class="ring"></div>
+      <div class="ring"></div>
+    </div>
+    <div class="loading-text">Initializing</div>
+    <div class="loading-subtext">Loading virtual environment...</div>
+    <div class="loading-progress">
+      <div class="loading-progress-bar"></div>
+    </div>
   </div>
   
   <!-- Mobile Debug Panel -->
@@ -2165,6 +2331,20 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       scene.add(roomModel);
       currentRoomModel = roomModel; // Track for easy removal
       console.log('Room model setup complete');
+      
+      // Hide loading animation once room is loaded
+      hideLoadingAnimation();
+    }
+    
+    // Hide loading animation
+    function hideLoadingAnimation() {
+      const loadingContainer = document.getElementById('loading-container');
+      if (loadingContainer) {
+        // Add a slight delay for smooth transition
+        setTimeout(() => {
+          loadingContainer.classList.remove('active');
+        }, 500);
+      }
     }
     
     // Setup screen object for video/screen sharing
@@ -2624,6 +2804,25 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
             const percentComplete = (xhr.loaded / xhr.total * 100).toFixed(2);
             console.log('Room loading progress:', percentComplete + '%');
             
+            // Update loading animation text with progress
+            const loadingText = document.querySelector('.loading-text');
+            const loadingSubtext = document.querySelector('.loading-subtext');
+            if (loadingText) {
+              if (percentComplete < 30) {
+                loadingText.textContent = 'Initializing';
+                loadingSubtext.textContent = 'Preparing virtual environment...';
+              } else if (percentComplete < 60) {
+                loadingText.textContent = 'Loading Assets';
+                loadingSubtext.textContent = `Loading 3D models... ${Math.round(percentComplete)}%`;
+              } else if (percentComplete < 90) {
+                loadingText.textContent = 'Building World';
+                loadingSubtext.textContent = `Constructing environment... ${Math.round(percentComplete)}%`;
+              } else {
+                loadingText.textContent = 'Finalizing';
+                loadingSubtext.textContent = 'Almost ready...';
+              }
+            }
+            
             // Update debug panel with loading progress
             if (isMobileEarly || isRealIOS) {
               debugInfo.performance['Loading'] = percentComplete + '%';
@@ -2632,6 +2831,10 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
           } else {
             // When total is not available (CORS or chunked transfer)
             console.log('Room loading:', xhr.loaded, 'bytes');
+            const loadingSubtext = document.querySelector('.loading-subtext');
+            if (loadingSubtext) {
+              loadingSubtext.textContent = `Loading assets... ${Math.round(xhr.loaded / 1024)}KB`;
+            }
             if (isMobileEarly || isRealIOS) {
               debugInfo.performance['Loading'] = Math.round(xhr.loaded / 1024) + 'KB';
               updateDebugPanel();
@@ -2651,6 +2854,9 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
             debugInfo.performance['Loading'] = 'ERROR';
             updateDebugPanel();
           }
+          
+          // Hide loading animation on error
+          hideLoadingAnimation();
           
           console.log('Creating fallback screen instead');
           createFallbackScreen();
@@ -3020,6 +3226,12 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         // Hide welcome dialog
         welcomeDialog.style.display = 'none';
         welcomeOverlay.style.display = 'none';
+        
+        // Show loading animation
+        const loadingContainer = document.getElementById('loading-container');
+        if (loadingContainer) {
+          loadingContainer.classList.add('active');
+        }
         
         // Initialize room system with chosen name
         initializeRoomSystem();

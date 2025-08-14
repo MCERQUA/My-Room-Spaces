@@ -1322,6 +1322,10 @@
         📦 Load GLB Model
         <input type="file" id="glb-upload" accept=".glb,.gltf" style="display: none;" />
       </label>
+      <label class="file-input-wrapper" style="margin-top: 10px; background: rgba(74, 144, 226, 0.2); border: 1px solid rgba(74, 144, 226, 0.4);">
+        🏠 Replace Room Model
+        <input type="file" id="room-upload" accept=".glb" style="display: none;" />
+      </label>
       <div id="object-controls" style="display: none; margin-top: 12px;">
         <div style="display: flex; gap: 8px; margin: 8px 0;">
           <button id="move-up" style="flex: 1;">↑</button>
@@ -1481,6 +1485,7 @@
     }
   </script>
   
+  <script src="glb-processor-client.js"></script>
   <script type="module">
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -1490,6 +1495,10 @@
     import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
     console.log('Starting 3D Interactive Website...');
+    
+    // Initialize GLB processor
+    const glbProcessor = new ClientGLBProcessor(THREE, GLTFLoader);
+    console.log('GLB Processor initialized');
 
     // Enhanced mobile detection - define FIRST
     const isMobileEarly = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2129,7 +2138,94 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     // Load the room model and setup SHARESCREEN object
     let largeScreen = null;
     
-    function loadRoomModel() {
+    // Helper function to setup room model after loading
+    function setupRoomModel(roomModel) {
+      roomModel.position.set(0, 0, 0);
+      roomModel.scale.set(1, 1, 1);
+      
+      // Setup shadows and find screen object
+      roomModel.traverse((child) => {
+        if (child.isMesh) {
+          if (!isMobile) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+          }
+          
+          // Check for screen object
+          if (child.name === 'SHARESCREEN' || 
+              child.name?.toLowerCase().includes('screen')) {
+            console.log('Found screen object:', child.name);
+            setupScreenObject(child);
+          }
+        }
+      });
+      
+      scene.add(roomModel);
+      console.log('Room model setup complete');
+    }
+    
+    // Setup screen object for video/screen sharing
+    function setupScreenObject(screenMesh) {
+      const screenTexture = createScreenTexture();
+      largeScreen = screenTexture;
+      
+      if (screenMesh.material) {
+        const materials = Array.isArray(screenMesh.material) ? 
+                         screenMesh.material : [screenMesh.material];
+        
+        materials.forEach(material => {
+          material.map = screenTexture.texture;
+          material.emissive = new THREE.Color(0x222222);
+          material.emissiveIntensity = 0.2;
+          material.needsUpdate = true;
+        });
+      }
+      
+      console.log('Screen object configured');
+    }
+    
+    // Show processing status UI
+    function showProcessingStatus(message) {
+      let statusDiv = document.getElementById('glb-processing-status');
+      if (!statusDiv) {
+        statusDiv = document.createElement('div');
+        statusDiv.id = 'glb-processing-status';
+        statusDiv.style.cssText = `
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          background: rgba(255, 255, 255, 0.1);
+          backdrop-filter: blur(10px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          border-radius: 16px;
+          padding: 20px 30px;
+          color: white;
+          font-size: 14px;
+          z-index: 10000;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        `;
+        document.body.appendChild(statusDiv);
+      }
+      statusDiv.textContent = message;
+      statusDiv.style.display = 'block';
+    }
+    
+    function updateProcessingStatus(message) {
+      const statusDiv = document.getElementById('glb-processing-status');
+      if (statusDiv) {
+        statusDiv.textContent = message;
+      }
+    }
+    
+    function hideProcessingStatus() {
+      const statusDiv = document.getElementById('glb-processing-status');
+      if (statusDiv) {
+        statusDiv.style.display = 'none';
+      }
+    }
+    
+    async function loadRoomModel() {
       // Debug mobile detection
       console.log('=== MOBILE DETECTION DEBUG ===');
       console.log('isMobile:', isMobile);
@@ -2139,7 +2235,18 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       // isRealIOS is already defined globally at the top
       console.log('Is Real iOS device:', isRealIOS);
       
-      // Use unpacked GLTF with external textures for mobile (iOS texture fix)
+      // Check if we have a processed room model available
+      const processedRoom = glbProcessor.processedModels.get('WEBROOM1');
+      
+      if (processedRoom) {
+        // Use pre-processed model
+        console.log('Using pre-processed room model');
+        const model = glbProcessor.applyProcessedModel(scene, processedRoom, isMobile || isRealIOS);
+        setupRoomModel(model);
+        return;
+      }
+      
+      // Fall back to old loading method for now
       const shouldUseMobileGLTF = isMobile || isRealIOS;
       const modelPath = shouldUseMobileGLTF 
         ? './models/unpacked-mobile/WEBROOM1-mob.gltf'  // External textures for iOS
@@ -4652,11 +4759,19 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     // Load the room model after loader is initialized
     loadRoomModel();
 
-    function loadModelFromFile(file) {
-      const url = URL.createObjectURL(file);
+    async function loadModelFromFile(file) {
+      // Show processing status
+      showProcessingStatus('Processing GLB model...');
       
-      loader.load(url, function(gltf) {
-        const model = gltf.scene;
+      try {
+        // Process the GLB file
+        const processed = await glbProcessor.processGLB(file, (progress) => {
+          updateProcessingStatus(`Processing: ${progress.stage} (${Math.round(progress.progress)}%)`);
+        });
+        
+        // Apply the processed model
+        const version = (isMobile || isRealIOS) ? processed.mobile : processed.desktop;
+        const model = version.scene.clone();
         
         model.position.set(0, 0.5, -3);
         model.scale.set(1, 1, 1);
@@ -4716,16 +4831,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
           });
         }
         
-        URL.revokeObjectURL(url);
+        hideProcessingStatus();
         console.log('Model loaded successfully:', file.name);
-      }, 
-      function(progress) {
-        console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
-      },
-      function(error) {
-        console.error('Error loading model:', error);
-        alert('Error loading model: ' + error.message);
-      });
+        
+      } catch (error) {
+        console.error('Error processing model:', error);
+        hideProcessingStatus();
+        alert('Error processing model: ' + error.message);
+      }
     }
 
     // Handle window resize
@@ -4859,7 +4972,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
     // Glass menu event handlers with popup
     document.getElementById('menu-home').addEventListener('click', (e) => {
       e.stopPropagation();
-      showPopup('home-popup');
+      window.location.href = 'https://my-room.chat/';
     });
     
     document.getElementById('menu-screen').addEventListener('click', (e) => {
@@ -4889,6 +5002,60 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         const file = e.target.files[0];
         if (file) {
           loadModelFromFile(file);
+          // Close the popup after loading
+          if (activePopup) {
+            document.getElementById(activePopup).classList.remove('active');
+            activePopup = null;
+          }
+        }
+      });
+    }
+    
+    // Room Model Upload from popup
+    const roomUpload = document.getElementById('room-upload');
+    if (roomUpload) {
+      roomUpload.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          showProcessingStatus('Processing room model...');
+          
+          try {
+            // Process the room GLB file
+            const processed = await glbProcessor.processGLB(file, (progress) => {
+              updateProcessingStatus(`Processing room: ${progress.stage} (${Math.round(progress.progress)}%)`);
+            });
+            
+            // Store as WEBROOM1 for future use
+            glbProcessor.processedModels.set('WEBROOM1', processed);
+            
+            // Remove existing room model
+            const existingRoom = scene.getObjectByName('RoomModel');
+            if (existingRoom) {
+              scene.remove(existingRoom);
+            }
+            
+            // Apply the new room model
+            const roomModel = glbProcessor.applyProcessedModel(scene, processed, isMobile || isRealIOS);
+            setupRoomModel(roomModel);
+            
+            hideProcessingStatus();
+            console.log('Room model replaced successfully');
+            
+            // Notify other users if connected
+            if (socket && socket.connected) {
+              socket.emit('room-model-changed', {
+                name: file.name,
+                metadata: processed.metadata
+              });
+            }
+            
+          } catch (error) {
+            console.error('Error processing room model:', error);
+            hideProcessingStatus();
+            alert('Error processing room model: ' + error.message);
+          }
+          
+          e.target.value = ''; // Reset input
           // Close the popup after loading
           if (activePopup) {
             document.getElementById(activePopup).classList.remove('active');

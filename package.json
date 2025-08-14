@@ -7,7 +7,9 @@
     "start": "node signaling-server.js",
     "dev": "nodemon signaling-server.js",
     "build": "echo 'No build required'",
-    "deploy": "netlify deploy --prod"
+    "deploy": "netlify deploy --prod",
+    "process-glb": "node glb-processor.js",
+    "install-glb-tools": "npm install -g gltf-pipeline"
   },
   "keywords": [
     "threejs",

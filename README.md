@@ -17,6 +17,7 @@ A modern, real-time 3D virtual world that multiple users can join and interact w
 ### 🎮 **3D World Interaction**
 - **WASD + Mouse Controls**: First-person navigation through the 3D environment
 - **Object Manipulation**: Add, move, scale, rotate, and delete 3D objects (GLB/GLTF models)
+- **Room Model Replacement**: Upload custom GLB room models with automatic processing
 - **Screen Sharing**: Share your screen on the large display for all users to see
 - **Dynamic Lighting**: Professional lighting with shadows and bloom effects
 - **Mobile Support**: Touch controls and mobile-optimized rendering
@@ -38,13 +39,15 @@ A modern, real-time 3D virtual world that multiple users can join and interact w
 - **Server-Authoritative Architecture**: Railway-hosted Node.js server maintains world state
 - **Real-time Synchronization**: Socket.IO for instant updates across all users
 - **Persistent Object State**: All 3D object manipulations saved server-side and restored on connect
+- **Automatic GLB Processing**: Smart texture extraction and mobile optimization
+- **Screen Object Detection**: Automatic identification of display surfaces in models
 - **Auto-scaling Backend**: Railway handles traffic and server resources automatically
 - **CDN Frontend**: Netlify-hosted static site with global CDN distribution
 - **Visitor Counter**: Persistent visitor tracking that survives server restarts (Cloudflare KV)
 
 ## 🎯 **Live Demo**
 
-Visit the live website: [**3D Multi-user World**](https://3d-threejs-site.netlify.app)
+Visit the live website: [**my-room.chat**](https://my-room.chat/) or [**3D Multi-user World**](https://3d-threejs-site.netlify.app)
 
 ## 🚀 Quick Start
 
@@ -111,23 +114,23 @@ npm run dev        # Backend (http://localhost:3001)
 
 ## 📖 Documentation
 
+### 📚 User Documentation
+- **[Quick Start Guide](user-docs/quick-start.md)** - Get started in minutes
+- **[Controls & Navigation](user-docs/controls.md)** - Complete control reference
+- **[Screen Objects Guide](user-docs/screen-objects.md)** - Understanding display screens in 3D models
+- **[GLB Processing Guide](user-docs/glb-processing.md)** - How models are optimized
+- **[User Documentation Hub](user-docs/README.md)** - All user guides in one place
+
 ### Setup Guides
 - **[Complete Setup Guide](docs/SETUP.md)** - Detailed deployment instructions
 - **[Netlify Deployment](docs/netlify-deployment.md)** - Frontend hosting setup
 - **[Railway Deployment](docs/railway-deployment.md)** - Backend server setup
-- **[Local Development](docs/development.md)** - Running locally for development
-
-### Features & Usage
-- **[User Guide](docs/USER_GUIDE.md)** - How to use all features
-- **[3D Controls](docs/3D_CONTROLS.md)** - Navigation and object manipulation
-- **[Screen Sharing](docs/SCREEN_SHARING.md)** - How to share your screen
-- **[Chat System](docs/CHAT_SYSTEM.md)** - Using the chat and social features
 
 ### Technical Documentation
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - System design and components
-- **[API Reference](docs/API.md)** - Server endpoints and Socket.IO events
-- **[WebRTC Implementation](docs/WEBRTC.md)** - P2P streaming details
+- **[User Guide](docs/USER_GUIDE.md)** - Comprehensive feature reference
+- **[GLB Processing System](docs/GLB_PROCESSING.md)** - Technical details of model processing
 - **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Contributing](docs/CONTRIBUTING.md)** - Development setup and guidelines
 
 ## 🎮 **How to Use**
 
@@ -151,11 +154,12 @@ npm run dev        # Backend (http://localhost:3001)
 5. **Stop sharing** with the "⏹️ Stop Sharing" button
 
 ### **3D Object Interaction**
-1. **Load Models**: Drag GLB/GLTF files onto browser window
-2. **Select Objects**: Click any object to select (cyan wireframe appears)
-3. **Manipulate Objects**: Use control panel buttons or keyboard shortcuts
-4. **Persistent Changes**: All object modifications sync to all users in real-time
-5. **Server Storage**: Objects persist even after page refresh
+1. **Load Models**: Drag GLB/GLTF files or use the 📦 menu button
+2. **Replace Room Model**: Upload custom room GLB with automatic mobile optimization
+3. **Select Objects**: Click any object to select (cyan wireframe appears)
+4. **Manipulate Objects**: Use control panel buttons or keyboard shortcuts
+5. **Persistent Changes**: All object modifications sync to all users in real-time
+6. **Server Storage**: Objects persist even after page refresh
 
 ### **Social Chat System**
 - **Open Chat**: Click 💬 button in bottom-left corner
@@ -207,14 +211,25 @@ ENTER - Send chat message (when input focused)
 
 ### **File Structure**
 ```
-├── index.html              # Main application (2400+ lines)
+├── index.html              # Main application (5000+ lines)
 ├── signaling-server.js     # Railway persistent world server (350+ lines)
+├── glb-processor.js        # Node.js GLB processing tool
+├── glb-processor-client.js # Browser-based GLB processor
 ├── package.json            # Dependencies and scripts
 ├── netlify.toml           # Static site deployment config
-├── models/                # Optional GLB models directory
-└── docs/                  # Documentation folder
+├── models/                # GLB models directory
+│   ├── BAKE-WEBROOM1.glb  # Desktop room model
+│   └── unpacked-mobile/   # Mobile-optimized assets
+├── user-docs/             # User documentation
+│   ├── README.md          # Documentation hub
+│   ├── quick-start.md     # Getting started guide
+│   ├── controls.md        # Control reference
+│   ├── screen-objects.md  # Screen object guide
+│   └── glb-processing.md  # Model processing guide
+└── docs/                  # Technical documentation
     ├── SETUP.md           # Complete setup guide
-    ├── ARCHITECTURE.md    # Technical architecture
+    ├── USER_GUIDE.md      # Feature reference
+    ├── GLB_PROCESSING.md  # Processing system details
     └── ...                # Additional documentation
 ```
 
@@ -232,10 +247,18 @@ npm start                   # Runs on http://localhost:8080
 
 ## 📈 Roadmap
 
+### Recently Completed ✅
+- [x] Automatic GLB processing for mobile compatibility
+- [x] Room model replacement feature
+- [x] Screen object detection and handling
+- [x] Comprehensive user documentation
+
+### Coming Soon
 - [ ] VR/AR Support (WebXR integration)
 - [ ] Voice Chat (WebRTC audio)
 - [ ] Custom Avatar Systems
 - [ ] Persistent Object Storage (Database integration)
+- [ ] Multiple independent screens
 - [ ] Room/World Management
 - [ ] Admin Controls and Moderation
 - [ ] Mobile App (React Native)

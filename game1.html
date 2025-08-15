@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Empty 3D Room - Build From Scratch</title>
+    <title>Space Room - 3D Builder</title>
     <style>
         body {
             margin: 0;
             padding: 0;
             overflow: hidden;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #000000;
         }
         
         #container {
@@ -123,12 +123,12 @@
         
         <div class="control-group">
             <label>Floor Color:</label>
-            <input type="color" id="floorColor" value="#404040">
+            <input type="color" id="floorColor" value="#1a1a2e">
         </div>
         
         <div class="control-group">
             <label>Wall Color:</label>
-            <input type="color" id="wallColor" value="#808080">
+            <input type="color" id="wallColor" value="#16213e">
         </div>
         
         <div class="control-group">
@@ -162,8 +162,10 @@
         function init() {
             // Create scene
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x87CEEB); // Sky blue background
-            scene.fog = new THREE.Fog(0x87CEEB, 10, 100);
+            scene.background = new THREE.Color(0x000000); // Black space background
+            
+            // Add starfield
+            createStarfield();
             
             // Setup camera
             camera = new THREE.PerspectiveCamera(
@@ -186,7 +188,7 @@
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
             controls.dampingFactor = 0.05;
-            controls.maxPolarAngle = Math.PI / 2.1; // Prevent camera from going below floor
+            controls.maxPolarAngle = Math.PI; // Allow full rotation in space
             
             // Add lighting
             setupLighting();
@@ -201,13 +203,34 @@
             animate();
         }
         
+        function createStarfield() {
+            const starsGeometry = new THREE.BufferGeometry();
+            const starsMaterial = new THREE.PointsMaterial({
+                color: 0xffffff,
+                size: 0.7,
+                transparent: true
+            });
+            
+            const starsVertices = [];
+            for (let i = 0; i < 10000; i++) {
+                const x = (Math.random() - 0.5) * 2000;
+                const y = (Math.random() - 0.5) * 2000;
+                const z = (Math.random() - 0.5) * 2000;
+                starsVertices.push(x, y, z);
+            }
+            
+            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+            const starField = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(starField);
+        }
+        
         function setupLighting() {
-            // Ambient light for overall illumination
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            // Ambient light for overall illumination (dimmer for space)
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
             scene.add(ambientLight);
             
-            // Directional light for shadows
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            // Main sun-like light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
             directionalLight.position.set(10, 20, 5);
             directionalLight.castShadow = true;
             directionalLight.shadow.camera.left = -30;
@@ -238,7 +261,8 @@
             const floorMaterial = new THREE.MeshStandardMaterial({ 
                 color: document.getElementById('floorColor').value,
                 roughness: 0.8,
-                metalness: 0.2
+                metalness: 0.4,
+                emissive: 0x111111
             });
             floor = new THREE.Mesh(floorGeometry, floorMaterial);
             floor.rotation.x = -Math.PI / 2;
@@ -249,7 +273,8 @@
             const wallMaterial = new THREE.MeshStandardMaterial({ 
                 color: document.getElementById('wallColor').value,
                 roughness: 0.7,
-                metalness: 0.1,
+                metalness: 0.3,
+                emissive: 0x0a0a0a,
                 side: THREE.DoubleSide
             });
             

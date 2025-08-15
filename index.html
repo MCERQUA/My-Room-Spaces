@@ -1394,6 +1394,20 @@
         padding: 20px;
       }
     }
+
+    /* Upload spinner animation */
+    .spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #4a90e2;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
@@ -1469,13 +1483,26 @@
     <div class="menu-popup" id="objects-popup">
       <h3>📦 3D Objects</h3>
       <label class="file-input-wrapper">
-        📦 Load GLB Model
+        📦 Load Local GLB Model
         <input type="file" id="glb-upload" accept=".glb,.gltf" style="display: none;" />
+      </label>
+      <label class="file-input-wrapper" style="margin-top: 10px; background: rgba(255, 165, 0, 0.2); border: 1px solid rgba(255, 165, 0, 0.4);">
+        ☁️ Upload GLB to Cloud
+        <input type="file" id="glb-cloud-upload" accept=".glb" style="display: none;" />
       </label>
       <label class="file-input-wrapper" style="margin-top: 10px; background: rgba(74, 144, 226, 0.2); border: 1px solid rgba(74, 144, 226, 0.4);">
         🏠 Replace Room Model
         <input type="file" id="room-upload" accept=".glb" style="display: none;" />
       </label>
+      <div id="upload-progress" style="display: none; margin-top: 12px; padding: 10px; background: rgba(255, 255, 255, 0.1); border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div class="spinner"></div>
+          <span id="upload-status">Uploading...</span>
+        </div>
+        <div style="width: 100%; background: rgba(255, 255, 255, 0.2); border-radius: 4px; height: 4px; margin-top: 8px;">
+          <div id="upload-progress-bar" style="width: 0%; background: #4a90e2; height: 100%; border-radius: 4px; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
       <div id="object-controls" style="display: none; margin-top: 12px;">
         <div style="display: flex; gap: 8px; margin: 8px 0;">
           <button id="move-up" style="flex: 1;">↑</button>
@@ -3408,6 +3435,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
             updateObjectInScene(objectId, state);
           });
           
+          // Load uploaded models from world state
+          if (worldData.uploadedModels) {
+            worldData.uploadedModels.forEach(([modelId, metadata]) => {
+              console.log('🌥️ Loading uploaded model from world state:', metadata.name);
+              loadUploadedModelFromWorldState(metadata);
+            });
+          }
+          
           // Spawn existing user avatars
           worldData.users.forEach(([userId, avatar]) => {
             if (userId !== socket.id) {
@@ -3466,8 +3501,79 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         // ===== PERSISTENT OBJECT INTERACTIONS =====
         socket.on('object-added', (data) => {
           console.log(`📦 New object ${data.objectId} (${data.name}) added by ${data.addedBy}`);
-          // TODO: Need to create object in scene from server data
-          // This would require storing object type/model data on server
+          
+          // Handle uploaded models from other users
+          if (data.isUploadedModel && data.modelUrl) {
+            console.log('🌥️ Loading uploaded model from other user:', data.name);
+            
+            const loader = new THREE.GLTFLoader();
+            
+            loader.load(
+              data.modelUrl,
+              (gltf) => {
+                const model = gltf.scene;
+                
+                // Set unique name for tracking
+                model.name = `object_${data.objectId}`;
+                
+                // Apply position from server
+                model.position.copy(data.position);
+                model.rotation.copy(data.rotation);
+                model.scale.copy(data.scale);
+                
+                // Configure model for scene
+                model.traverse((child) => {
+                  if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    
+                    // Configure textures for mobile compatibility
+                    if (child.material) {
+                      const materials = Array.isArray(child.material) ? child.material : [child.material];
+                      
+                      materials.forEach(material => {
+                        const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'];
+                        
+                        textureProps.forEach(prop => {
+                          if (material[prop]) {
+                            if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+                              configureMobileTexture(material[prop]);
+                            }
+                          }
+                        });
+                      });
+                    }
+                  }
+                });
+                
+                // Set up userData with cloud model info
+                model.userData = {
+                  name: data.name,
+                  type: data.type,
+                  objectId: data.objectId,
+                  originalPosition: model.position.clone(),
+                  originalScale: model.scale.clone(),
+                  originalRotation: model.rotation.clone(),
+                  // Cloud model specific data
+                  isUploadedModel: true,
+                  modelId: data.modelId,
+                  modelUrl: data.modelUrl,
+                  uploadedBy: data.uploadedBy
+                };
+                
+                scene.add(model);
+                console.log('Cloud model added from other user:', data.name);
+              },
+              (progress) => {
+                // Loading progress
+                console.log(`Loading ${data.name}: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+              },
+              (error) => {
+                console.error('Error loading uploaded model from other user:', error);
+              }
+            );
+          }
+          // Handle regular objects (non-uploaded models) would go here if needed
         });
 
         socket.on('object-moved', (data) => {
@@ -5133,6 +5239,226 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       }
     }
 
+    // Upload model to cloud storage
+    async function uploadModelToCloud(file) {
+      // Show upload progress
+      showProcessingStatus('Uploading GLB model to cloud...');
+      
+      try {
+        // Validate file type
+        if (!file.name.toLowerCase().endsWith('.glb')) {
+          throw new Error('Only GLB files are supported for cloud upload');
+        }
+        
+        // Validate file size (50MB limit)
+        if (file.size > 50 * 1024 * 1024) {
+          throw new Error('File size must be under 50MB');
+        }
+        
+        // Get user info for authentication
+        const userId = socket?.id || 'anonymous';
+        const modelName = file.name.replace('.glb', '');
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('glbFile', file);
+        formData.append('modelName', modelName);
+        formData.append('userId', userId);
+        
+        // Upload to server
+        updateProcessingStatus('Uploading to cloud storage...');
+        
+        const response = await fetch(`${SIGNALING_SERVER}/api/upload-model`, {
+          method: 'POST',
+          headers: {
+            'X-User-ID': userId,
+            // Don't set Content-Type - let browser set it for FormData
+          },
+          body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(result.error || 'Upload failed');
+        }
+        
+        updateProcessingStatus('Processing uploaded model...');
+        
+        // Load the uploaded model into the scene
+        const loader = new THREE.GLTFLoader();
+        
+        loader.load(
+          result.publicUrl,
+          (gltf) => {
+            const model = gltf.scene;
+            
+            // Position model
+            model.position.set(0, 0.5, -3);
+            model.scale.set(1, 1, 1);
+            
+            // Configure model for scene
+            model.traverse((child) => {
+              if (child.isMesh) {
+                child.castShadow = true;
+                child.receiveShadow = true;
+                
+                // Configure textures for mobile compatibility
+                if (child.material) {
+                  const materials = Array.isArray(child.material) ? child.material : [child.material];
+                  
+                  materials.forEach(material => {
+                    const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'];
+                    
+                    textureProps.forEach(prop => {
+                      if (material[prop]) {
+                        if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+                          configureMobileTexture(material[prop]);
+                        }
+                      }
+                    });
+                  });
+                }
+              }
+            });
+            
+            // Generate unique ID for this object
+            const objectId = `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            model.userData = {
+              name: result.metadata.name,
+              type: 'model',
+              objectId: objectId,
+              originalPosition: model.position.clone(),
+              originalScale: model.scale.clone(),
+              originalRotation: model.rotation.clone(),
+              // Cloud model specific data
+              isUploadedModel: true,
+              modelId: result.modelId,
+              modelUrl: result.publicUrl,
+              uploadedBy: userId
+            };
+            
+            scene.add(model);
+            console.log('Cloud model added to scene:', model.userData.name);
+            
+            // Notify server of new object with cloud model info
+            if (socket && socket.connected) {
+              socket.emit('object-add', {
+                objectId: objectId,
+                name: model.userData.name,
+                type: model.userData.type,
+                position: model.position,
+                rotation: model.rotation,
+                scale: model.scale,
+                // Cloud model specific fields
+                modelId: result.modelId,
+                modelUrl: result.publicUrl,
+                uploadedBy: userId
+              });
+            }
+            
+            hideProcessingStatus();
+            console.log('Cloud model loaded successfully:', result.metadata.name);
+            alert(`Model "${result.metadata.name}" uploaded and loaded successfully!`);
+          },
+          (progress) => {
+            // Loading progress
+            const percent = (progress.loaded / progress.total) * 100;
+            updateProcessingStatus(`Loading model: ${Math.round(percent)}%`);
+          },
+          (error) => {
+            console.error('Error loading uploaded model:', error);
+            hideProcessingStatus();
+            alert('Model uploaded successfully but failed to load in scene. Check console for details.');
+          }
+        );
+        
+      } catch (error) {
+        console.error('Error uploading model:', error);
+        hideProcessingStatus();
+        alert('Upload failed: ' + error.message);
+      }
+    }
+
+    // Load uploaded model from world state (when joining)
+    function loadUploadedModelFromWorldState(metadata) {
+      // Check if model is already loaded to avoid duplicates
+      const existingModel = scene.getObjectByName(`uploaded_${metadata.modelId}`);
+      if (existingModel) {
+        console.log('Model already loaded, skipping:', metadata.name);
+        return;
+      }
+      
+      console.log('Loading uploaded model from world state:', metadata.name);
+      
+      const loader = new THREE.GLTFLoader();
+      
+      loader.load(
+        metadata.publicUrl,
+        (gltf) => {
+          const model = gltf.scene;
+          
+          // Set unique name for tracking
+          model.name = `uploaded_${metadata.modelId}`;
+          
+          // Position model (this will be updated by object state if it exists)
+          model.position.set(0, 0.5, -3);
+          model.scale.set(1, 1, 1);
+          
+          // Configure model for scene
+          model.traverse((child) => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+              
+              // Configure textures for mobile compatibility
+              if (child.material) {
+                const materials = Array.isArray(child.material) ? child.material : [child.material];
+                
+                materials.forEach(material => {
+                  const textureProps = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap'];
+                  
+                  textureProps.forEach(prop => {
+                    if (material[prop]) {
+                      if (isMobileEarly || mobileSettings.isIOS || mobileSettings.isAndroid) {
+                        configureMobileTexture(material[prop]);
+                      }
+                    }
+                  });
+                });
+              }
+            }
+          });
+          
+          // Set up userData with cloud model info
+          model.userData = {
+            name: metadata.name,
+            type: 'model',
+            objectId: `uploaded_${metadata.modelId}`,
+            originalPosition: model.position.clone(),
+            originalScale: model.scale.clone(),
+            originalRotation: model.rotation.clone(),
+            // Cloud model specific data
+            isUploadedModel: true,
+            modelId: metadata.modelId,
+            modelUrl: metadata.publicUrl,
+            uploadedBy: metadata.uploadedBy
+          };
+          
+          scene.add(model);
+          console.log('Cloud model loaded from world state:', metadata.name);
+        },
+        (progress) => {
+          // Loading progress
+          console.log(`Loading ${metadata.name}: ${Math.round((progress.loaded / progress.total) * 100)}%`);
+        },
+        (error) => {
+          console.error('Error loading uploaded model from world state:', error);
+        }
+      );
+    }
+
     // Handle window resize
     // Research-backed resize handling for mobile compatibility
     function onWindowResize() {
@@ -5309,6 +5635,22 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         if (file) {
           loadModelFromFile(file);
           // Close the popup after loading
+          if (activePopup) {
+            document.getElementById(activePopup).classList.remove('active');
+            activePopup = null;
+          }
+        }
+      });
+    }
+    
+    // Cloud GLB Upload from popup
+    const glbCloudUpload = document.getElementById('glb-cloud-upload');
+    if (glbCloudUpload) {
+      glbCloudUpload.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          await uploadModelToCloud(file);
+          // Close the popup after upload attempt
           if (activePopup) {
             document.getElementById(activePopup).classList.remove('active');
             activePopup = null;

@@ -10,6 +10,13 @@ const fetch = require('node-fetch');
 // const sqlite3 = require('sqlite3').verbose(); // Disabled for visitor counter
 const fs = require('fs');
 
+// GLB Upload System Dependencies
+const AWS = require('aws-sdk');
+const multer = require('multer');
+const { v4: uuidv4 } = require('uuid');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -21,6 +28,119 @@ const io = socketIo(server, {
 
 app.use(cors());
 app.use(express.json());
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://*.r2.cloudflarestorage.com"],
+      connectSrc: ["'self'", "wss:", "https://*.r2.cloudflarestorage.com"]
+    }
+  }
+}));
+
+// Rate limiting
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000,
+  message: 'Too many requests from this IP'
+});
+app.use(globalLimiter);
+
+// GLB Upload rate limiting
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 uploads per window
+  message: 'Too many uploads, try again later',
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+// R2 Configuration (S3-compatible)
+const r2 = new AWS.S3({
+  endpoint: `https://${process.env.R2_ACCOUNT_ID || 'demo'}.r2.cloudflarestorage.com`,
+  accessKeyId: process.env.R2_ACCESS_KEY,
+  secretAccessKey: process.env.R2_SECRET_KEY,
+  region: 'auto'
+});
+
+// File upload middleware
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'model/gltf-binary' || 
+        file.originalname.toLowerCase().endsWith('.glb')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only GLB files allowed'), false);
+    }
+  }
+});
+
+// Authentication middleware
+const authenticateUser = (req, res, next) => {
+  const userId = req.headers['x-user-id'] || req.body.userId;
+  const sessionToken = req.headers['authorization'];
+  
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  
+  // For MVP: simple user ID validation
+  // In production: validate session token
+  req.userId = userId;
+  next();
+};
+
+// GLB validation function
+const validateGLBFile = async (buffer) => {
+  try {
+    // Check GLB magic number (first 4 bytes should be "glTF")
+    const magic = buffer.slice(0, 4).toString();
+    if (magic !== 'glTF') {
+      throw new Error('Invalid GLB file format');
+    }
+    
+    // Check file structure integrity
+    const version = buffer.readUInt32LE(4);
+    const length = buffer.readUInt32LE(8);
+    
+    if (version !== 2) {
+      throw new Error('Unsupported GLB version');
+    }
+    
+    if (length !== buffer.length) {
+      throw new Error('Corrupted GLB file');
+    }
+    
+    // Parse and validate JSON chunk
+    const jsonChunkLength = buffer.readUInt32LE(12);
+    const jsonChunk = buffer.slice(20, 20 + jsonChunkLength);
+    const gltfData = JSON.parse(jsonChunk.toString());
+    
+    // Security checks
+    if (gltfData.meshes && gltfData.meshes.length > 100) {
+      throw new Error('Too many meshes (max 100)');
+    }
+    
+    // Check for excessive polygon count
+    const totalPrimitives = gltfData.meshes?.reduce((sum, mesh) => 
+      sum + (mesh.primitives?.length || 0), 0) || 0;
+    
+    if (totalPrimitives > 1000) {
+      throw new Error('Too many primitives (max 1000)');
+    }
+    
+    return { valid: true, metadata: gltfData };
+    
+  } catch (error) {
+    return { valid: false, error: error.message };
+  }
+};
 
 // Environment configuration
 const SPACE_NAME = process.env.SPACE_NAME || 'main-world';
@@ -92,6 +212,7 @@ const worldState = {
   users: new Map(),       // Active user avatars
   sharedScreen: null,     // Current screen sharing state
   chatHistory: [],        // Chat messages
+  uploadedModels: new Map(), // Uploaded GLB models metadata
   roomSettings: {
     lighting: { ambient: 0.3, directional: 0.8 },
     environment: 'room1'
@@ -213,10 +334,147 @@ app.get('/api/world-state', (req, res) => {
     users: Array.from(worldState.users.entries()),
     sharedScreen: worldState.sharedScreen,
     chatHistory: worldState.chatHistory.slice(-10),
+    uploadedModels: Array.from(worldState.uploadedModels.entries()),
     roomSettings: worldState.roomSettings,
     activeUsers: worldState.users.size,
     // visitorCount: worldState.visitorCount // Disabled
   });
+});
+
+// ===== GLB UPLOAD API ENDPOINTS =====
+app.post('/api/upload-model', authenticateUser, uploadLimiter, upload.single('glbFile'), async (req, res) => {
+  try {
+    const file = req.file;
+    const userId = req.userId;
+    const modelName = req.body.modelName || file.originalname.replace('.glb', '');
+    
+    if (!file) {
+      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    }
+    
+    // Validate GLB file
+    const validation = await validateGLBFile(file.buffer);
+    if (!validation.valid) {
+      return res.status(400).json({ success: false, error: validation.error });
+    }
+    
+    // Generate unique model ID
+    const modelId = `model_${uuidv4()}`;
+    const fileName = `${modelId}.glb`;
+    
+    // Upload to R2
+    const uploadParams = {
+      Bucket: '3d-world-models',
+      Key: fileName,
+      Body: file.buffer,
+      ContentType: 'model/gltf-binary',
+      CacheControl: 'public, max-age=31536000, immutable',
+      Metadata: {
+        'original-name': file.originalname,
+        'uploaded-by': userId,
+        'upload-timestamp': new Date().toISOString(),
+        'model-name': modelName
+      }
+    };
+    
+    const uploadResult = await r2.upload(uploadParams).promise();
+    
+    // Store model metadata in world state
+    const modelMetadata = {
+      modelId,
+      name: modelName,
+      fileName,
+      originalName: file.originalname,
+      fileSize: file.size,
+      uploadedBy: userId,
+      uploadedAt: new Date().toISOString(),
+      r2Location: uploadResult.Location,
+      publicUrl: `https://${process.env.R2_ACCOUNT_ID || 'demo'}.r2.cloudflarestorage.com/3d-world-models/${fileName}`,
+      validation: validation.metadata
+    };
+    
+    worldState.uploadedModels.set(modelId, modelMetadata);
+    
+    // Log successful upload
+    console.log(`📦 GLB uploaded: ${modelName} (${file.size} bytes) by ${userId}`);
+    
+    res.json({
+      success: true,
+      modelId,
+      publicUrl: modelMetadata.publicUrl,
+      metadata: modelMetadata
+    });
+    
+  } catch (error) {
+    console.error('Upload error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message || 'Upload failed' 
+    });
+  }
+});
+
+// Get uploaded models list
+app.get('/api/uploaded-models', (req, res) => {
+  res.json({
+    count: worldState.uploadedModels.size,
+    models: Array.from(worldState.uploadedModels.entries())
+  });
+});
+
+// Get specific model metadata
+app.get('/api/models/:modelId', (req, res) => {
+  const modelId = req.params.modelId;
+  const model = worldState.uploadedModels.get(modelId);
+  
+  if (!model) {
+    return res.status(404).json({ error: 'Model not found' });
+  }
+  
+  res.json(model);
+});
+
+// Delete uploaded model (only by uploader)
+app.delete('/api/models/:modelId', authenticateUser, async (req, res) => {
+  try {
+    const modelId = req.params.modelId;
+    const userId = req.userId;
+    const model = worldState.uploadedModels.get(modelId);
+    
+    if (!model) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+    
+    if (model.uploadedBy !== userId) {
+      return res.status(403).json({ error: 'Not authorized to delete this model' });
+    }
+    
+    // Delete from R2
+    await r2.deleteObject({
+      Bucket: '3d-world-models',
+      Key: model.fileName
+    }).promise();
+    
+    // Remove from world state
+    worldState.uploadedModels.delete(modelId);
+    
+    // Remove any objects in scene using this model
+    for (const [objectId, objectData] of worldState.objects.entries()) {
+      if (objectData.modelId === modelId) {
+        worldState.objects.delete(objectId);
+        // Notify all connected users
+        io.emit('object-deleted', { objectId, deletedBy: userId });
+      }
+    }
+    
+    console.log(`🗑️ GLB deleted: ${model.name} by ${userId}`);
+    
+    res.json({ success: true, message: 'Model deleted successfully' });
+    
+  } catch (error) {
+    console.error('Delete error:', error);
+    res.status(500).json({ error: 'Failed to delete model' });
+  }
 });
 
 app.get('/api/users', (req, res) => {
@@ -282,9 +540,15 @@ app.get('/api/visitor-stats', async (req, res) => {
 app.get('/', (req, res) => {
   res.json({ 
     status: 'Persistent Metaverse Server Online',
+    features: {
+      r2Storage: !!process.env.R2_ACCESS_KEY,
+      uploadEnabled: true,
+      mobileProcessing: true
+    },
     worldState: {
       users: worldState.users.size,
       objects: worldState.objects.size,
+      uploadedModels: worldState.uploadedModels.size,
       sharedScreen: !!worldState.sharedScreen,
       chatMessages: worldState.chatHistory.length,
       // visitorCount: worldState.visitorCount // Disabled
@@ -321,6 +585,7 @@ io.on('connection', async (socket) => {
     users: Array.from(worldState.users.entries()),
     sharedScreen: worldState.sharedScreen,
     chatHistory: worldState.chatHistory.slice(-10), // Last 10 messages
+    uploadedModels: Array.from(worldState.uploadedModels.entries()),
     roomSettings: worldState.roomSettings,
     // visitorCount: worldState.visitorCount // Disabled,
     spaceName: worldState.spaceName
@@ -408,18 +673,25 @@ io.on('connection', async (socket) => {
 
   // ===== PERSISTENT OBJECT INTERACTIONS =====
   socket.on('object-add', (data) => {
-    // Save new object permanently
-    worldState.objects.set(data.objectId, {
+    // Save new object permanently with uploaded model support
+    const objectData = {
       name: data.name,
       type: data.type,
       position: data.position,
       rotation: data.rotation,
       scale: data.scale,
       addedBy: socket.id,
-      addedAt: new Date()
-    });
+      addedAt: new Date(),
+      // New fields for uploaded models
+      isUploadedModel: data.modelId ? true : false,
+      modelId: data.modelId || null,
+      modelUrl: data.modelUrl || null,
+      uploadedBy: data.uploadedBy || null
+    };
+    
+    worldState.objects.set(data.objectId, objectData);
 
-    // Notify all other users of new object
+    // Notify all other users of new object (including model info)
     socket.broadcast.emit('object-added', {
       objectId: data.objectId,
       name: data.name,
@@ -427,11 +699,17 @@ io.on('connection', async (socket) => {
       position: data.position,
       rotation: data.rotation,
       scale: data.scale,
-      addedBy: socket.id
+      addedBy: socket.id,
+      isUploadedModel: objectData.isUploadedModel,
+      modelId: objectData.modelId,
+      modelUrl: objectData.modelUrl,
+      uploadedBy: objectData.uploadedBy
     });
 
     saveWorldState();
-    console.log(`📦 Object ${data.objectId} (${data.name}) added by ${socket.id}`);
+    
+    const modelInfo = data.modelId ? ` (uploaded model: ${data.modelId})` : '';
+    console.log(`📦 Object ${data.objectId} (${data.name})${modelInfo} added by ${socket.id}`);
   });
 
   socket.on('object-move', (data) => {

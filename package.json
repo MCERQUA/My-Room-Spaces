@@ -5,11 +5,19 @@
   "main": "signaling-server.js",
   "scripts": {
     "start": "node signaling-server.js",
+    "start:persistent": "node signaling-server-persistent.js",
     "dev": "nodemon signaling-server.js",
+    "dev:persistent": "nodemon signaling-server-persistent.js",
     "build": "echo 'No build required'",
     "deploy": "netlify deploy --prod",
     "process-glb": "node glb-processor.js",
-    "install-glb-tools": "npm install -g gltf-pipeline"
+    "install-glb-tools": "npm install -g gltf-pipeline",
+    "test": "mocha test/**/*.test.js",
+    "test:watch": "mocha test/**/*.test.js --watch",
+    "test:coverage": "nyc mocha test/**/*.test.js",
+    "migrate": "node migrations/run-migrations.js",
+    "migrate:up": "psql $DATABASE_URL < migrations/001_initial_schema.sql && psql $DATABASE_URL < migrations/002_audit_logging.sql && psql $DATABASE_URL < migrations/003_analytics_views.sql",
+    "migrate:down": "psql $DATABASE_URL < migrations/rollback.sql"
   },
   "keywords": [
     "threejs",
@@ -36,16 +44,28 @@
     "node": "18.x"
   },
   "dependencies": {
+    "aws-sdk": "^2.1691.0",
     "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
+    "helmet": "^7.1.0",
+    "ioredis": "^5.3.2",
+    "multer": "^1.4.5-lts.1",
     "node-fetch": "^2.6.7",
+    "node-pg-migrate": "^6.2.2",
     "pg": "^8.16.3",
     "socket.io": "^4.7.2",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.1.7"
+    "sqlite3": "^5.1.7",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "chai": "^4.3.10",
+    "mocha": "^10.2.0",
+    "nodemon": "^3.0.1",
+    "nyc": "^15.1.0",
+    "sinon": "^17.0.1"
   },
   "browserslist": [
     "> 1%",

@@ -312,9 +312,9 @@ const recordVisitor = (visitorId) => {
 
 // Space initialization is handled by the database setup above
 
-// Simulate database (in production, use Railway PostgreSQL)
+// Simulate database (in production, use PostgreSQL)
 const saveWorldState = () => {
-  // In production: save to Railway database
+  // In production: save to PostgreSQL database
   console.log('💾 World state saved - Objects:', worldState.objects.size, 'Users:', worldState.users.size);
 };
 

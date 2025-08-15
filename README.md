@@ -1,7 +1,6 @@
 # 🌐 Self-Hosted Multi-user 3D World Website
 
 [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/MCERQUA/3D-threejs-site)
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/MCERQUA/3D-threejs-site)
 
 A modern, real-time 3D virtual world that multiple users can join and interact with together. Built with Three.js, Node.js, and WebRTC for seamless multi-user experiences with persistent world state and visitor tracking.
 
@@ -36,12 +35,12 @@ A modern, real-time 3D virtual world that multiple users can join and interact w
 - **Video File Loading**: Drag-and-drop or file picker for local video files
 
 ### 🔧 **Technical Features**
-- **Server-Authoritative Architecture**: Railway-hosted Node.js server maintains world state
+- **Server-Authoritative Architecture**: Hetzner VPS-hosted Node.js server maintains world state
 - **Real-time Synchronization**: Socket.IO for instant updates across all users
 - **Persistent Object State**: All 3D object manipulations saved server-side and restored on connect
 - **Automatic GLB Processing**: Smart texture extraction and mobile optimization
 - **Screen Object Detection**: Automatic identification of display surfaces in models
-- **Auto-scaling Backend**: Railway handles traffic and server resources automatically
+- **Dedicated VPS Backend**: Hetzner VPS with 4 vCPUs, 16GB RAM for optimal performance
 - **CDN Frontend**: Netlify-hosted static site with global CDN distribution
 - **Visitor Counter**: Persistent visitor tracking that survives server restarts (Cloudflare KV)
 - **Multi-Space Support**: Deploy multiple independent 3D environments with different GLB models
@@ -52,13 +51,13 @@ Visit the live website: [**my-room.chat**](https://my-room.chat/) or [**3D Multi
 
 ## 🚀 Quick Start
 
-### Option 1: One-Click Deploy (Recommended)
+### Option 1: Production Deployment
 
 1. **Deploy Frontend**: [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/MCERQUA/3D-threejs-site)
 
-2. **Deploy Backend**: [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https://github.com/MCERQUA/3D-threejs-site)
+2. **Backend Server**: Already deployed on Hetzner VPS at `http://178.156.181.117:3001`
 
-3. **Connect Frontend to Backend**: Update the `SIGNALING_SERVER` URL in `index.html` (line ~826) with your Railway deployment URL
+3. **Connect Frontend to Backend**: The `SIGNALING_SERVER` URL in `index.html` is pre-configured for the Hetzner VPS
 
 ### Option 2: Manual Setup
 
@@ -79,7 +78,7 @@ npm run dev        # Backend (http://localhost:3001)
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Netlify CDN   │    │  Railway Server │    │   WebRTC P2P    │
+│   Netlify CDN   │    │  Hetzner VPS    │    │   WebRTC P2P    │
 │   (Frontend)    │◄──►│   (Backend)     │◄──►│  (Media Stream) │
 │                 │    │                 │    │                 │
 │ • Static Site   │    │ • World State   │    │ • Screen Share  │
@@ -91,7 +90,7 @@ npm run dev        # Backend (http://localhost:3001)
 ### Key Components
 
 - **Frontend (Netlify)**: Static Three.js application with WebRTC capabilities
-- **Backend (Railway)**: Node.js server managing world state and real-time events
+- **Backend (Hetzner VPS)**: Node.js server managing world state and real-time events
 - **WebRTC Layer**: Direct peer-to-peer connections for screen sharing
 - **Persistent Storage**: Server-side world state with object persistence
 
@@ -107,11 +106,12 @@ npm run dev        # Backend (http://localhost:3001)
 - **[Node.js](https://nodejs.org/)**: Server runtime
 - **[Express.js](https://expressjs.com/)**: Web framework
 - **[Socket.IO](https://socket.io/)**: Real-time bidirectional communication
-- **[Railway](https://railway.app/)**: Cloud hosting platform
+- **PostgreSQL**: Persistent database storage
+- **Redis**: High-performance caching
 
 ### Hosting
 - **[Netlify](https://netlify.com/)**: Frontend CDN and deployment
-- **[Railway](https://railway.app/)**: Backend server hosting
+- **[Hetzner VPS](https://hetzner.com/)**: Dedicated backend server (4 vCPUs, 16GB RAM)
 
 ## 📖 Documentation
 
@@ -125,7 +125,7 @@ npm run dev        # Backend (http://localhost:3001)
 ### Setup Guides
 - **[Complete Setup Guide](docs/SETUP.md)** - Detailed deployment instructions
 - **[Netlify Deployment](docs/netlify-deployment.md)** - Frontend hosting setup
-- **[Railway Deployment](docs/railway-deployment.md)** - Backend server setup
+- **[VPS Migration Guide](docs/VPS_MIGRATION_GUIDE.md)** - Complete VPS setup instructions
 
 ### Technical Documentation
 - **[User Guide](docs/USER_GUIDE.md)** - Comprehensive feature reference
@@ -231,7 +231,7 @@ See the [Multi-Space Deployment Guide](docs/MULTI_SPACE_DEPLOYMENT.md) for compl
 ### **File Structure**
 ```
 ├── index.html              # Main application (5000+ lines)
-├── signaling-server.js     # Railway persistent world server (350+ lines)
+├── signaling-server.js     # Hetzner VPS persistent world server (350+ lines)
 ├── glb-processor.js        # Node.js GLB processing tool
 ├── glb-processor-client.js # Browser-based GLB processor
 ├── package.json            # Dependencies and scripts

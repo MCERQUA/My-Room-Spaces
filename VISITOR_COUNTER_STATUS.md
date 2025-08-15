@@ -2,14 +2,14 @@
 
 ## ✅ WORKING: Visitor Counter is Fully Operational
 
-The visitor counter is now **permanently persistent** using the Railway backend with SQLite database.
+The visitor counter is now **permanently persistent** using the Hetzner VPS backend with PostgreSQL database.
 
 ### Current Architecture:
-1. **Primary: Railway Backend (SQLite)** ✅ WORKING
-   - Stores visitor count in `data/visitors.db`
+1. **Primary: Hetzner VPS Backend (PostgreSQL)** ✅ WORKING
+   - Stores visitor count in PostgreSQL database
    - Persists across ALL deployments and updates
    - Tracks unique visitors with IDs
-   - Already deployed and operational
+   - Deployed on dedicated VPS with 4 vCPUs, 16GB RAM
 
 2. **Fallback: Cloudflare Worker** ⚠️ (Optional Enhancement)
    - Deployed at `https://visitor-counter.metamike.workers.dev/`
@@ -18,28 +18,28 @@ The visitor counter is now **permanently persistent** using the Railway backend 
 
 ### How It Works Now:
 1. Page loads → Tries Cloudflare Worker first
-2. If Cloudflare fails → Automatically uses Railway backend
-3. Railway stores count in SQLite database (permanent storage)
+2. If Cloudflare fails → Automatically uses Hetzner VPS backend
+3. VPS stores count in PostgreSQL database (permanent storage)
 4. Count displays in the UI regardless of which system responds
 
 ### Visitor Count Persistence:
 Your visitor count is **100% persistent** and survives:
 - ✅ Code updates to GitHub
 - ✅ Netlify frontend redeployments  
-- ✅ Railway backend restarts
+- ✅ VPS server restarts
 - ✅ Database migrations
 - ✅ Platform maintenance
 
 ### Testing the Counter:
 ```bash
 # Check current visitor count in database
-sqlite3 data/visitors.db "SELECT * FROM space_stats WHERE space_name='main-world';"
+sudo -u postgres psql -d threedworld -c "SELECT * FROM space_stats WHERE space_name='main-world';"
 
 # View visitor history
-sqlite3 data/visitors.db "SELECT COUNT(*) as total_visitors FROM visitors WHERE space_name='main-world';"
+sudo -u postgres psql -d threedworld -c "SELECT COUNT(*) as total_visitors FROM visitors WHERE space_name='main-world';"
 
 # Test via API
-curl https://3d-threejs-site-production.up.railway.app/api/visitor-stats
+curl http://178.156.181.117:3001/api/visitor-stats
 ```
 
 ### Optional: Adding Cloudflare KV (Not Required)
@@ -52,15 +52,15 @@ If you want to enable Cloudflare KV storage later:
    - Variable name: `VISITOR_COUNTER`
    - Select the namespace you created
 
-But this is **completely optional** - your visitor counter is already working perfectly with Railway!
+But this is **completely optional** - your visitor counter is already working perfectly with the Hetzner VPS!
 
 ### Current Visitor Count Location:
-- **Database file**: `/data/visitors.db`
+- **Database**: PostgreSQL on Hetzner VPS
 - **Table**: `space_stats`
-- **Current count**: Check with SQLite command above
-- **Backup**: Stored with Railway deployment
+- **Current count**: Check with PostgreSQL command above
+- **Backup**: Daily automated backups on VPS
 
 ## Summary
 ✅ **Your visitor counter is WORKING and PERSISTENT!**
 
-No further action needed - the counter will continue working permanently with the Railway backend.
+No further action needed - the counter will continue working permanently with the Hetzner VPS backend.

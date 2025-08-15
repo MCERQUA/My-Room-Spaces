@@ -32,13 +32,14 @@ This is a **real-time multi-user 3D virtual world** where users can:
 ### Local Development
 ```bash
 # Start backend server (required for multi-user features)
-npm run dev                 # Railway server on localhost:3001
+npm run dev                 # VPS server on localhost:3001
 
 # Start frontend (separate terminal)
 npm start                   # Static site on localhost:8080
 
 # Deploy to production
-git push origin main        # Auto-deploys to Netlify + Railway
+git push origin main        # Auto-deploys to Netlify
+./deploy-to-vps.sh          # Deploy backend to Hetzner VPS
 ```
 
 ### Testing Multi-User Features
@@ -52,7 +53,7 @@ git push origin main        # Auto-deploys to Netlify + Railway
 ### Hybrid Multi-User Architecture
 This is a **hybrid client-server application** with:
 - **Frontend**: Single-file Three.js application (`index.html`) hosted on Netlify
-- **Backend**: Node.js Socket.IO server (`signaling-server.js`) hosted on Railway
+- **Backend**: Node.js Socket.IO server (`signaling-server.js`) hosted on Hetzner VPS (178.156.181.117)
 - **WebRTC Layer**: Direct P2P connections for screen sharing between users
 
 ### Key Components
@@ -70,8 +71,8 @@ This is a **hybrid client-server application** with:
 - **Audio Support**: Full audio playback with volume controls
 - **Video File Loading**: Drag-and-drop or file picker for local video files
 
-#### Persistent World & Multi-User System (v2.0 - Railway Backend)
-- **Server-Authoritative Architecture**: Railway-hosted Node.js server maintains world state
+#### Persistent World & Multi-User System (v2.0 - VPS Backend)
+- **Server-Authoritative Architecture**: Hetzner VPS-hosted Node.js server maintains world state
 - **Real-time User Avatars**: 3D spheres with username labels track all connected users
 - **Persistent Object State**: All 3D object manipulations saved server-side and restored on connect
 - **Hybrid Screen Sharing**: Server coordination + WebRTC P2P for optimal performance
@@ -96,7 +97,7 @@ index.html              # Main application with multi-user features (2400+ lines
 ├── Object Manipulation # Server-mediated 3D object interactions
 └── Mobile Touch        # Touch controls and responsive design
 
-signaling-server.js     # Railway persistent world server (350+ lines)
+signaling-server.js     # VPS persistent world server (350+ lines)
 ├── World State API     # /api/world-state, /api/users, /api/objects
 ├── Real-time Events    # Socket.IO user/object/chat/screen sharing
 ├── Avatar Management   # User spawning, position tracking, cleanup
@@ -119,12 +120,12 @@ CLAUDE.md              # This documentation file
 
 ## Important Implementation Details
 
-### Railway Backend Server Configuration (v2.0)
-The persistent world server is configured in `index.html` around line 826:
+### VPS Backend Server Configuration (v2.0)
+The persistent world server is configured in `index.html` around line 3555:
 ```javascript
 const SIGNALING_SERVER = window.location.hostname === 'localhost' 
   ? 'http://localhost:3001'  // Local development
-  : 'https://3d-threejs-site-production.up.railway.app';  // Railway backend
+  : 'http://178.156.181.117:3001';  // Hetzner VPS backend
 ```
 
 **Server Features:**
@@ -353,7 +354,7 @@ function spawnUserAvatar(userId, avatar) {
 - **Check Console for WebRTC Events**: Look for `📨 WebRTC offer/answer/ice-candidate` messages
 - **Verify Peer Connections**: `peers` object should contain active SimplePeer instances
 - **Stream Validation**: `currentStream.active` should be true when sharing
-- **Signaling Server**: Ensure Railway backend is accessible and Socket.IO connected
+- **Signaling Server**: Ensure VPS backend is accessible and Socket.IO connected
 
 ### Model Loading Issues
 - Only GLB and GLTF formats supported
@@ -377,15 +378,16 @@ function spawnUserAvatar(userId, avatar) {
 - Deploy `index.html` and `models/` directory
 - Netlify configuration in `netlify.toml` handles caching and security headers
 
-### Railway Backend Deployment (v2.0)
-- **Production URL**: `https://3d-threejs-site-production.up.railway.app`
+### VPS Backend Deployment (v2.0)
+- **Production URL**: `http://178.156.181.117:3001`
 - **Features**: Persistent world state, user avatars, screen sharing coordination
 - **API Endpoints**: Health check and world state debugging at root URL
-- **Auto-scaling**: Railway handles traffic and server resources automatically
+- **Infrastructure**: Hetzner VPS with 4 vCPUs, 16GB RAM, PostgreSQL, Redis
+- **Management**: PM2 process manager with automatic restarts
 
 ### Development Workflow (v2.0)
 1. **Local Development**: 
-   - Run `npm run dev` to start Railway server on port 3001
+   - Run `npm run dev` to start local server on port 3001
    - Open `http://localhost:8080` for frontend (served by `npm start` or live server)
    - Test multi-user features by opening multiple browser tabs
 
@@ -462,10 +464,10 @@ When adding new UI elements:
 
 ## Recent Major Changes (v2.0 Architecture Upgrade)
 
-### Migration from Cloudflare Workers to Railway (August 2025)
+### Migration from Cloudflare Workers to VPS (August 2025)
 - **Previous**: Pure P2P with Cloudflare Workers signaling
-- **Current**: Hybrid server-authoritative + P2P architecture with comprehensive documentation
-- **Benefits**: Persistent world state, reliable user management, better scalability, easy deployment
+- **Current**: Hybrid server-authoritative + P2P architecture on Hetzner VPS
+- **Benefits**: Persistent world state, reliable user management, better scalability, full control, zero latency database
 
 ### Key Files Added/Modified:
 - `signaling-server.js`: Comprehensive persistent world server (350+ lines)

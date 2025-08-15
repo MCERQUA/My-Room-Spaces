@@ -11,9 +11,6 @@ Your Hetzner VPS (4 vCPU, 16GB RAM) is more than sufficient for:
 - Redis cache
 - Nginx reverse proxy
 - Multiple project instances
-
-## Project is currently setup already in /projects/3D-threejs-site/
- -project is already cloned and uptodate working version
  
 ## 📦 Step 1: Install Required Software
 

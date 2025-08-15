@@ -3554,7 +3554,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       // Connect to Railway Socket.IO server (not Netlify which only serves static files)
       const SIGNALING_SERVER = window.location.hostname === 'localhost' 
         ? 'http://localhost:3001'  // Local development
-        : 'https://3d-threejs-site-production.up.railway.app';  // Railway backend
+        : 'http://178.156.181.117:3001';  // Hetzner VPS backend
       
       // Cloudflare Worker API for persistent visitor counter
       const VISITOR_COUNTER_API = 'https://visitor-counter.mikecerqua.workers.dev';

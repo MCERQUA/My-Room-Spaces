@@ -11,7 +11,7 @@
   for = "/*"
   [headers.values]
     # Enable HTTPS for screen sharing APIs
-    Content-Security-Policy = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.socket.io; media-src 'self' blob: data:; connect-src 'self' blob: data: wss://*.railway.app https://*.railway.app ws://localhost:* http://localhost:* https://*.workers.dev;"
+    Content-Security-Policy = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdn.socket.io; media-src 'self' blob: data:; connect-src 'self' blob: data: ws://178.156.181.117:* http://178.156.181.117:* ws://localhost:* http://localhost:* https://*.workers.dev;"
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"

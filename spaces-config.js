@@ -9,7 +9,7 @@ const SPACES_CONFIG = {
       desktop: './models/BAKE-WEBROOM1.glb',
       mobile: './models/unpacked-mobile/WEBROOM1-mob.gltf'
     },
-    serverEndpoint: 'https://3d-threejs-site-production.up.railway.app',
+    serverEndpoint: 'http://178.156.181.117:3001',
     welcomeMessage: 'Welcome to the Main Space',
     themeColor: '#00ffcc',
     cameraPosition: { x: 0, y: 2, z: -4 },
@@ -23,7 +23,7 @@ const SPACES_CONFIG = {
       desktop: './models/white-room1.glb',
       mobile: './models/unpacked-white/white-room-mobile.gltf' // Mobile-optimized with JPG textures
     },
-    serverEndpoint: 'https://3d-threejs-site-production.up.railway.app',
+    serverEndpoint: 'http://178.156.181.117:3001',
     welcomeMessage: 'Welcome to the White Room',
     themeColor: '#e0e0e0',
     cameraPosition: { x: 0, y: 2, z: -4 },
@@ -37,7 +37,7 @@ const SPACES_CONFIG = {
       desktop: null, // No room model - pure space environment
       mobile: null
     },
-    serverEndpoint: 'https://3d-threejs-site-production.up.railway.app',
+    serverEndpoint: 'http://178.156.181.117:3001',
     welcomeMessage: 'Welcome to the Game Room',
     themeColor: '#00ff88',
     cameraPosition: { x: 0, y: 5, z: 10 },
@@ -59,7 +59,7 @@ const SPACES_CONFIG = {
       desktop: './models/BAKE-WEBROOM1.glb', // Change this to your new GLB
       mobile: './models/WEBROOM1-mob.glb'
     },
-    serverEndpoint: 'https://3d-threejs-site-production.up.railway.app',
+    serverEndpoint: 'http://178.156.181.117:3001',
     welcomeMessage: 'Welcome to the Custom Space',
     themeColor: '#0099ff',
     cameraPosition: { x: 0, y: 2, z: -4 },

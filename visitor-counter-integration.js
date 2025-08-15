@@ -12,11 +12,11 @@ const VISITOR_COUNTER_CONFIG = {
     'https://visitor-counter.mikecerqua.workers.dev'
   ],
   
-  // Use Railway backend as last resort
-  useRailwayFallback: true,
-  railwayUrl: window.location.hostname === 'localhost' 
+  // Use Hetzner VPS backend as last resort
+  useVPSFallback: true,
+  vpsUrl: window.location.hostname === 'localhost' 
     ? 'http://localhost:3001'
-    : 'https://3d-threejs-site-production.up.railway.app'
+    : 'http://178.156.181.117:3001'
 };
 
 // Initialize visitor counter on page load
@@ -95,16 +95,16 @@ class VisitorCounter {
     }
   }
 
-  // Try Railway backend as fallback
-  async tryRailwayBackend() {
+  // Try Hetzner VPS backend as fallback
+  async tryVPSBackend() {
     try {
-      if (!VISITOR_COUNTER_CONFIG.useRailwayFallback) {
+      if (!VISITOR_COUNTER_CONFIG.useVPSFallback) {
         return false;
       }
       
-      console.log('🔄 Trying Railway backend fallback...');
+      console.log('🔄 Trying Hetzner VPS backend fallback...');
       
-      const response = await fetch(`${VISITOR_COUNTER_CONFIG.railwayUrl}/api/visitor-increment`, {
+      const response = await fetch(`${VISITOR_COUNTER_CONFIG.vpsUrl}/api/visitor-increment`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -118,7 +118,7 @@ class VisitorCounter {
       if (response.ok) {
         const data = await response.json();
         if (data.count !== undefined) {
-          console.log(`✅ Railway backend success! Count: ${data.count}`);
+          console.log(`✅ Hetzner VPS backend success! Count: ${data.count}`);
           this.updateDisplay(data.count);
           this.initialized = true;
           return true;
@@ -128,7 +128,7 @@ class VisitorCounter {
       return false;
       
     } catch (error) {
-      console.warn('❌ Railway backend failed:', error.message);
+      console.warn('❌ Hetzner VPS backend failed:', error.message);
       return false;
     }
   }
@@ -149,8 +149,8 @@ class VisitorCounter {
       }
     }
     
-    // Try Railway backend as last resort
-    if (await this.tryRailwayBackend()) {
+    // Try Hetzner VPS backend as last resort
+    if (await this.tryVPSBackend()) {
       return;
     }
     

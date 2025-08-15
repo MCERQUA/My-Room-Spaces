@@ -30,15 +30,15 @@ const SPACES_CONFIG = {
     mobileCameraPosition: { x: 0, y: 2, z: 0 }
   },
   
-  // Space environment
-  'space': {
-    name: 'Space Station',
+  // Game Room - Space environment
+  'Game-Room': {
+    name: 'Game Room',
     roomModel: {
       desktop: null, // No room model - pure space environment
       mobile: null
     },
     serverEndpoint: 'https://3d-threejs-site-production.up.railway.app',
-    welcomeMessage: 'Welcome to the Space Station',
+    welcomeMessage: 'Welcome to the Game Room',
     themeColor: '#00ff88',
     cameraPosition: { x: 0, y: 5, z: 10 },
     mobileCameraPosition: { x: 0, y: 5, z: 10 },

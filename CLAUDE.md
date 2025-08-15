@@ -485,3 +485,4 @@ When adding new UI elements:
 - User avatars require server connection
 - Screen sharing uses hybrid approach (coordination + P2P video)
 - Chat interface adds new UI elements and Socket.IO events
+- the url of the site is https://3d-mc.netlify.app/

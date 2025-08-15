@@ -104,41 +104,31 @@
     <div id="container"></div>
     
     <div class="controls">
-        <h3>🏠 Room Builder</h3>
+        <h3>🌌 Space Environment</h3>
         
         <div class="control-group">
-            <label>Room Width: <span id="widthValue">20</span></label>
-            <input type="range" id="roomWidth" min="10" max="50" value="20" step="1">
+            <label>Aurora Intensity: <span id="auroraValue">0.5</span></label>
+            <input type="range" id="auroraIntensity" min="0" max="1" value="0.5" step="0.1">
         </div>
         
         <div class="control-group">
-            <label>Room Depth: <span id="depthValue">20</span></label>
-            <input type="range" id="roomDepth" min="10" max="50" value="20" step="1">
+            <label>Particle Speed: <span id="speedValue">1</span></label>
+            <input type="range" id="particleSpeed" min="0.1" max="3" value="1" step="0.1">
         </div>
         
         <div class="control-group">
-            <label>Room Height: <span id="heightValue">10</span></label>
-            <input type="range" id="roomHeight" min="5" max="20" value="10" step="1">
+            <label>Nebula Density: <span id="nebulaValue">0.5</span></label>
+            <input type="range" id="nebulaDensity" min="0" max="1" value="0.5" step="0.1">
         </div>
         
         <div class="control-group">
-            <label>Floor Color:</label>
-            <input type="color" id="floorColor" value="#1a1a2e">
+            <label>Aurora Color:</label>
+            <input type="color" id="auroraColor" value="#00ff88">
         </div>
         
         <div class="control-group">
-            <label>Wall Color:</label>
-            <input type="color" id="wallColor" value="#16213e">
-        </div>
-        
-        <div class="control-group">
-            <button class="button" id="addCube">Add Cube</button>
-            <button class="button" id="addSphere">Add Sphere</button>
-            <button class="button" id="addLight">Add Light</button>
-        </div>
-        
-        <div class="control-group">
-            <button class="button" id="resetRoom">Reset Room</button>
+            <label>Nebula Color:</label>
+            <input type="color" id="nebulaColor" value="#ff00ff">
         </div>
     </div>
     
@@ -146,7 +136,7 @@
         <p>🖱️ Left-click + drag to rotate</p>
         <p>🖱️ Right-click + drag to pan</p>
         <p>🖱️ Scroll to zoom</p>
-        <p>📦 Objects: <span id="objectCount">0</span></p>
+        <p>✨ Space Particles Active</p>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -154,9 +144,11 @@
     <script>
         // Scene setup
         let scene, camera, renderer, controls;
-        let floor, walls = [];
-        let objects = [];
-        let roomWidth = 20, roomDepth = 20, roomHeight = 10;
+        let aurora, nebula, lightParticles;
+        let auroraIntensity = 0.5;
+        let particleSpeed = 1;
+        let nebulaDensity = 0.5;
+        let auroraUniforms, nebulaUniforms;
         
         // Initialize Three.js
         function init() {
@@ -193,8 +185,10 @@
             // Add lighting
             setupLighting();
             
-            // Create initial room
-            createRoom();
+            // Create space effects
+            createAurora();
+            createNebula();
+            createLightParticles();
             
             // Setup event listeners
             setupEventListeners();
@@ -248,226 +242,239 @@
             // scene.add(helper);
         }
         
-        function createRoom() {
-            // Clear existing room
-            if (floor) {
-                scene.remove(floor);
+        function createAurora() {
+            // Aurora shader material
+            const auroraGeometry = new THREE.PlaneGeometry(200, 100, 100, 50);
+            
+            auroraUniforms = {
+                time: { value: 0 },
+                intensity: { value: auroraIntensity },
+                color: { value: new THREE.Color(0x00ff88) }
+            };
+            
+            const auroraMaterial = new THREE.ShaderMaterial({
+                uniforms: auroraUniforms,
+                vertexShader: `
+                    uniform float time;
+                    uniform float intensity;
+                    varying vec2 vUv;
+                    varying float vWave;
+                    
+                    void main() {
+                        vUv = uv;
+                        vec3 pos = position;
+                        float wave = sin(position.x * 0.1 + time) * cos(position.y * 0.1 + time * 0.5) * 5.0 * intensity;
+                        pos.z += wave;
+                        vWave = wave;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 color;
+                    uniform float intensity;
+                    uniform float time;
+                    varying vec2 vUv;
+                    varying float vWave;
+                    
+                    void main() {
+                        float alpha = smoothstep(0.0, 1.0, vUv.y) * intensity;
+                        alpha *= (sin(vUv.x * 10.0 + time) * 0.5 + 0.5) * 0.3 + 0.7;
+                        vec3 finalColor = color + vec3(vWave * 0.1);
+                        gl_FragColor = vec4(finalColor, alpha * 0.6);
+                    }
+                `,
+                transparent: true,
+                side: THREE.DoubleSide,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            
+            aurora = new THREE.Mesh(auroraGeometry, auroraMaterial);
+            aurora.position.y = 50;
+            aurora.rotation.x = -Math.PI / 4;
+            scene.add(aurora);
+        }
+        
+        function createNebula() {
+            // Nebula cloud particles
+            const nebulaGeometry = new THREE.BufferGeometry();
+            const nebulaCount = 2000;
+            const positions = new Float32Array(nebulaCount * 3);
+            const colors = new Float32Array(nebulaCount * 3);
+            const sizes = new Float32Array(nebulaCount);
+            
+            for (let i = 0; i < nebulaCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 300;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 300;
+                
+                const color = new THREE.Color(0xff00ff);
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+                
+                sizes[i] = Math.random() * 5 + 2;
             }
-            walls.forEach(wall => scene.remove(wall));
-            walls = [];
             
-            // Create floor
-            const floorGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
-            const floorMaterial = new THREE.MeshStandardMaterial({ 
-                color: document.getElementById('floorColor').value,
-                roughness: 0.8,
-                metalness: 0.4,
-                emissive: 0x111111
-            });
-            floor = new THREE.Mesh(floorGeometry, floorMaterial);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
+            nebulaGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            nebulaGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            nebulaGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
             
-            // Create walls
-            const wallMaterial = new THREE.MeshStandardMaterial({ 
-                color: document.getElementById('wallColor').value,
-                roughness: 0.7,
-                metalness: 0.3,
-                emissive: 0x0a0a0a,
-                side: THREE.DoubleSide
-            });
+            nebulaUniforms = {
+                time: { value: 0 },
+                density: { value: nebulaDensity }
+            };
             
-            // Back wall
-            const backWallGeometry = new THREE.PlaneGeometry(roomWidth, roomHeight);
-            const backWall = new THREE.Mesh(backWallGeometry, wallMaterial);
-            backWall.position.z = -roomDepth / 2;
-            backWall.position.y = roomHeight / 2;
-            backWall.receiveShadow = true;
-            backWall.castShadow = true;
-            scene.add(backWall);
-            walls.push(backWall);
-            
-            // Front wall (transparent for viewing)
-            const frontWallGeometry = new THREE.PlaneGeometry(roomWidth, roomHeight);
-            const frontWallMaterial = new THREE.MeshStandardMaterial({ 
-                color: wallMaterial.color,
+            const nebulaMaterial = new THREE.ShaderMaterial({
+                uniforms: nebulaUniforms,
+                vertexShader: `
+                    attribute float size;
+                    varying vec3 vColor;
+                    uniform float time;
+                    
+                    void main() {
+                        vColor = color;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_PointSize = size * (300.0 / -mvPosition.z);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    uniform float density;
+                    
+                    void main() {
+                        float r = distance(gl_PointCoord, vec2(0.5, 0.5));
+                        if (r > 0.5) discard;
+                        float alpha = (1.0 - r * 2.0) * density * 0.3;
+                        gl_FragColor = vec4(vColor, alpha);
+                    }
+                `,
                 transparent: true,
-                opacity: 0.1,
-                side: THREE.DoubleSide
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
             });
-            const frontWall = new THREE.Mesh(frontWallGeometry, frontWallMaterial);
-            frontWall.position.z = roomDepth / 2;
-            frontWall.position.y = roomHeight / 2;
-            scene.add(frontWall);
-            walls.push(frontWall);
             
-            // Left wall
-            const leftWallGeometry = new THREE.PlaneGeometry(roomDepth, roomHeight);
-            const leftWall = new THREE.Mesh(leftWallGeometry, wallMaterial);
-            leftWall.rotation.y = Math.PI / 2;
-            leftWall.position.x = -roomWidth / 2;
-            leftWall.position.y = roomHeight / 2;
-            leftWall.receiveShadow = true;
-            leftWall.castShadow = true;
-            scene.add(leftWall);
-            walls.push(leftWall);
+            nebula = new THREE.Points(nebulaGeometry, nebulaMaterial);
+            scene.add(nebula);
+        }
+        
+        function createLightParticles() {
+            // Floating light particles
+            const particleCount = 500;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const velocities = new Float32Array(particleCount * 3);
             
-            // Right wall
-            const rightWallGeometry = new THREE.PlaneGeometry(roomDepth, roomHeight);
-            const rightWall = new THREE.Mesh(rightWallGeometry, wallMaterial);
-            rightWall.rotation.y = -Math.PI / 2;
-            rightWall.position.x = roomWidth / 2;
-            rightWall.position.y = roomHeight / 2;
-            rightWall.receiveShadow = true;
-            rightWall.castShadow = true;
-            scene.add(rightWall);
-            walls.push(rightWall);
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 100;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 100;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+                
+                velocities[i * 3] = (Math.random() - 0.5) * 0.2;
+                velocities[i * 3 + 1] = (Math.random() - 0.5) * 0.2;
+                velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.2;
+            }
             
-            // Ceiling (optional - semi-transparent)
-            const ceilingGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
-            const ceilingMaterial = new THREE.MeshStandardMaterial({ 
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+            
+            const material = new THREE.PointsMaterial({
                 color: 0xffffff,
+                size: 1,
                 transparent: true,
-                opacity: 0.3,
-                side: THREE.DoubleSide
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending,
+                map: createParticleTexture()
             });
-            const ceiling = new THREE.Mesh(ceilingGeometry, ceilingMaterial);
-            ceiling.rotation.x = Math.PI / 2;
-            ceiling.position.y = roomHeight;
-            scene.add(ceiling);
-            walls.push(ceiling);
+            
+            lightParticles = new THREE.Points(geometry, material);
+            lightParticles.userData.velocities = velocities;
+            scene.add(lightParticles);
         }
         
-        function addCube() {
-            const geometry = new THREE.BoxGeometry(2, 2, 2);
-            const material = new THREE.MeshStandardMaterial({ 
-                color: Math.random() * 0xffffff,
-                roughness: 0.5,
-                metalness: 0.3
-            });
-            const cube = new THREE.Mesh(geometry, material);
+        function createParticleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
             
-            // Random position within room bounds
-            cube.position.x = (Math.random() - 0.5) * (roomWidth - 4);
-            cube.position.y = 1 + Math.random() * 3;
-            cube.position.z = (Math.random() - 0.5) * (roomDepth - 4);
+            const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.2, 'rgba(255,255,255,0.8)');
+            gradient.addColorStop(0.4, 'rgba(128,200,255,0.6)');
+            gradient.addColorStop(1, 'rgba(0,100,255,0)');
             
-            cube.castShadow = true;
-            cube.receiveShadow = true;
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 32, 32);
             
-            scene.add(cube);
-            objects.push(cube);
-            updateObjectCount();
+            const texture = new THREE.CanvasTexture(canvas);
+            return texture;
         }
         
-        function addSphere() {
-            const geometry = new THREE.SphereGeometry(1, 32, 16);
-            const material = new THREE.MeshStandardMaterial({ 
-                color: Math.random() * 0xffffff,
-                roughness: 0.3,
-                metalness: 0.6
-            });
-            const sphere = new THREE.Mesh(geometry, material);
-            
-            // Random position within room bounds
-            sphere.position.x = (Math.random() - 0.5) * (roomWidth - 4);
-            sphere.position.y = 1 + Math.random() * 3;
-            sphere.position.z = (Math.random() - 0.5) * (roomDepth - 4);
-            
-            sphere.castShadow = true;
-            sphere.receiveShadow = true;
-            
-            scene.add(sphere);
-            objects.push(sphere);
-            updateObjectCount();
-        }
-        
-        function addLight() {
-            const light = new THREE.PointLight(0xffff00, 1, 10);
-            light.position.x = (Math.random() - 0.5) * (roomWidth - 4);
-            light.position.y = roomHeight - 2;
-            light.position.z = (Math.random() - 0.5) * (roomDepth - 4);
-            
-            // Add visible sphere to show light position
-            const sphereGeometry = new THREE.SphereGeometry(0.3, 16, 8);
-            const sphereMaterial = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-            const lightSphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-            lightSphere.position.copy(light.position);
-            
-            scene.add(light);
-            scene.add(lightSphere);
-            objects.push(lightSphere);
-            updateObjectCount();
-        }
-        
-        function resetRoom() {
-            // Remove all added objects
-            objects.forEach(obj => scene.remove(obj));
-            objects = [];
-            
-            // Reset room dimensions
-            roomWidth = 20;
-            roomDepth = 20;
-            roomHeight = 10;
-            
-            // Update UI
-            document.getElementById('roomWidth').value = roomWidth;
-            document.getElementById('roomDepth').value = roomDepth;
-            document.getElementById('roomHeight').value = roomHeight;
-            document.getElementById('widthValue').textContent = roomWidth;
-            document.getElementById('depthValue').textContent = roomDepth;
-            document.getElementById('heightValue').textContent = roomHeight;
-            
-            // Recreate room
-            createRoom();
-            updateObjectCount();
-        }
-        
-        function updateObjectCount() {
-            document.getElementById('objectCount').textContent = objects.length;
+        function updateParticles() {
+            if (lightParticles) {
+                const positions = lightParticles.geometry.attributes.position.array;
+                const velocities = lightParticles.userData.velocities;
+                
+                for (let i = 0; i < positions.length; i += 3) {
+                    positions[i] += velocities[i] * particleSpeed;
+                    positions[i + 1] += velocities[i + 1] * particleSpeed;
+                    positions[i + 2] += velocities[i + 2] * particleSpeed;
+                    
+                    // Wrap around
+                    if (Math.abs(positions[i]) > 50) velocities[i] *= -1;
+                    if (Math.abs(positions[i + 1]) > 50) velocities[i + 1] *= -1;
+                    if (Math.abs(positions[i + 2]) > 50) velocities[i + 2] *= -1;
+                }
+                
+                lightParticles.geometry.attributes.position.needsUpdate = true;
+            }
         }
         
         function setupEventListeners() {
-            // Room dimension controls
-            document.getElementById('roomWidth').addEventListener('input', (e) => {
-                roomWidth = parseFloat(e.target.value);
-                document.getElementById('widthValue').textContent = roomWidth;
-                createRoom();
-            });
-            
-            document.getElementById('roomDepth').addEventListener('input', (e) => {
-                roomDepth = parseFloat(e.target.value);
-                document.getElementById('depthValue').textContent = roomDepth;
-                createRoom();
-            });
-            
-            document.getElementById('roomHeight').addEventListener('input', (e) => {
-                roomHeight = parseFloat(e.target.value);
-                document.getElementById('heightValue').textContent = roomHeight;
-                createRoom();
-            });
-            
-            // Color controls
-            document.getElementById('floorColor').addEventListener('change', (e) => {
-                if (floor) {
-                    floor.material.color.set(e.target.value);
+            // Aurora controls
+            document.getElementById('auroraIntensity').addEventListener('input', (e) => {
+                auroraIntensity = parseFloat(e.target.value);
+                document.getElementById('auroraValue').textContent = auroraIntensity;
+                if (auroraUniforms) {
+                    auroraUniforms.intensity.value = auroraIntensity;
                 }
             });
             
-            document.getElementById('wallColor').addEventListener('change', (e) => {
-                walls.forEach(wall => {
-                    if (wall.material.opacity === 1 || wall.material.opacity === undefined) {
-                        wall.material.color.set(e.target.value);
-                    }
-                });
+            document.getElementById('particleSpeed').addEventListener('input', (e) => {
+                particleSpeed = parseFloat(e.target.value);
+                document.getElementById('speedValue').textContent = particleSpeed;
             });
             
-            // Object controls
-            document.getElementById('addCube').addEventListener('click', addCube);
-            document.getElementById('addSphere').addEventListener('click', addSphere);
-            document.getElementById('addLight').addEventListener('click', addLight);
-            document.getElementById('resetRoom').addEventListener('click', resetRoom);
+            document.getElementById('nebulaDensity').addEventListener('input', (e) => {
+                nebulaDensity = parseFloat(e.target.value);
+                document.getElementById('nebulaValue').textContent = nebulaDensity;
+                if (nebulaUniforms) {
+                    nebulaUniforms.density.value = nebulaDensity;
+                }
+            });
+            
+            // Color controls
+            document.getElementById('auroraColor').addEventListener('change', (e) => {
+                if (auroraUniforms) {
+                    auroraUniforms.color.value = new THREE.Color(e.target.value);
+                }
+            });
+            
+            document.getElementById('nebulaColor').addEventListener('change', (e) => {
+                if (nebula) {
+                    const color = new THREE.Color(e.target.value);
+                    const colors = nebula.geometry.attributes.color.array;
+                    for (let i = 0; i < colors.length; i += 3) {
+                        colors[i] = color.r;
+                        colors[i + 1] = color.g;
+                        colors[i + 2] = color.b;
+                    }
+                    nebula.geometry.attributes.color.needsUpdate = true;
+                }
+            });
             
             // Window resize
             window.addEventListener('resize', () => {
@@ -480,18 +487,32 @@
         function animate() {
             requestAnimationFrame(animate);
             
+            const time = Date.now() * 0.001;
+            
             // Update controls
             controls.update();
             
-            // Rotate objects for visual interest
-            objects.forEach((obj, index) => {
-                if (obj.geometry && obj.geometry.type === 'BoxGeometry') {
-                    obj.rotation.x += 0.01;
-                    obj.rotation.y += 0.01;
-                } else if (obj.geometry && obj.geometry.type === 'SphereGeometry' && !obj.material.emissive) {
-                    obj.position.y += Math.sin(Date.now() * 0.001 + index) * 0.01;
+            // Animate aurora
+            if (auroraUniforms) {
+                auroraUniforms.time.value = time;
+            }
+            
+            // Animate nebula
+            if (nebula) {
+                nebula.rotation.y += 0.0005 * particleSpeed;
+                if (nebulaUniforms) {
+                    nebulaUniforms.time.value = time;
                 }
-            });
+            }
+            
+            // Update light particles
+            updateParticles();
+            
+            // Rotate light particles system
+            if (lightParticles) {
+                lightParticles.rotation.y += 0.001 * particleSpeed;
+                lightParticles.rotation.x += 0.0005 * particleSpeed;
+            }
             
             renderer.render(scene, camera);
         }

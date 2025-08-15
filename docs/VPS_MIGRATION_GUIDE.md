@@ -12,35 +12,19 @@ Your Hetzner VPS (4 vCPU, 16GB RAM) is more than sufficient for:
 - Nginx reverse proxy
 - Multiple project instances
 
-## 🔧 Step 1: Initial VPS Setup
+## Project is currently setup already in /projects/3D-threejs-site/
+ -project is already cloned and uptodate working version
+ 
+## 📦 Step 1: Install Required Software
 
-### 1.1 SSH into your VPS
-```bash
-ssh root@your-vps-ip
-```
-
-### 1.2 Update system
-```bash
-apt update && apt upgrade -y
-```
-
-### 1.3 Create application user
-```bash
-adduser nodejs
-usermod -aG sudo nodejs
-su - nodejs
-```
-
-## 📦 Step 2: Install Required Software
-
-### 2.1 Install Node.js 18.x
+### 1 Install Node.js 18.x
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 sudo apt-get install -y nodejs
 node --version  # Should show v18.x
 ```
 
-### 2.2 Install PostgreSQL
+### 2. Install PostgreSQL
 ```bash
 sudo apt install postgresql postgresql-contrib -y
 sudo systemctl start postgresql

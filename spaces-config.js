@@ -30,6 +30,28 @@ const SPACES_CONFIG = {
     mobileCameraPosition: { x: 0, y: 2, z: 0 }
   },
   
+  // Space environment
+  'space': {
+    name: 'Space Station',
+    roomModel: {
+      desktop: null, // No room model - pure space environment
+      mobile: null
+    },
+    serverEndpoint: 'https://3d-threejs-site-production.up.railway.app',
+    welcomeMessage: 'Welcome to the Space Station',
+    themeColor: '#00ff88',
+    cameraPosition: { x: 0, y: 5, z: 10 },
+    mobileCameraPosition: { x: 0, y: 5, z: 10 },
+    environment: {
+      type: 'space',
+      backgroundColor: '#000000',
+      starfield: true,
+      aurora: true,
+      nebula: true,
+      particles: true
+    }
+  },
+  
   // Add more spaces as needed
   'custom': {
     name: 'Custom Space',

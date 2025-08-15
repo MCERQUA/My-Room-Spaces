@@ -2401,6 +2401,185 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       console.log('Screen object configured');
     }
     
+    // Create space environment with aurora, nebula, and particles
+    function createSpaceEnvironment(config) {
+      // Set space background
+      scene.background = new THREE.Color(config.backgroundColor || 0x000000);
+      
+      // Create starfield
+      if (config.starfield) {
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsMaterial = new THREE.PointsMaterial({
+          color: 0xffffff,
+          size: 0.7,
+          transparent: true
+        });
+        
+        const starsVertices = [];
+        for (let i = 0; i < 10000; i++) {
+          const x = (Math.random() - 0.5) * 2000;
+          const y = (Math.random() - 0.5) * 2000;
+          const z = (Math.random() - 0.5) * 2000;
+          starsVertices.push(x, y, z);
+        }
+        
+        starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
+        const starField = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(starField);
+      }
+      
+      // Create aurora effect
+      if (config.aurora) {
+        const auroraGeometry = new THREE.PlaneGeometry(200, 100, 100, 50);
+        const auroraUniforms = {
+          time: { value: 0 },
+          intensity: { value: 0.5 },
+          color: { value: new THREE.Color(0x00ff88) }
+        };
+        
+        const auroraMaterial = new THREE.ShaderMaterial({
+          uniforms: auroraUniforms,
+          vertexShader: `
+            uniform float time;
+            uniform float intensity;
+            varying vec2 vUv;
+            varying float vWave;
+            
+            void main() {
+              vUv = uv;
+              vec3 pos = position;
+              float wave = sin(position.x * 0.1 + time) * cos(position.y * 0.1 + time * 0.5) * 5.0 * intensity;
+              pos.z += wave;
+              vWave = wave;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 color;
+            uniform float intensity;
+            uniform float time;
+            varying vec2 vUv;
+            varying float vWave;
+            
+            void main() {
+              float alpha = smoothstep(0.0, 1.0, vUv.y) * intensity;
+              alpha *= (sin(vUv.x * 10.0 + time) * 0.5 + 0.5) * 0.3 + 0.7;
+              vec3 finalColor = color + vec3(vWave * 0.1);
+              gl_FragColor = vec4(finalColor, alpha * 0.6);
+            }
+          `,
+          transparent: true,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        
+        const aurora = new THREE.Mesh(auroraGeometry, auroraMaterial);
+        aurora.position.y = 50;
+        aurora.rotation.x = -Math.PI / 4;
+        scene.add(aurora);
+        
+        // Animate aurora in render loop
+        window.auroraUniforms = auroraUniforms;
+      }
+      
+      // Create nebula particles
+      if (config.nebula) {
+        const nebulaGeometry = new THREE.BufferGeometry();
+        const nebulaCount = 2000;
+        const positions = new Float32Array(nebulaCount * 3);
+        const colors = new Float32Array(nebulaCount * 3);
+        const sizes = new Float32Array(nebulaCount);
+        
+        for (let i = 0; i < nebulaCount; i++) {
+          positions[i * 3] = (Math.random() - 0.5) * 300;
+          positions[i * 3 + 1] = (Math.random() - 0.5) * 200;
+          positions[i * 3 + 2] = (Math.random() - 0.5) * 300;
+          
+          const color = new THREE.Color(0xff00ff);
+          colors[i * 3] = color.r;
+          colors[i * 3 + 1] = color.g;
+          colors[i * 3 + 2] = color.b;
+          
+          sizes[i] = Math.random() * 5 + 2;
+        }
+        
+        nebulaGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        nebulaGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        nebulaGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        
+        const nebulaMaterial = new THREE.PointsMaterial({
+          size: 3,
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.6,
+          blending: THREE.AdditiveBlending
+        });
+        
+        const nebula = new THREE.Points(nebulaGeometry, nebulaMaterial);
+        scene.add(nebula);
+        window.nebula = nebula;
+      }
+      
+      // Create floating light particles
+      if (config.particles) {
+        const particleCount = 500;
+        const particleGeometry = new THREE.BufferGeometry();
+        const particlePositions = new Float32Array(particleCount * 3);
+        const particleVelocities = new Float32Array(particleCount * 3);
+        
+        for (let i = 0; i < particleCount; i++) {
+          particlePositions[i * 3] = (Math.random() - 0.5) * 100;
+          particlePositions[i * 3 + 1] = (Math.random() - 0.5) * 100;
+          particlePositions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+          
+          particleVelocities[i * 3] = (Math.random() - 0.5) * 0.2;
+          particleVelocities[i * 3 + 1] = (Math.random() - 0.5) * 0.2;
+          particleVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.2;
+        }
+        
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        
+        const particleMaterial = new THREE.PointsMaterial({
+          color: 0xffffff,
+          size: 1,
+          transparent: true,
+          opacity: 0.8,
+          blending: THREE.AdditiveBlending
+        });
+        
+        const lightParticles = new THREE.Points(particleGeometry, particleMaterial);
+        lightParticles.userData.velocities = particleVelocities;
+        scene.add(lightParticles);
+        window.lightParticles = lightParticles;
+      }
+      
+      // Add a floating platform or space station floor
+      const platformGeometry = new THREE.CylinderGeometry(20, 20, 1, 32);
+      const platformMaterial = new THREE.MeshStandardMaterial({
+        color: 0x1a1a2e,
+        metalness: 0.8,
+        roughness: 0.2,
+        emissive: 0x0a0a0a
+      });
+      const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+      platform.position.y = -2;
+      platform.receiveShadow = true;
+      scene.add(platform);
+      
+      // Adjust lighting for space
+      scene.children.forEach(child => {
+        if (child.type === 'AmbientLight') {
+          child.intensity = 0.3;
+        }
+        if (child.type === 'DirectionalLight') {
+          child.intensity = 0.6;
+        }
+      });
+      
+      console.log('Space environment created');
+    }
+    
     // Show processing status UI
     function showProcessingStatus(message) {
       let statusDiv = document.getElementById('glb-processing-status');
@@ -2466,6 +2645,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         console.log('Using pre-processed room model');
         const model = glbProcessor.applyProcessedModel(scene, processedRoom, isMobile || isRealIOS);
         setupRoomModel(model);
+        return;
+      }
+      
+      // Check if this is a space environment (no room model)
+      if (spaceConfig.environment && spaceConfig.environment.type === 'space') {
+        console.log('Creating space environment...');
+        createSpaceEnvironment(spaceConfig.environment);
+        hideLoadingScreen();
         return;
       }
       
@@ -5526,6 +5713,37 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       
       // ===== USER POSITION TRACKING =====
       trackUserPosition();
+      
+      // Animate space environment effects
+      const time = Date.now() * 0.001;
+      
+      if (window.auroraUniforms) {
+        window.auroraUniforms.time.value = time;
+      }
+      
+      if (window.nebula) {
+        window.nebula.rotation.y += 0.0005;
+      }
+      
+      if (window.lightParticles) {
+        const positions = window.lightParticles.geometry.attributes.position.array;
+        const velocities = window.lightParticles.userData.velocities;
+        
+        for (let i = 0; i < positions.length; i += 3) {
+          positions[i] += velocities[i];
+          positions[i + 1] += velocities[i + 1];
+          positions[i + 2] += velocities[i + 2];
+          
+          // Wrap around
+          if (Math.abs(positions[i]) > 50) velocities[i] *= -1;
+          if (Math.abs(positions[i + 1]) > 50) velocities[i + 1] *= -1;
+          if (Math.abs(positions[i + 2]) > 50) velocities[i + 2] *= -1;
+        }
+        
+        window.lightParticles.geometry.attributes.position.needsUpdate = true;
+        window.lightParticles.rotation.y += 0.001;
+        window.lightParticles.rotation.x += 0.0005;
+      }
       
       // Use composer for both mobile and desktop now
       if (composer) {

@@ -1,13 +1,14 @@
 // Persistent Metaverse Server for 3D Interactive Website
-// Maintains world state, object positions, user avatars, and shared experiences
+// PostgreSQL version - maintains world state, object positions, user avatars, and shared experiences
 
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const fetch = require('node-fetch');
-// const sqlite3 = require('sqlite3').verbose(); // Disabled for visitor counter
+const { Pool } = require('pg');
 const fs = require('fs');
 
 // GLB Upload System Dependencies
@@ -57,6 +58,24 @@ const uploadLimiter = rateLimit({
   message: 'Too many uploads, try again later',
   standardHeaders: true,
   legacyHeaders: false
+});
+
+// PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://threedworld:ThreeD2024WorldSecure@127.0.0.1:5432/threedworld',
+  max: parseInt(process.env.DATABASE_POOL_SIZE) || 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : false
+});
+
+// Test database connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('❌ Database connection error:', err);
+  } else {
+    console.log('✅ Connected to PostgreSQL database at', new Date(res.rows[0].now).toISOString());
+  }
 });
 
 // R2 Configuration (S3-compatible)
@@ -145,838 +164,614 @@ const validateGLBFile = async (buffer) => {
 // Environment configuration
 const SPACE_NAME = process.env.SPACE_NAME || 'main-world';
 
-// Database setup for persistent visitor tracking (Disabled)
-/*
-const DB_DIR = process.env.DB_DIR || './data';
-const DB_PATH = path.join(DB_DIR, 'visitors.db');
+// Helper function to track visitor
+async function trackVisitor(spaceName, visitorId) {
+  try {
+    // Update or insert visitor record
+    const result = await pool.query(`
+      INSERT INTO visitors (space_name, visitor_id, first_visit, last_visit)
+      VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      ON CONFLICT (space_name, visitor_id) 
+      DO UPDATE SET last_visit = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [spaceName, visitorId]);
 
-// Ensure data directory exists
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
-  console.log(`📁 Created database directory: ${DB_DIR}`);
+    // Update space stats
+    const statsResult = await pool.query(`
+      INSERT INTO space_stats (space_name, total_visits, unique_visitors)
+      VALUES ($1, 1, 1)
+      ON CONFLICT (space_name)
+      DO UPDATE SET 
+        total_visits = space_stats.total_visits + 1,
+        last_updated = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [spaceName]);
+
+    // Count unique visitors
+    const countResult = await pool.query(`
+      SELECT COUNT(DISTINCT visitor_id) as unique_visitors
+      FROM visitors
+      WHERE space_name = $1
+    `, [spaceName]);
+
+    // Update unique visitors count
+    await pool.query(`
+      UPDATE space_stats 
+      SET unique_visitors = $1
+      WHERE space_name = $2
+    `, [countResult.rows[0].unique_visitors, spaceName]);
+
+    return {
+      isNew: result.rows[0].first_visit === result.rows[0].last_visit,
+      stats: statsResult.rows[0]
+    };
+  } catch (error) {
+    console.error('Error tracking visitor:', error);
+    return null;
+  }
 }
 
-// Initialize SQLite database
-const db = new sqlite3.Database(DB_PATH, (err) => {
-  if (err) {
-    console.error('❌ Error opening database:', err);
-  } else {
-    console.log(`✅ Connected to SQLite database at ${DB_PATH}`);
-  }
-});
-
-// Create tables if they don't exist
-db.serialize(() => {
-  // Visitor tracking table
-  db.run(`
-    CREATE TABLE IF NOT EXISTS visitors (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      space_name TEXT NOT NULL,
-      visitor_id TEXT NOT NULL,
-      first_visit DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_visit DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(space_name, visitor_id)
-    )
-  `, (err) => {
-    if (err) console.error('Error creating visitors table:', err);
-    else console.log('✅ Visitors table ready');
-  });
-
-  // Space statistics table
-  db.run(`
-    CREATE TABLE IF NOT EXISTS space_stats (
-      space_name TEXT PRIMARY KEY,
-      total_visitors INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
-    )
-  `, (err) => {
-    if (err) console.error('Error creating space_stats table:', err);
-    else console.log('✅ Space stats table ready');
-  });
-
-  // Initialize space if it doesn't exist
-  db.run(`
-    INSERT OR IGNORE INTO space_stats (space_name, total_visitors) 
-    VALUES (?, 0)
-  `, [SPACE_NAME], (err) => {
-    if (err) console.error('Error initializing space:', err);
-    else console.log(`✅ Space "${SPACE_NAME}" initialized`);
-  });
-});
-*/
-
-// ===== PERSISTENT WORLD STATE =====
-const worldState = {
-  objects: new Map(),     // 3D object positions/rotations/scales
-  users: new Map(),       // Active user avatars
-  sharedScreen: null,     // Current screen sharing state
-  chatHistory: [],        // Chat messages
-  uploadedModels: new Map(), // Uploaded GLB models metadata
-  roomSettings: {
-    lighting: { ambient: 0.3, directional: 0.8 },
-    environment: 'room1'
-  },
-  // visitorCount: 0,        // Total unique visitors (Disabled)
-  spaceName: SPACE_NAME   // The name of this space
-};
-
-// Database functions for persistent visitor tracking (Disabled)
-/*
-const getVisitorCount = () => {
-  return new Promise((resolve, reject) => {
-    db.get(
-      `SELECT total_visitors FROM space_stats WHERE space_name = ?`,
-      [SPACE_NAME],
-      (err, row) => {
-        if (err) {
-          console.error('❌ Error fetching visitor count:', err);
-          resolve(0);
-        } else {
-          const count = row ? row.total_visitors : 0;
-          console.log(`📊 Visitor count for ${SPACE_NAME}: ${count}`);
-          resolve(count);
-        }
-      }
-    );
-  });
-};
-
-const recordVisitor = (visitorId) => {
-  return new Promise((resolve, reject) => {
-    // First, check if visitor already exists
-    db.get(
-      `SELECT visitor_id FROM visitors WHERE space_name = ? AND visitor_id = ?`,
-      [SPACE_NAME, visitorId],
-      (err, row) => {
-        if (err) {
-          console.error('❌ Error checking visitor:', err);
-          resolve({ visitorCount: worldState.visitorCount, isNewVisitor: false });
-          return;
-        }
-
-        if (row) {
-          // Existing visitor - update last visit
-          db.run(
-            `UPDATE visitors SET last_visit = CURRENT_TIMESTAMP WHERE space_name = ? AND visitor_id = ?`,
-            [SPACE_NAME, visitorId],
-            (err) => {
-              if (err) console.error('Error updating visitor:', err);
-            }
-          );
-          resolve({ visitorCount: worldState.visitorCount, isNewVisitor: false });
-        } else {
-          // New visitor - insert and update count
-          db.run(
-            `INSERT INTO visitors (space_name, visitor_id) VALUES (?, ?)`,
-            [SPACE_NAME, visitorId],
-            (err) => {
-              if (err) {
-                console.error('Error inserting visitor:', err);
-                resolve({ visitorCount: worldState.visitorCount, isNewVisitor: false });
-                return;
-              }
-
-              // Update total visitor count
-              db.run(
-                `UPDATE space_stats 
-                 SET total_visitors = total_visitors + 1, 
-                     last_updated = CURRENT_TIMESTAMP 
-                 WHERE space_name = ?`,
-                [SPACE_NAME],
-                async (err) => {
-                  if (err) {
-                    console.error('Error updating visitor count:', err);
-                  }
-                  
-                  // Get updated count
-                  const newCount = await getVisitorCount();
-                  worldState.visitorCount = newCount;
-                  console.log(`🎉 New visitor! Total visitors for ${SPACE_NAME}: ${newCount}`);
-                  
-                  resolve({
-                    visitorCount: newCount,
-                    isNewVisitor: true,
-                    message: 'New visitor recorded in database'
-                  });
-                }
-              );
-            }
-          );
-        }
-      }
-    );
-  });
-};
-*/
-
-// Space initialization is handled by the database setup above
-
-// Simulate database (in production, use PostgreSQL)
-const saveWorldState = () => {
-  // In production: save to PostgreSQL database
-  console.log('💾 World state saved - Objects:', worldState.objects.size, 'Users:', worldState.users.size);
-};
-
-const loadWorldState = async () => {
-  // Load visitor count from database (Disabled)
-  // worldState.visitorCount = await getVisitorCount();
-  // console.log(`📊 Loaded visitor count for space ${SPACE_NAME}: ${worldState.visitorCount}`);
-  
-  // In production: load other world state from database
-  console.log('📂 World state loaded');
-};
-
-// ===== WORLD STATE API ENDPOINTS =====
-app.get('/api/world-state', (req, res) => {
-  res.json({
-    objects: Array.from(worldState.objects.entries()),
-    users: Array.from(worldState.users.entries()),
-    sharedScreen: worldState.sharedScreen,
-    chatHistory: worldState.chatHistory.slice(-10),
-    uploadedModels: Array.from(worldState.uploadedModels.entries()),
-    roomSettings: worldState.roomSettings,
-    activeUsers: worldState.users.size,
-    // visitorCount: worldState.visitorCount // Disabled
-  });
-});
-
-// ===== GLB UPLOAD API ENDPOINTS =====
-app.post('/api/upload-model', authenticateUser, uploadLimiter, upload.single('glbFile'), async (req, res) => {
+// Get visitor count for a space
+async function getVisitorCount(spaceName) {
   try {
-    const file = req.file;
-    const userId = req.userId;
-    const modelName = req.body.modelName || file.originalname.replace('.glb', '');
-    
-    if (!file) {
-      return res.status(400).json({ success: false, error: 'No file uploaded' });
+    const result = await pool.query(`
+      SELECT unique_visitors, total_visits 
+      FROM space_stats 
+      WHERE space_name = $1
+    `, [spaceName]);
+
+    if (result.rows.length > 0) {
+      return result.rows[0].unique_visitors || 0;
     }
-    
-    // Validate GLB file
-    const validation = await validateGLBFile(file.buffer);
-    if (!validation.valid) {
-      return res.status(400).json({ success: false, error: validation.error });
-    }
-    
-    // Generate unique model ID
-    const modelId = `model_${uuidv4()}`;
-    const fileName = `${modelId}.glb`;
-    
-    // Upload to R2
-    const uploadParams = {
-      Bucket: '3d-world-models',
-      Key: fileName,
-      Body: file.buffer,
-      ContentType: 'model/gltf-binary',
-      CacheControl: 'public, max-age=31536000, immutable',
-      Metadata: {
-        'original-name': file.originalname,
-        'uploaded-by': userId,
-        'upload-timestamp': new Date().toISOString(),
-        'model-name': modelName
-      }
-    };
-    
-    const uploadResult = await r2.upload(uploadParams).promise();
-    
-    // Store model metadata in world state
-    const modelMetadata = {
-      modelId,
-      name: modelName,
-      fileName,
-      originalName: file.originalname,
-      fileSize: file.size,
-      uploadedBy: userId,
-      uploadedAt: new Date().toISOString(),
-      r2Location: uploadResult.Location,
-      publicUrl: `https://${process.env.R2_ACCOUNT_ID || 'demo'}.r2.cloudflarestorage.com/3d-world-models/${fileName}`,
-      validation: validation.metadata
-    };
-    
-    worldState.uploadedModels.set(modelId, modelMetadata);
-    
-    // Log successful upload
-    console.log(`📦 GLB uploaded: ${modelName} (${file.size} bytes) by ${userId}`);
-    
-    res.json({
-      success: true,
-      modelId,
-      publicUrl: modelMetadata.publicUrl,
-      metadata: modelMetadata
-    });
-    
+    return 0;
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message || 'Upload failed' 
+    console.error('Error getting visitor count:', error);
+    return 0;
+  }
+}
+
+// Persistent world state for each space
+const worldStates = new Map();
+
+// Initialize or get world state for a space
+function getWorldState(spaceName) {
+  if (!worldStates.has(spaceName)) {
+    worldStates.set(spaceName, {
+      objects: new Map(),
+      users: new Map(),
+      sharedScreen: null,
+      screenShareUserId: null,
+      messages: []
     });
   }
-});
+  return worldStates.get(spaceName);
+}
 
-// Get uploaded models list
-app.get('/api/uploaded-models', (req, res) => {
-  res.json({
-    count: worldState.uploadedModels.size,
-    models: Array.from(worldState.uploadedModels.entries())
-  });
-});
-
-// Get specific model metadata
-app.get('/api/models/:modelId', (req, res) => {
-  const modelId = req.params.modelId;
-  const model = worldState.uploadedModels.get(modelId);
-  
-  if (!model) {
-    return res.status(404).json({ error: 'Model not found' });
-  }
-  
-  res.json(model);
-});
-
-// Delete uploaded model (only by uploader)
-app.delete('/api/models/:modelId', authenticateUser, async (req, res) => {
+// Load world objects from database
+async function loadWorldObjects(spaceName) {
   try {
-    const modelId = req.params.modelId;
-    const userId = req.userId;
-    const model = worldState.uploadedModels.get(modelId);
-    
-    if (!model) {
-      return res.status(404).json({ error: 'Model not found' });
-    }
-    
-    if (model.uploadedBy !== userId) {
-      return res.status(403).json({ error: 'Not authorized to delete this model' });
-    }
-    
-    // Delete from R2
-    await r2.deleteObject({
-      Bucket: '3d-world-models',
-      Key: model.fileName
-    }).promise();
-    
-    // Remove from world state
-    worldState.uploadedModels.delete(modelId);
-    
-    // Remove any objects in scene using this model
-    for (const [objectId, objectData] of worldState.objects.entries()) {
-      if (objectData.modelId === modelId) {
-        worldState.objects.delete(objectId);
-        // Notify all connected users
-        io.emit('object-deleted', { objectId, deletedBy: userId });
-      }
-    }
-    
-    console.log(`🗑️ GLB deleted: ${model.name} by ${userId}`);
-    
-    res.json({ success: true, message: 'Model deleted successfully' });
-    
+    const result = await pool.query(`
+      SELECT * FROM world_objects 
+      WHERE space_name = $1
+    `, [spaceName]);
+
+    const worldState = getWorldState(spaceName);
+    result.rows.forEach(row => {
+      worldState.objects.set(row.object_id, {
+        objectId: row.object_id,
+        type: row.object_type,
+        position: { x: row.position_x, y: row.position_y, z: row.position_z },
+        rotation: { x: row.rotation_x, y: row.rotation_y, z: row.rotation_z },
+        scale: { x: row.scale_x, y: row.scale_y, z: row.scale_z },
+        metadata: row.metadata
+      });
+    });
+
+    console.log(`✅ Loaded ${result.rows.length} objects for space: ${spaceName}`);
   } catch (error) {
-    console.error('Delete error:', error);
-    res.status(500).json({ error: 'Failed to delete model' });
+    console.error('Error loading world objects:', error);
   }
-});
+}
 
-app.get('/api/users', (req, res) => {
-  res.json({
-    count: worldState.users.size,
-    users: Array.from(worldState.users.entries())
-  });
-});
-
-app.get('/api/objects', (req, res) => {
-  res.json({
-    count: worldState.objects.size,
-    objects: Array.from(worldState.objects.entries())
-  });
-});
-
-// Get visitor statistics from database (Disabled)
-/*
-app.get('/api/visitor-stats', async (req, res) => {
+// Save world object to database
+async function saveWorldObject(spaceName, objectData) {
   try {
-    const stats = await new Promise((resolve, reject) => {
-      db.get(
-        `SELECT * FROM space_stats WHERE space_name = ?`,
-        [SPACE_NAME],
-        (err, row) => {
-          if (err) reject(err);
-          else resolve(row);
-        }
-      );
-    });
-    
-    const recentVisitors = await new Promise((resolve, reject) => {
-      db.all(
-        `SELECT visitor_id, first_visit, last_visit 
-         FROM visitors 
-         WHERE space_name = ? 
-         ORDER BY last_visit DESC 
-         LIMIT 10`,
-        [SPACE_NAME],
-        (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        }
-      );
-    });
-    
-    res.json({
-      space: SPACE_NAME,
-      totalVisitors: stats ? stats.total_visitors : 0,
-      createdAt: stats ? stats.created_at : null,
-      lastUpdated: stats ? stats.last_updated : null,
-      recentVisitors: recentVisitors,
-      databasePath: DB_PATH
-    });
+    await pool.query(`
+      INSERT INTO world_objects (
+        object_id, space_name, object_type,
+        position_x, position_y, position_z,
+        rotation_x, rotation_y, rotation_z,
+        scale_x, scale_y, scale_z,
+        metadata
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+      ON CONFLICT (object_id) DO UPDATE SET
+        position_x = $4, position_y = $5, position_z = $6,
+        rotation_x = $7, rotation_y = $8, rotation_z = $9,
+        scale_x = $10, scale_y = $11, scale_z = $12,
+        metadata = $13,
+        updated_at = CURRENT_TIMESTAMP
+    `, [
+      objectData.objectId, spaceName, objectData.type || 'model',
+      objectData.position.x, objectData.position.y, objectData.position.z,
+      objectData.rotation.x, objectData.rotation.y, objectData.rotation.z,
+      objectData.scale.x, objectData.scale.y, objectData.scale.z,
+      JSON.stringify(objectData.metadata || {})
+    ]);
   } catch (error) {
-    console.error('Error fetching visitor stats:', error);
-    res.status(500).json({ error: 'Failed to fetch visitor statistics' });
+    console.error('Error saving world object:', error);
   }
-});
-*/
+}
 
-// Health check endpoint
-app.get('/', (req, res) => {
-  res.json({ 
-    status: 'Persistent Metaverse Server Online',
-    features: {
-      r2Storage: !!process.env.R2_ACCESS_KEY,
-      uploadEnabled: true,
-      mobileProcessing: true
-    },
-    worldState: {
-      users: worldState.users.size,
-      objects: worldState.objects.size,
-      uploadedModels: worldState.uploadedModels.size,
-      sharedScreen: !!worldState.sharedScreen,
-      chatMessages: worldState.chatHistory.length,
-      // visitorCount: worldState.visitorCount // Disabled
-    },
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-io.on('connection', async (socket) => {
-  console.log('👥 User connected:', socket.id);
-
-  // Track unique visitor with Cloudflare Worker (Disabled)
-  /*
-  const visitorData = await recordVisitor(socket.id);
-  if (visitorData) {
-    worldState.visitorCount = visitorData.visitorCount;
-    
-    // Broadcast updated visitor count to all users
-    io.emit('visitor-count-update', { 
-      visitorCount: worldState.visitorCount,
-      spaceName: worldState.spaceName 
-    });
-    
-    if (visitorData.isNewVisitor) {
-      console.log(`🎉 New visitor to space ${SPACE_NAME}! Total visitors: ${worldState.visitorCount}`);
-    }
+// Delete world object from database
+async function deleteWorldObject(objectId) {
+  try {
+    await pool.query('DELETE FROM world_objects WHERE object_id = $1', [objectId]);
+  } catch (error) {
+    console.error('Error deleting world object:', error);
   }
-  */
+}
 
-  // Send current world state to new user
-  socket.emit('world-state', {
-    objects: Array.from(worldState.objects.entries()),
-    users: Array.from(worldState.users.entries()),
-    sharedScreen: worldState.sharedScreen,
-    chatHistory: worldState.chatHistory.slice(-10), // Last 10 messages
-    uploadedModels: Array.from(worldState.uploadedModels.entries()),
-    roomSettings: worldState.roomSettings,
-    // visitorCount: worldState.visitorCount // Disabled,
-    spaceName: worldState.spaceName
-  });
+// Load chat messages from database
+async function loadChatMessages(spaceName, limit = 50) {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM chat_messages 
+      WHERE space_name = $1
+      ORDER BY created_at DESC
+      LIMIT $2
+    `, [spaceName, limit]);
 
-  // ===== USER AVATAR MANAGEMENT =====
-  socket.on('user-spawn', (data) => {
-    const userAvatar = {
-      id: socket.id,
-      position: data.position || { x: 0, y: 0, z: 0 },
-      rotation: data.rotation || { x: 0, y: 0, z: 0 },
-      username: data.username || `User${socket.id.substr(0,4)}`,
-      customAvatarUrl: data.customAvatarUrl || null,
-      joinedAt: new Date()
+    return result.rows.reverse().map(row => ({
+      userId: row.user_id,
+      username: row.username,
+      message: row.message,
+      timestamp: row.created_at
+    }));
+  } catch (error) {
+    console.error('Error loading chat messages:', error);
+    return [];
+  }
+}
+
+// Save chat message to database
+async function saveChatMessage(spaceName, messageData) {
+  try {
+    await pool.query(`
+      INSERT INTO chat_messages (space_name, user_id, username, message)
+      VALUES ($1, $2, $3, $4)
+    `, [spaceName, messageData.userId, messageData.username, messageData.message]);
+  } catch (error) {
+    console.error('Error saving chat message:', error);
+  }
+}
+
+// Initialize world states on server start
+async function initializeWorlds() {
+  const spaces = ['main-world', 'Game-Room', 'Social-Space', 'Creative-Studio'];
+  for (const space of spaces) {
+    await loadWorldObjects(space);
+    const messages = await loadChatMessages(space);
+    const worldState = getWorldState(space);
+    worldState.messages = messages;
+  }
+}
+
+// Initialize on startup
+initializeWorlds();
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  let currentUserId = null;
+  let currentSpaceName = SPACE_NAME;
+  let currentUserData = null;
+
+  socket.on('join-world', async (data) => {
+    currentUserId = data.userId || `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    currentSpaceName = data.spaceName || SPACE_NAME;
+    currentUserData = {
+      userId: currentUserId,
+      username: data.username || 'Anonymous',
+      position: data.position || { x: 0, y: 2, z: 0 },
+      rotation: data.rotation || { x: 0, y: 0, z: 0 }
     };
 
-    worldState.users.set(socket.id, userAvatar);
-    console.log(`🧑 User spawned: ${userAvatar.username} (${socket.id}), Total users: ${worldState.users.size}`);
+    // Join the space room
+    socket.join(currentSpaceName);
     
-    // Notify all users of new avatar
-    io.emit('user-joined', userAvatar);
+    // Track visitor
+    const visitorResult = await trackVisitor(currentSpaceName, currentUserId);
     
-    // Send updated user count to all
-    io.emit('user-count-update', { count: worldState.users.size });
+    // Get world state
+    const worldState = getWorldState(currentSpaceName);
+    
+    // Add user to world state
+    worldState.users.set(currentUserId, {
+      ...currentUserData,
+      socketId: socket.id
+    });
+
+    // Send world state to new user
+    socket.emit('world-state', {
+      objects: Array.from(worldState.objects.values()),
+      users: Array.from(worldState.users.values()),
+      sharedScreen: worldState.sharedScreen,
+      screenShareUserId: worldState.screenShareUserId,
+      messages: worldState.messages,
+      visitorCount: await getVisitorCount(currentSpaceName)
+    });
+
+    // Notify others of new user
+    socket.to(currentSpaceName).emit('user-joined', currentUserData);
+
+    // Log session
+    await pool.query(`
+      INSERT INTO user_sessions (user_id, socket_id, space_name, ip_address, user_agent)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [
+      currentUserId, 
+      socket.id, 
+      currentSpaceName,
+      socket.handshake.address,
+      socket.handshake.headers['user-agent']
+    ]);
+
+    console.log(`👤 User ${currentUserId} joined ${currentSpaceName} (Total users: ${worldState.users.size})`);
   });
 
-  // ===== REAL-TIME POSITION UPDATES =====
+  // Handle user movement
   socket.on('user-move', (data) => {
-    if (worldState.users.has(socket.id)) {
-      const user = worldState.users.get(socket.id);
+    if (!currentUserId || !currentSpaceName) return;
+    
+    const worldState = getWorldState(currentSpaceName);
+    const user = worldState.users.get(currentUserId);
+    if (user) {
       user.position = data.position;
       user.rotation = data.rotation;
-      
-      // Broadcast to all other users
-      socket.broadcast.emit('user-moved', {
-        userId: socket.id,
+      socket.to(currentSpaceName).emit('user-move', {
+        userId: currentUserId,
         position: data.position,
         rotation: data.rotation
       });
     }
   });
 
-  // ===== USER NAME CHANGES =====
-  socket.on('user-name-change', (data) => {
-    if (worldState.users.has(socket.id)) {
-      const user = worldState.users.get(socket.id);
-      const oldName = user.username;
-      user.username = data.newName;
-      
-      console.log(`📝 User ${socket.id} changed name from "${oldName}" to "${data.newName}"`);
-      
-      // Broadcast name change to all users (including sender for confirmation)
-      io.emit('user-name-changed', {
-        userId: socket.id,
-        oldName: oldName,
-        newName: data.newName
-      });
-      
-      saveWorldState();
-    }
-  });
-
-  // ===== CUSTOM AVATAR UPDATES =====
-  socket.on('user-avatar-update', (data) => {
-    if (worldState.users.has(socket.id)) {
-      const user = worldState.users.get(socket.id);
-      user.customAvatarUrl = data.customAvatarUrl;
-      
-      // Log size info if available
-      const sizeInfo = data.customAvatarUrl ? 
-        ` (size: ${(data.customAvatarUrl.length / 1024).toFixed(2)}KB)` : '';
-      console.log(`🎭 User ${socket.id} updated their avatar${sizeInfo}`);
-      
-      // Broadcast avatar update to all OTHER users (not sender)
-      socket.broadcast.emit('user-avatar-updated', {
-        userId: socket.id,
-        customAvatarUrl: data.customAvatarUrl,
-        position: user.position,
-        rotation: user.rotation
-      });
-      
-      saveWorldState();
-    }
-  });
-
-  // ===== PERSISTENT OBJECT INTERACTIONS =====
-  socket.on('object-add', (data) => {
-    // Save new object permanently with uploaded model support
+  // Handle object operations
+  socket.on('object-add', async (data) => {
+    if (!currentSpaceName) return;
+    
+    const worldState = getWorldState(currentSpaceName);
     const objectData = {
-      name: data.name,
-      type: data.type,
-      position: data.position,
-      rotation: data.rotation,
-      scale: data.scale,
-      addedBy: socket.id,
-      addedAt: new Date(),
-      // New fields for uploaded models
-      isUploadedModel: data.modelId ? true : false,
-      modelId: data.modelId || null,
-      modelUrl: data.modelUrl || null,
-      uploadedBy: data.uploadedBy || null
+      ...data,
+      objectId: data.objectId || `obj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
     };
     
-    worldState.objects.set(data.objectId, objectData);
-
-    // Notify all other users of new object (including model info)
-    socket.broadcast.emit('object-added', {
-      objectId: data.objectId,
-      name: data.name,
-      type: data.type,
-      position: data.position,
-      rotation: data.rotation,
-      scale: data.scale,
-      addedBy: socket.id,
-      isUploadedModel: objectData.isUploadedModel,
-      modelId: objectData.modelId,
-      modelUrl: objectData.modelUrl,
-      uploadedBy: objectData.uploadedBy
-    });
-
-    saveWorldState();
+    worldState.objects.set(objectData.objectId, objectData);
+    await saveWorldObject(currentSpaceName, objectData);
     
-    const modelInfo = data.modelId ? ` (uploaded model: ${data.modelId})` : '';
-    console.log(`📦 Object ${data.objectId} (${data.name})${modelInfo} added by ${socket.id}`);
+    io.to(currentSpaceName).emit('object-add', objectData);
+    console.log(`🎯 Object added to ${currentSpaceName}: ${objectData.objectId}`);
   });
 
-  socket.on('object-move', (data) => {
-    // Get existing object data or create new entry
-    const existingObject = worldState.objects.get(data.objectId) || {};
+  socket.on('object-move', async (data) => {
+    if (!currentSpaceName) return;
     
-    // Update object position permanently, preserving other properties
-    worldState.objects.set(data.objectId, {
-      ...existingObject,  // Preserve name, type, etc.
-      position: data.position,
-      rotation: data.rotation,
-      scale: data.scale,
-      movedBy: socket.id,
-      movedAt: new Date()
-    });
-
-    // Notify all users of object change
-    io.emit('object-moved', {
-      objectId: data.objectId,
-      position: data.position,
-      rotation: data.rotation,
-      scale: data.scale,
-      movedBy: socket.id
-    });
-
-    saveWorldState(); // Persist to database
-    console.log(`📦 Object ${data.objectId} moved by ${socket.id}`);
-  });
-
-  socket.on('object-delete', (data) => {
-    // Remove object permanently
-    worldState.objects.delete(data.objectId);
-
-    // Notify all users of object deletion
-    io.emit('object-deleted', {
-      objectId: data.objectId,
-      deletedBy: socket.id
-    });
-
-    saveWorldState();
-    console.log(`🗑️ Object ${data.objectId} deleted by ${socket.id}`);
-  });
-
-
-
-  // ===== PERSISTENT SCREEN SHARING =====
-  socket.on('screen-share-start', (data) => {
-    worldState.sharedScreen = {
-      userId: socket.id,
-      startedAt: new Date(),
-      streamId: data.streamId,
-      hasAudio: data.hasAudio,
-      isVideoFile: data.isVideoFile,
-      fileName: data.fileName
-    };
-
-    // Apply screen to SHARESCREEN-HERE object for everyone
-    io.emit('screen-share-started', {
-      userId: socket.id,
-      streamId: data.streamId,
-      applyToObject: 'SHARESCREEN-HERE',
-      hasAudio: data.hasAudio,
-      isVideoFile: data.isVideoFile,
-      fileName: data.fileName
-    });
-
-    if (data.isVideoFile) {
-      console.log(`📹 ${socket.id} started video file sharing: ${data.fileName}`);
-    } else {
-      console.log(`📺 ${socket.id} started screen sharing`);
-    }
-  });
-
-  socket.on('screen-share-stop', () => {
-    if (worldState.sharedScreen?.userId === socket.id) {
-      worldState.sharedScreen = null;
+    const worldState = getWorldState(currentSpaceName);
+    const object = worldState.objects.get(data.objectId);
+    if (object) {
+      object.position = data.position;
+      object.rotation = data.rotation;
+      object.scale = data.scale;
       
-      io.emit('screen-share-stopped', {
-        userId: socket.id,
-        clearObject: 'SHARESCREEN-HERE'
-      });
+      await saveWorldObject(currentSpaceName, object);
+      socket.to(currentSpaceName).emit('object-move', data);
     }
   });
 
-  // ===== VOICE CHAT COORDINATION (WebRTC P2P for audio only) =====
+  socket.on('object-delete', async (data) => {
+    if (!currentSpaceName) return;
+    
+    const worldState = getWorldState(currentSpaceName);
+    worldState.objects.delete(data.objectId);
+    await deleteWorldObject(data.objectId);
+    
+    io.to(currentSpaceName).emit('object-delete', data);
+    console.log(`🗑️ Object deleted from ${currentSpaceName}: ${data.objectId}`);
+  });
+
+  // Handle chat messages
+  socket.on('chat-message', async (data) => {
+    if (!currentUserId || !currentSpaceName) return;
+    
+    const worldState = getWorldState(currentSpaceName);
+    const user = worldState.users.get(currentUserId);
+    if (!user) return;
+
+    const messageData = {
+      userId: currentUserId,
+      username: user.username,
+      message: data.message,
+      timestamp: new Date().toISOString()
+    };
+
+    worldState.messages.push(messageData);
+    if (worldState.messages.length > 100) {
+      worldState.messages.shift();
+    }
+
+    await saveChatMessage(currentSpaceName, messageData);
+    
+    io.to(currentSpaceName).emit('chat-message', messageData);
+    console.log(`💬 Chat in ${currentSpaceName}: ${user.username}: ${data.message}`);
+  });
+
+  // Handle screen sharing
+  socket.on('screen-share-started', (data) => {
+    if (!currentUserId || !currentSpaceName) return;
+    
+    const worldState = getWorldState(currentSpaceName);
+    worldState.sharedScreen = true;
+    worldState.screenShareUserId = currentUserId;
+    
+    socket.to(currentSpaceName).emit('screen-share-started', {
+      userId: currentUserId,
+      username: worldState.users.get(currentUserId)?.username
+    });
+    
+    console.log(`📺 Screen share started in ${currentSpaceName} by ${currentUserId}`);
+  });
+
+  socket.on('screen-share-stopped', () => {
+    if (!currentUserId || !currentSpaceName) return;
+    
+    const worldState = getWorldState(currentSpaceName);
+    worldState.sharedScreen = null;
+    worldState.screenShareUserId = null;
+    
+    socket.to(currentSpaceName).emit('screen-share-stopped', {
+      userId: currentUserId
+    });
+    
+    console.log(`📺 Screen share stopped in ${currentSpaceName}`);
+  });
+
+  // Handle WebRTC signaling
   socket.on('webrtc-offer', (data) => {
-    socket.to(data.to).emit('webrtc-offer', {
-      from: socket.id,
-      offer: data.offer
+    socket.to(data.targetUserId).emit('webrtc-offer', {
+      offer: data.offer,
+      userId: currentUserId
     });
   });
 
   socket.on('webrtc-answer', (data) => {
-    socket.to(data.to).emit('webrtc-answer', {
-      from: socket.id,
-      answer: data.answer
+    socket.to(data.targetUserId).emit('webrtc-answer', {
+      answer: data.answer,
+      userId: currentUserId
     });
   });
 
   socket.on('webrtc-ice-candidate', (data) => {
-    socket.to(data.to).emit('webrtc-ice-candidate', {
-      from: socket.id,
-      candidate: data.candidate
+    socket.to(data.targetUserId).emit('webrtc-ice-candidate', {
+      candidate: data.candidate,
+      userId: currentUserId
     });
   });
 
-  // ===== CHAT SYSTEM =====
-  socket.on('chat-message', (data) => {
-    const chatMessage = {
-      id: Date.now(),
-      userId: socket.id,
-      username: worldState.users.get(socket.id)?.username || 'Unknown',
-      message: data.message,
-      timestamp: new Date()
-    };
-
-    worldState.chatHistory.push(chatMessage);
+  // Handle disconnection
+  socket.on('disconnect', async () => {
+    if (!currentUserId || !currentSpaceName) return;
     
-    // Keep only last 100 messages
-    if (worldState.chatHistory.length > 100) {
-      worldState.chatHistory.shift();
-    }
-
-    io.emit('chat-message', chatMessage);
-    saveWorldState();
-  });
-
-  // ===== WORLD SETTINGS =====
-  socket.on('change-lighting', (data) => {
-    worldState.roomSettings.lighting = data.lighting;
-    io.emit('lighting-changed', data.lighting);
-    saveWorldState();
-  });
-
-  socket.on('change-environment', (data) => {
-    worldState.roomSettings.environment = data.environment;
-    io.emit('environment-changed', data.environment);
-    saveWorldState();
-  });
-
-  // ===== VISITOR COUNTER (Disabled) =====
-  /*
-  socket.on('visitor-increment', async (data) => {
-    const visitorId = data.visitorId || socket.id;
-    const visitorData = await recordVisitor(visitorId);
+    const worldState = getWorldState(currentSpaceName);
+    worldState.users.delete(currentUserId);
     
-    if (visitorData) {
-      // Send the visitor count back to the requesting client
-      socket.emit('visitor-count', { 
-        count: visitorData.visitorCount,
-        isNewVisitor: visitorData.isNewVisitor
-      });
-      
-      // If it's a new visitor, broadcast to all clients
-      if (visitorData.isNewVisitor) {
-        io.emit('visitor-count-update', { 
-          visitorCount: visitorData.visitorCount,
-          spaceName: worldState.spaceName 
-        });
-      }
-      
-      console.log(`📊 Visitor count requested by ${socket.id}: ${visitorData.visitorCount}`);
-    }
-  });
-  */
-  
-  // ===== DISCONNECT HANDLING =====
-  socket.on('disconnect', () => {
-    console.log(`👋 User disconnected: ${socket.id}`);
+    // Update session disconnect time
+    await pool.query(`
+      UPDATE user_sessions 
+      SET disconnected_at = CURRENT_TIMESTAMP 
+      WHERE socket_id = $1
+    `, [socket.id]);
     
-    // Remove user from world state
-    if (worldState.users.has(socket.id)) {
-      const user = worldState.users.get(socket.id);
-      worldState.users.delete(socket.id);
-      console.log(`👥 User removed: ${user.username}, Remaining users: ${worldState.users.size}`);
-      
-      // Notify others that user left
-      socket.broadcast.emit('user-left', {
-        userId: socket.id,
-        username: user.username
-      });
-      
-      // Send updated user count to all
-      io.emit('user-count-update', { count: worldState.users.size });
-      
-      console.log(`🗑️ Removed ${user.username} from world state`);
-    }
-    
-    // If this user was sharing screen, stop it
-    if (worldState.sharedScreen?.userId === socket.id) {
+    // If user was screen sharing, stop it
+    if (worldState.screenShareUserId === currentUserId) {
       worldState.sharedScreen = null;
-      io.emit('screen-share-stopped', {
-        userId: socket.id,
-        clearObject: 'SHARESCREEN-HERE'
+      worldState.screenShareUserId = null;
+      io.to(currentSpaceName).emit('screen-share-stopped', {
+        userId: currentUserId
       });
-      console.log(`📺 Screen sharing stopped - user ${socket.id} disconnected`);
     }
     
-    saveWorldState();
+    socket.to(currentSpaceName).emit('user-left', { userId: currentUserId });
+    console.log(`👤 User ${currentUserId} left ${currentSpaceName} (Remaining users: ${worldState.users.size})`);
   });
 });
 
-// ===== WORLD STATE CLEANUP =====
-// Clean up stale data every 10 minutes
-setInterval(() => {
-  const now = new Date();
-  let cleaned = 0;
+// API Endpoints
+
+// Health check
+app.get('/', (req, res) => {
+  const spaces = Array.from(worldStates.keys());
+  const totalUsers = spaces.reduce((sum, space) => 
+    sum + getWorldState(space).users.size, 0);
+  const totalObjects = spaces.reduce((sum, space) => 
+    sum + getWorldState(space).objects.size, 0);
+
+  res.json({
+    status: 'operational',
+    server: 'PostgreSQL Persistent World Server',
+    database: 'PostgreSQL',
+    spaces: spaces.length,
+    totalUsers,
+    totalObjects,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Get world state for a space
+app.get('/api/world-state/:spaceName', async (req, res) => {
+  const { spaceName } = req.params;
+  const worldState = getWorldState(spaceName);
   
-  // Clean up old chat messages (keep last 100)
-  if (worldState.chatHistory.length > 100) {
-    const removed = worldState.chatHistory.length - 100;
-    worldState.chatHistory = worldState.chatHistory.slice(-100);
-    cleaned += removed;
+  res.json({
+    spaceName,
+    objects: Array.from(worldState.objects.values()),
+    users: Array.from(worldState.users.values()),
+    sharedScreen: worldState.sharedScreen,
+    messages: worldState.messages,
+    visitorCount: await getVisitorCount(spaceName)
+  });
+});
+
+// Get visitor statistics
+app.get('/api/stats/:spaceName', async (req, res) => {
+  const { spaceName } = req.params;
+  
+  try {
+    const statsResult = await pool.query(`
+      SELECT * FROM space_stats WHERE space_name = $1
+    `, [spaceName]);
+    
+    const recentVisitors = await pool.query(`
+      SELECT COUNT(*) as recent_count 
+      FROM visitors 
+      WHERE space_name = $1 
+      AND last_visit > NOW() - INTERVAL '24 hours'
+    `, [spaceName]);
+    
+    res.json({
+      spaceName,
+      stats: statsResult.rows[0] || { unique_visitors: 0, total_visits: 0 },
+      recentVisitors: parseInt(recentVisitors.rows[0]?.recent_count || 0)
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
+// Visitor counter endpoint (Cloudflare compatibility)
+app.post('/api/visitor-counter/:spaceName', async (req, res) => {
+  const { spaceName } = req.params;
+  const { visitorId } = req.body;
+  
+  if (!visitorId) {
+    return res.status(400).json({ error: 'Visitor ID required' });
   }
   
-  // Clean up objects not moved in 24 hours (optional)
-  for (const [objectId, objectData] of worldState.objects.entries()) {
-    if (objectData.movedAt && (now - new Date(objectData.movedAt)) > 24 * 60 * 60 * 1000) {
-      // Optionally remove old objects
-      // worldState.objects.delete(objectId);
-      // cleaned++;
+  const result = await trackVisitor(spaceName, visitorId);
+  const count = await getVisitorCount(spaceName);
+  
+  res.json({
+    success: true,
+    count,
+    isNewVisitor: result?.isNew || false
+  });
+});
+
+// Get visitor count
+app.get('/api/visitor-count/:spaceName', async (req, res) => {
+  const { spaceName } = req.params;
+  const count = await getVisitorCount(spaceName);
+  
+  res.json({
+    spaceName,
+    count,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// GLB Upload endpoint
+app.post('/api/upload-glb', 
+  uploadLimiter,
+  authenticateUser,
+  upload.single('glb'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file provided' });
+      }
+
+      // Validate GLB file
+      const validation = await validateGLBFile(req.file.buffer);
+      if (!validation.valid) {
+        return res.status(400).json({ 
+          error: 'Invalid GLB file',
+          details: validation.error 
+        });
+      }
+
+      // Generate unique filename
+      const fileId = uuidv4();
+      const fileName = `${fileId}.glb`;
+      const key = `models/${req.userId}/${fileName}`;
+
+      // Upload to R2
+      const uploadParams = {
+        Bucket: process.env.R2_BUCKET || '3d-world-models',
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: 'model/gltf-binary',
+        Metadata: {
+          userId: req.userId,
+          originalName: req.file.originalname,
+          uploadTime: new Date().toISOString()
+        }
+      };
+
+      const uploadResult = await r2.upload(uploadParams).promise();
+
+      // Generate public URL
+      const publicUrl = `https://${process.env.R2_PUBLIC_URL || 'assets.example.com'}/${key}`;
+
+      res.json({
+        success: true,
+        fileId,
+        url: publicUrl,
+        metadata: validation.metadata,
+        size: req.file.size
+      });
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      res.status(500).json({ 
+        error: 'Upload failed',
+        details: error.message 
+      });
     }
   }
-  
-  if (cleaned > 0) {
-    console.log(`🧹 Cleaned up ${cleaned} stale items from world state`);
-    saveWorldState();
-  }
-}, 10 * 60 * 1000);
+);
 
-// Initialize server (visitor stats disabled)
+// Start server
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, async () => {
-  console.log(`\n🌍 3D World Server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/`);
-  console.log(`Space name: ${SPACE_NAME}`);
-  // console.log(`Database: ${DB_PATH}`); // Disabled
-  
-  // Load world state from database (visitor statistics disabled)
-  await loadWorldState();
+server.listen(PORT, () => {
+  console.log(`
+🌐 =============================================
+🚀 PostgreSQL Persistent World Server Running
+📍 Port: ${PORT}
+🗄️  Database: PostgreSQL
+🌍 Environment: ${process.env.NODE_ENV || 'development'}
+📊 Features: World State, Visitor Tracking, Chat
+🔄 Real-time: Socket.IO enabled
+🔒 CORS: Enabled for all origins
+⏰ Started: ${new Date().toISOString()}
+=============================================
+  `);
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, closing server...');
-  // Database closing disabled
-  // db.close((err) => {
-  //   if (err) console.error('Error closing database:', err);
-  //   else console.log('Database closed');
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, closing connections...');
+  await pool.end();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
-  // });
 });
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, closing server...');
-  // Database closing disabled
-  // db.close((err) => {
-  //   if (err) console.error('Error closing database:', err);
-  //   else console.log('Database closed');
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, closing connections...');
+  await pool.end();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
   });
-  // });
 });
-
-module.exports = server;

@@ -97,11 +97,23 @@ function detectSpace() {
   
   // Try to match the last segment of the path
   const segments = cleanPath.split('/').filter(s => s);
+  console.log('Path segments:', segments);
+  
   if (segments.length > 0) {
     const lastSegment = segments[segments.length - 1];
+    console.log(`Checking segment "${lastSegment}" against spaces...`);
+    
+    // Check exact match
     if (SPACES_CONFIG[lastSegment]) {
       console.log(`Loading space from path: ${lastSegment}`);
       return lastSegment;
+    }
+    
+    // Check case-insensitive match for Game-Room
+    const lowerSegment = lastSegment.toLowerCase();
+    if (lowerSegment === 'game-room' || lowerSegment === 'gameroom') {
+      console.log('Loading Game-Room space (case-insensitive match)');
+      return 'Game-Room';
     }
   }
   

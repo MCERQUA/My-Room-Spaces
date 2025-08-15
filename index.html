@@ -2401,10 +2401,73 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       console.log('Screen object configured');
     }
     
+    // Create a standalone screen for space environments without room models
+    function createStandaloneScreen() {
+      console.log('Creating standalone screen for space environment...');
+      
+      // Create the screen geometry (16:9 aspect ratio)
+      const screenGeometry = new THREE.PlaneGeometry(16, 9);
+      
+      // Create canvas for video texture
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 576;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      // Create texture from canvas
+      const screenTexture = new THREE.CanvasTexture(canvas);
+      screenTexture.minFilter = THREE.LinearFilter;
+      screenTexture.magFilter = THREE.LinearFilter;
+      
+      // Create screen material
+      const screenMaterial = new THREE.MeshBasicMaterial({
+        map: screenTexture,
+        side: THREE.DoubleSide
+      });
+      
+      // Create screen mesh
+      const screenMesh = new THREE.Mesh(screenGeometry, screenMaterial);
+      screenMesh.name = 'SHARESCREEN';
+      screenMesh.position.set(0, 6, -10); // Position in front of user
+      screenMesh.userData.isScreen = true;
+      
+      // Store references globally
+      largeScreen = {
+        mesh: screenMesh,
+        canvas: canvas,
+        context: ctx,
+        texture: screenTexture,
+        material: screenMaterial
+      };
+      
+      scene.add(screenMesh);
+      console.log('Standalone screen created for space environment');
+    }
+    
     // Create space environment with aurora, nebula, and particles
     function createSpaceEnvironment(config) {
+      console.log('🌌 Creating space environment with config:', config);
+      
       // Set space background
       scene.background = new THREE.Color(config.backgroundColor || 0x000000);
+      
+      // Add an invisible floor for object placement
+      const floorGeometry = new THREE.PlaneGeometry(100, 100);
+      const floorMaterial = new THREE.MeshBasicMaterial({ 
+        color: 0x000000,
+        transparent: true,
+        opacity: 0,
+        side: THREE.DoubleSide
+      });
+      const floor = new THREE.Mesh(floorGeometry, floorMaterial);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = 0;
+      floor.receiveShadow = true;
+      floor.name = 'SpaceFloor';
+      scene.add(floor);
+      console.log('Added invisible floor for space environment');
       
       // Create starfield
       if (config.starfield) {
@@ -2641,6 +2704,10 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       if (spaceConfig.environment && spaceConfig.environment.type === 'space') {
         console.log('Creating space environment...');
         createSpaceEnvironment(spaceConfig.environment);
+        
+        // Create a standalone screen for the space environment
+        createStandaloneScreen();
+        
         hideLoadingScreen();
         return;
       }

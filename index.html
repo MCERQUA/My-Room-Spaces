@@ -2554,18 +2554,7 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
         window.lightParticles = lightParticles;
       }
       
-      // Add a floating platform or space station floor
-      const platformGeometry = new THREE.CylinderGeometry(20, 20, 1, 32);
-      const platformMaterial = new THREE.MeshStandardMaterial({
-        color: 0x1a1a2e,
-        metalness: 0.8,
-        roughness: 0.2,
-        emissive: 0x0a0a0a
-      });
-      const platform = new THREE.Mesh(platformGeometry, platformMaterial);
-      platform.position.y = -2;
-      platform.receiveShadow = true;
-      scene.add(platform);
+      // No floor - pure space environment
       
       // Adjust lighting for space
       scene.children.forEach(child => {
@@ -2661,6 +2650,14 @@ ${debugInfo.logs.filter(log => log.includes('Texture') || log.includes('GLB') ||
       const modelPath = shouldUseMobileGLTF 
         ? spaceConfig.roomModel.mobile  // Mobile model from config
         : spaceConfig.roomModel.desktop; // Desktop model from config
+      
+      // Check if model path is null (for pure environment spaces)
+      if (!modelPath) {
+        console.log('No room model specified, skipping model load');
+        hideLoadingScreen();
+        return;
+      }
+      
       console.log(`Loading ${shouldUseMobileGLTF ? 'mobile GLTF (external JPG textures)' : 'desktop GLB (embedded WebP textures)'} room model...`);
       
       // Test if we can load textures at all on mobile

@@ -69,6 +69,11 @@ const SPACES_CONFIG = {
 
 // Function to detect which space to load based on URL
 function detectSpace() {
+  console.log('=== SPACE DETECTION DEBUG ===');
+  console.log('Current URL:', window.location.href);
+  console.log('Pathname:', window.location.pathname);
+  console.log('Available spaces:', Object.keys(SPACES_CONFIG));
+  
   // Check URL parameters first
   const urlParams = new URLSearchParams(window.location.search);
   const spaceParam = urlParams.get('space');
@@ -85,12 +90,19 @@ function detectSpace() {
     return subdomain;
   }
   
-  // Check path (e.g., /white/ or /space/white)
+  // Check path (e.g., /white/ or /Game-Room or /space/white)
   const path = window.location.pathname;
-  const pathMatch = path.match(/\/(space\/)?([^\/]+)/);
-  if (pathMatch && pathMatch[2] && SPACES_CONFIG[pathMatch[2]]) {
-    console.log(`Loading space from path: ${pathMatch[2]}`);
-    return pathMatch[2];
+  // Remove trailing slash and index.html if present
+  const cleanPath = path.replace(/\/index\.html$/, '').replace(/\/$/, '');
+  
+  // Try to match the last segment of the path
+  const segments = cleanPath.split('/').filter(s => s);
+  if (segments.length > 0) {
+    const lastSegment = segments[segments.length - 1];
+    if (SPACES_CONFIG[lastSegment]) {
+      console.log(`Loading space from path: ${lastSegment}`);
+      return lastSegment;
+    }
   }
   
   // Default to main space
